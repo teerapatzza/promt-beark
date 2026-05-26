@@ -1,0 +1,1442 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>ฟอร์มเบิกจ่ายงบประมาณ - TUC Finance</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <style>
+        body { font-family: 'Sarabun', sans-serif; }
+        .animate-fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+    <!-- Sticky header -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-20">
+        <div class="max-w-3xl mx-auto px-6 py-4 flex items-center gap-3">
+            <a href="index.html" class="text-slate-400 hover:text-slate-700 transition-colors p-1 -m-1 rounded-lg">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                </svg>
+            </a>
+            <div class="h-5 w-px bg-slate-200"></div>
+            <div>
+                <h1 id="pageTitle" class="text-base font-bold text-slate-800 leading-none">ทำรายการขอเบิกงบประมาณ</h1>
+                <p class="text-xs text-slate-400 mt-0.5">ระบบคำนวณยอดเงินอัตโนมัติตามโครงสร้างของ สรพ.</p>
+            </div>
+        </div>
+    </header>
+
+    <div class="max-w-3xl mx-auto px-4 md:px-6 py-8">
+        <div>
+
+        <div id="editModeBanner" class="hidden mb-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-center gap-3">
+            <svg class="w-5 h-5 text-amber-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+            </svg>
+            <div>
+                <div class="font-bold text-amber-800">กำลังแก้ไขรายการที่บันทึกไว้แล้ว</div>
+                <div class="text-amber-700 text-sm mt-0.5">เมื่อกด "อัปเดตรายการ" ระบบจะบันทึกทับข้อมูลเดิม</div>
+            </div>
+        </div>
+
+        <div id="profileSelectorBox" class="bg-blue-50 rounded-2xl border border-blue-100 p-5 mb-6">
+            <label class="block text-sm font-bold text-blue-800 mb-2 flex items-center gap-2">
+                <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                โหลดข้อมูลอัตโนมัติจากโปรไฟล์ที่บันทึกไว้
+            </label>
+            <div class="flex gap-2">
+                <div class="relative w-full">
+                    <div class="relative">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                        </span>
+                        <input type="text" id="profileSearch" placeholder="พิมพ์ชื่อเพื่อค้นหาโปรไฟล์..." autocomplete="off"
+                            class="w-full border border-blue-200 pl-9 pr-8 py-3 rounded-xl text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100 bg-white font-medium outline-none transition-all"
+                            oninput="filterProfiles()" onfocus="openProfileDropdown()">
+                        <button type="button" id="profileClearBtn" onclick="clearProfileSelection()" class="hidden absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-600 p-1">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+                    <div id="profileDropdown" class="hidden absolute z-50 w-full bg-white border border-blue-200 shadow-2xl rounded-xl mt-1 max-h-72 overflow-y-auto"></div>
+                </div>
+                <a href="profile.html" target="_blank" class="shrink-0 bg-white border border-blue-200 text-blue-600 px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-colors flex items-center">
+                    จัดการโปรไฟล์
+                </a>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-2">ชื่อผู้ขอเบิก (ภาษาไทย)</label>
+                    <input type="text" id="requestedBy" placeholder="ระบุชื่อ-นามสกุล ของท่าน" class="w-full border border-slate-200 p-3.5 rounded-xl text-lg focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all">
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-2">ตำแหน่งงาน</label>
+                    <input type="text" id="position" placeholder="เช่น นักวิเคราะห์นโยบายและแผน" class="w-full border border-slate-200 p-3.5 rounded-xl text-lg focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-bold text-slate-700 mb-2">สังกัด / กลุ่มงาน</label>
+                    <input type="text" id="affiliation" placeholder="ระบุสังกัด (สำหรับใบรายงาน)" class="w-full border border-slate-200 p-3.5 rounded-xl text-lg focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all">
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-6">
+            <div class="bg-slate-50 px-6 py-4 border-b border-slate-100">
+                <h2 class="text-base font-bold text-slate-700 flex items-center gap-2">
+                    <span class="bg-blue-600 text-white w-6 h-6 rounded-full inline-flex items-center justify-center text-xs font-bold">1</span> ระบุกิจกรรม (ถ้ามี)
+                </h2>
+            </div>
+            <div class="p-6">
+                <input type="text" id="activityName" placeholder="ระบุชื่อกิจกรรม (จะแสดงเฉพาะในใบรับรองแทนใบเสร็จฯ)" class="w-full border-2 border-slate-200 p-3.5 rounded-xl text-lg focus:border-blue-500 outline-none transition-all">
+                <p class="text-xs text-slate-500 mt-2">💡 หากไม่ระบุ ระบบจะเว้นว่างไว้ในเอกสาร PDF</p>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-6">
+            <div class="bg-slate-50 px-6 py-4 border-b border-slate-100 flex justify-between items-center">
+                <h2 class="text-base font-bold text-slate-700 flex items-center gap-2">
+                    <span class="bg-blue-600 text-white w-6 h-6 rounded-full inline-flex items-center justify-center text-xs font-bold">2</span> ระบุรายละเอียดการเบิก
+                </h2>
+            </div>
+            <div class="p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-600 mb-2">หมวดงบประมาณ (ระบุสูตร)</label>
+                        <select id="categorySelect" onchange="generateInputs()" class="w-full border-2 border-slate-200 p-3.5 rounded-xl text-lg focus:border-blue-500 outline-none transition-all cursor-pointer">
+                            <option value="">-- กรุณาเลือกหมวดการเบิก --</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-600 mb-2">เอกสาร PDF ที่จะสร้าง</label>
+                        <div id="pdfTemplatesDisplay" class="flex flex-wrap gap-2 p-3 bg-amber-50/50 border border-amber-200 rounded-xl min-h-[44px] items-center">
+                            <span class="text-slate-400 text-sm">กรุณาเลือกหมวดการเบิกก่อน</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="addressSection" class="hidden mt-6 bg-slate-50 p-5 rounded-xl border border-slate-200 animate-fade-in">
+                    <h3 class="text-sm font-bold text-blue-900 mb-3 border-b pb-2">ข้อมูลที่อยู่ผู้เดินทาง (แสดงในใบรายงาน/รับรอง)</h3>
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+                        <input type="text" id="addrNo" placeholder="เลขที่" class="border p-2.5 rounded-lg text-sm outline-none focus:border-blue-500">
+                        <input type="text" id="addrRoad" placeholder="ถนน" class="border p-2.5 rounded-lg text-sm outline-none focus:border-blue-500">
+                        <input type="text" id="addrSoi" placeholder="ซอย" class="border p-2.5 rounded-lg text-sm outline-none focus:border-blue-500">
+                        <input type="text" id="addrSub" placeholder="ตำบล/แขวง" class="border p-2.5 rounded-lg text-sm outline-none focus:border-blue-500">
+                        <input type="text" id="addrDist" placeholder="อำเภอ/เขต" class="border p-2.5 rounded-lg text-sm outline-none focus:border-blue-500">
+                        <input type="text" id="addrProv" placeholder="จังหวัด" class="border p-2.5 rounded-lg text-sm outline-none focus:border-blue-500 col-span-2">
+                        <input type="text" id="addrZip" placeholder="รหัสไปรษณีย์" class="border p-2.5 rounded-lg text-sm outline-none focus:border-blue-500">
+                    </div>
+                </div>
+
+                <div id="travelTimeBox" class="hidden mt-6 bg-slate-50 p-5 rounded-xl border border-slate-200 animate-fade-in">
+                    <h3 class="text-sm font-bold text-blue-900 mb-3 border-b pb-2">กำหนดการเดินทาง</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1">ออกเดินทางจาก <span class="text-rose-500">*</span></label>
+                            <select id="startFromType" class="w-full border p-2.5 rounded-lg text-sm outline-none focus:border-blue-500 mb-2">
+                                <option value="ที่พัก">ที่พัก</option>
+                                <option value="ที่ทำงาน">ที่ทำงาน</option>
+                            </select>
+                            <div class="flex gap-2">
+                                <input type="date" id="dateStart" class="w-full border p-2.5 rounded-lg text-sm outline-none focus:border-blue-500">
+                                <input type="time" id="timeStart" class="w-full border p-2.5 rounded-lg text-sm outline-none focus:border-blue-500">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1">กลับถึงที่พัก วันที่/เวลา <span class="text-rose-500">*</span></label>
+                            <input type="text" id="targetProv" placeholder="ไปปฏิบัติงาน ณ จังหวัด..." class="w-full border p-2.5 rounded-lg text-sm outline-none focus:border-blue-500 mb-2">
+                            <div class="flex gap-2">
+                                <input type="date" id="dateEnd" class="w-full border p-2.5 rounded-lg text-sm outline-none focus:border-blue-500">
+                                <input type="time" id="timeEnd" class="w-full border p-2.5 rounded-lg text-sm outline-none focus:border-blue-500">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="travelDetailsBox" class="hidden mt-6 bg-blue-50/50 p-5 rounded-xl border border-blue-200 shadow-inner animate-fade-in">
+                    <label class="block text-sm font-bold text-blue-900 mb-4 border-b border-blue-200 pb-2">
+                        รูปแบบการเดินทาง และแผนที่ (คำนวณระยะทางแยกขาไป-ขากลับ)
+                    </label>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+                        <div class="bg-white p-3 rounded-lg border border-blue-100 shadow-sm">
+                            <div class="flex items-center justify-between mb-2">
+                                <label class="text-xs font-bold text-slate-500">การเดินทางด้วยรถ Taxi</label>
+                                <button type="button" onclick="addTaxiEntry()"
+                                    class="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition-colors">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
+                                    </svg>
+                                    เพิ่มรอบ Taxi
+                                </button>
+                            </div>
+                            <div id="taxiEntriesList" class="space-y-2">
+                                <!-- entries added by addTaxiEntry() -->
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-3 rounded-lg border border-blue-100 shadow-sm">
+                            <label class="block text-xs font-bold text-slate-500 mb-2">🚘 การเดินทางด้วยรถส่วนตัว (ค่าน้ำมัน)</label>
+                            <select id="carType" onchange="calculateTravelTotal()" class="w-full border border-slate-200 p-2 rounded text-sm outline-none focus:border-blue-500">
+                                <option value="ไม่ระบุ">-- ไม่ได้เบิกรถส่วนตัว --</option>
+                                <option value="ขาไป">ขาไป</option>
+                                <option value="ขากลับ">ขากลับ</option>
+                                <option value="ไป-กลับ" selected>ไป-กลับ</option>
+                            </select>
+                            <input type="number" id="fuelRate" placeholder="เรทน้ำมัน เช่น 4 (บาท/กม.)" class="w-full border border-slate-200 p-2 mt-2 rounded text-sm outline-none focus:border-blue-500" oninput="calculateTravelTotal()" value="4">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div class="relative">
+                            <label class="block text-xs font-bold text-slate-500 mb-1">จุดเริ่มต้น <span class="text-rose-500">*</span></label>
+                            <input type="text" id="travelFrom" autocomplete="off" placeholder="พิมพ์ชื่อสถานที่..." class="w-full border-2 border-white p-3 rounded-lg text-sm shadow-sm focus:border-blue-400 outline-none">
+                            <div id="fromSuggestions" class="absolute z-50 w-full bg-white border border-slate-200 shadow-xl rounded-lg hidden max-h-60 overflow-y-auto mt-1"></div>
+                        </div>
+
+                        <div class="relative">
+                            <label class="block text-xs font-bold text-slate-500 mb-1">จุดหมาย <span class="text-rose-500">*</span></label>
+                            <input type="text" id="travelTo" autocomplete="off" placeholder="พิมพ์ชื่อสถานที่..." class="w-full border-2 border-white p-3 rounded-lg text-sm shadow-sm focus:border-blue-400 outline-none">
+                            <div id="toSuggestions" class="absolute z-50 w-full bg-white border border-slate-200 shadow-xl rounded-lg hidden max-h-60 overflow-y-auto mt-1"></div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div class="bg-white p-3 rounded-xl border border-emerald-200 shadow-sm text-center">
+                            <div class="text-xs font-bold text-emerald-700 mb-1">ระยะทางขาไป (กม.)</div>
+                            <input type="number" id="distOutbound" value="0" class="w-full text-center font-black text-xl text-emerald-600 outline-none" oninput="calculateTravelTotal()">
+                            <button onclick="saveMapDistance('outbound')" class="mt-2 w-full bg-emerald-100 text-emerald-700 hover:bg-emerald-200 text-xs font-bold py-1.5 rounded-lg transition-colors">⬇️ ดึงจากแผนที่ลง 'ขาไป'</button>
+                        </div>
+                        <div class="bg-white p-3 rounded-xl border border-amber-200 shadow-sm text-center">
+                            <div class="text-xs font-bold text-amber-700 mb-1">ระยะทางขากลับ (กม.)</div>
+                            <input type="number" id="distReturn" value="0" class="w-full text-center font-black text-xl text-amber-600 outline-none" oninput="calculateTravelTotal()">
+                            <button onclick="saveMapDistance('return')" class="mt-2 w-full bg-amber-100 text-amber-700 hover:bg-amber-200 text-xs font-bold py-1.5 rounded-lg transition-colors">⬇️ ดึงจากแผนที่ลง 'ขากลับ'</button>
+                        </div>
+                    </div>
+
+                    <div id="map" class="w-full h-[400px] rounded-xl border-4 border-white shadow-md relative z-0 mt-4"></div>
+                    <p class="text-xs text-rose-600 mt-3 flex items-start gap-2 bg-rose-50 border border-rose-100 p-3 rounded-lg shadow-sm">
+                        <span>💡</span><span><b>ทริค:</b> ค้นหาสถานที่ให้ได้เส้นทางขาไป จากนั้นกดปุ่มดึงลง 'ขาไป' แล้วค่อยค้นหาใหม่สำหรับเส้นทางขากลับ แล้วกดดึงลง 'ขากลับ' ครับ (ระบบค้นหาขับเคลื่อนด้วย Longdo Map API แม่นยำ 100%)</span>
+                    </p>
+                </div>
+
+                <div id="travelCostBox" class="hidden mt-6 bg-slate-50 p-5 rounded-xl border border-slate-200 animate-fade-in">
+                    <h3 class="text-sm font-bold text-blue-900 mb-4 border-b pb-2">รายละเอียดค่าใช้จ่ายเพิ่มเติม</h3>
+
+                    
+                    <div class="mb-4 bg-white p-3 rounded-lg border border-slate-200">
+                        <label class="block text-xs font-bold text-slate-700 mb-2">1. ค่าที่พัก</label>
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-2">
+                            <select id="hotelType" class="border p-2 rounded text-sm outline-none focus:border-blue-500"><option value="พักเดี่ยว">พักเดี่ยว</option><option value="พักคู่">พักคู่</option></select>
+                            <input type="text" id="hotelName" placeholder="ชื่อโรงแรม..." class="border p-2 rounded text-sm outline-none focus:border-blue-500 col-span-1 md:col-span-1">
+                            <input type="number" id="hotelRate" placeholder="เรทราคา/คืน" class="border p-2 rounded text-sm outline-none focus:border-blue-500" oninput="calculateTravelTotal()">
+                            <input type="number" id="hotelNights" placeholder="จำนวนคืน" class="border p-2 rounded text-sm outline-none focus:border-blue-500" oninput="calculateTravelTotal()">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="bg-white p-3 rounded-lg border border-slate-200">
+                            <label class="block text-xs font-bold text-slate-700 mb-2">2. ค่าตั๋วเครื่องบิน (บาท)</label>
+                            <input type="number" id="airfareCost" placeholder="จำนวนเงิน" class="w-full border p-2 rounded text-sm outline-none focus:border-blue-500" oninput="calculateTravelTotal()">
+                        </div>
+                        <div class="bg-white p-3 rounded-lg border border-slate-200">
+                            <label class="block text-xs font-bold text-slate-700 mb-2">3. ค่าทางด่วน/ที่จอดรถ</label>
+                            <input type="number" id="tollCost" placeholder="จำนวนเงิน" class="w-full border p-2 rounded text-sm outline-none focus:border-blue-500" oninput="calculateTravelTotal()">
+                        </div>
+                        <div class="bg-white p-3 rounded-lg border border-slate-200">
+                            <label class="block text-xs font-bold text-slate-700 mb-2">4. ค่าเบี้ยเลี้ยง/อื่นๆ</label>
+                            <input type="number" id="otherCost" placeholder="จำนวนเงิน" class="w-full border p-2 rounded text-sm outline-none focus:border-blue-500" oninput="calculateTravelTotal()">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="extraEntriesBox" class="hidden mt-6 bg-slate-50 p-5 rounded-xl border border-slate-200 animate-fade-in">
+                    <h3 class="text-sm font-bold text-blue-900 mb-1 border-b pb-2">
+                        รายการเพิ่มเติม (แถวด้านล่างเอกสาร)
+                        <span class="text-slate-400 font-normal text-xs ml-1">— ไม่บังคับ กรอกหรือเว้นว่างได้</span>
+                    </h3>
+                    <p class="text-xs text-slate-500 mb-4">ช่องนี้ตรงกับแถว "ที่อยู่" และ "กิจกรรม" ด้านล่างของตารางในเอกสาร PDF</p>
+
+                    <div class="mb-4 bg-white p-3 rounded-lg border border-slate-200">
+                        <label class="block text-xs font-bold text-slate-700 mb-1.5">ที่อยู่ <span class="text-slate-400 font-normal">(แถวที่อยู่ท้ายตาราง)</span></label>
+                        <input type="text" id="extraAddrLine" placeholder="เว้นว่างได้ ระบุเฉพาะกรณีที่ต้องการ" class="w-full border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-blue-400">
+                    </div>
+
+                    <div class="bg-white p-3 rounded-lg border border-slate-200">
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="text-xs font-bold text-slate-700">กิจกรรม <span class="text-slate-400 font-normal">(แถวกิจกรรมท้ายตาราง)</span></label>
+                            <button type="button" onclick="addExtraActivity()"
+                                class="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition-colors">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
+                                </svg>
+                                เพิ่มแถว
+                            </button>
+                        </div>
+                        <div id="extraActivitiesList" class="space-y-2">
+                            <p class="text-xs text-slate-400 italic">ยังไม่มีรายการ — กดปุ่ม "เพิ่มแถว" ด้านบน</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="generalReceiptSection" class="hidden mt-6 animate-fade-in">
+                    <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                        <div class="bg-slate-50 px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+                            <h3 class="text-sm font-bold text-blue-900">รายการค่าใช้จ่าย (FM-SAM-003-06)</h3>
+                            <button type="button" onclick="addGeneralReceiptRow()"
+                                class="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition-colors">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
+                                </svg>
+                                เพิ่มรายการ
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-slate-50 text-xs text-slate-500 font-bold border-b border-slate-100">
+                                    <tr>
+                                        <th class="px-4 py-2.5 text-left w-40">วัน เดือน ปี</th>
+                                        <th class="px-4 py-2.5 text-left">รายละเอียดรายจ่าย</th>
+                                        <th class="px-4 py-2.5 text-right w-36">จำนวนเงิน (บาท)</th>
+                                        <th class="px-2 py-2.5 w-10"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="generalReceiptBody" class="divide-y divide-slate-100"></tbody>
+                            </table>
+                        </div>
+                        <div class="px-5 py-3 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
+                            <span class="text-xs text-slate-500 font-semibold">รวมทั้งสิ้น</span>
+                            <span class="font-bold text-slate-800 font-mono" id="generalReceiptTotal">0.00 บาท</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="descBox" class="hidden mt-6 animate-fade-in">
+                    <label id="descLabel" class="block text-sm font-bold text-slate-700 mb-2"></label>
+                    <textarea id="description" rows="2" class="w-full border-2 border-slate-200 p-3.5 rounded-xl text-base focus:border-blue-500 outline-none shadow-inner"></textarea>
+                </div>
+
+                <div id="dynamicInputs" class="mt-6 space-y-5"></div>
+
+                <div id="evidenceBox" class="mt-8 pt-6 border-t border-dashed border-slate-200 hidden">
+                    <h3 class="text-xs font-black text-blue-800 mb-4 uppercase tracking-wider">อัปโหลดหลักฐานประกอบ</h3>
+                    <div id="evidenceInputs" class="space-y-4"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-10">
+            <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-6 flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
+                <div>
+                    <span class="block text-emerald-800 font-bold text-lg">ยอดเงินที่ขอเบิกครั้งนี้</span>
+                </div>
+                <div class="text-4xl font-black text-emerald-700 tracking-tight" id="totalAmount" data-value="0">0.00 <span class="text-2xl">฿</span></div>
+            </div>
+            <p class="text-xs text-slate-500 mb-3 text-center">หากไม่มี API เซิร์ฟเวอร์ ระบบจะบันทึกรายการในเครื่อง (LocalStorage) แล้วแสดงในหน้าประวัติ</p>
+            <button onclick="submitExpense()" id="submitBtn" class="w-full bg-blue-600 text-white font-bold text-lg py-4 rounded-xl hover:bg-blue-700 active:scale-[0.99] transition-all">ยืนยันการบันทึกรายการเบิก</button>
+        </div>
+    </div>
+    </div>
+
+    <script>
+    const API_BASE = '';
+    const LOCAL_EXPENSES_KEY = 'tuc_expenses';
+    const ATTACHMENT_IDS = ['LOCATION', 'RECEIPT', 'TAX_INVOICE', 'PHOTO'];
+    const TRAVEL_TEMPLATE_IDS = ['REPORT', 'TRANSPORT_RECEIPT'];
+    const PDF_TEMPLATE_LABELS = {
+        NORMAL:            { label: 'บันทึกข้อความ',            color: 'bg-slate-100 text-slate-700 border-slate-200' },
+        REPORT:            { label: 'ใบรายงานการเดินทาง',       color: 'bg-blue-50 text-blue-700 border-blue-200' },
+        TRANSPORT_RECEIPT: { label: 'ใบรับรองค่าพาหนะ',         color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+        GENERAL_RECEIPT:   { label: 'ใบรับรองทั่วไป (เงินสด)', color: 'bg-amber-50 text-amber-700 border-amber-200' }
+    };
+    let categories = [];
+    let taxiMaxPerTrip = Infinity;
+    let editingExpenseId = null;
+    window.currentPdfTemplates = [];
+
+    function normalizePdfTemplates(cat) {
+        if (!cat) return [];
+        if (Array.isArray(cat.pdfTemplates) && cat.pdfTemplates.length > 0) return [...cat.pdfTemplates];
+        const old = cat.pdfTemplate || '';
+        if (old === 'TRAVEL_BOTH')    return ['REPORT', 'TRANSPORT_RECEIPT'];
+        if (old === 'TRAVEL_REPORT')  return ['REPORT'];
+        if (old === 'TRAVEL_RECEIPT') return ['TRANSPORT_RECEIPT'];
+        if (old === 'NORMAL')         return ['NORMAL'];
+        return [];
+    }
+
+    function applyCategoryPdfTemplate(category) {
+        const templates = normalizePdfTemplates(category);
+        window.currentPdfTemplates = templates;
+        const display = document.getElementById('pdfTemplatesDisplay');
+        if (templates.length === 0) {
+            display.innerHTML = '<span class="text-slate-400 text-sm">ไม่ได้กำหนดเทมเพลต — ติดต่อแอดมินเพื่อตั้งค่า</span>';
+        } else {
+            display.innerHTML = templates.map(t => {
+                const info = PDF_TEMPLATE_LABELS[t] || { label: t, color: 'bg-slate-100 text-slate-700 border-slate-200' };
+                return `<span class="inline-flex items-center ${info.color} border px-2.5 py-1 rounded-lg text-xs font-bold">${info.label}</span>`;
+            }).join('');
+        }
+        updateFormUI();
+    }
+
+    function getAttachmentRules(cat) {
+        if (!cat) return {};
+        if (cat.attachmentRules && typeof cat.attachmentRules === 'object') {
+            const out = {};
+            ATTACHMENT_IDS.forEach(id => {
+                const r = cat.attachmentRules[id] || {};
+                const show = !!r.show;
+                out[id] = { show, required: show && !!r.required };
+            });
+            return out;
+        }
+        const out = {};
+        ATTACHMENT_IDS.forEach(id => {
+            const legacy = Array.isArray(cat.requiredFields) && cat.requiredFields.includes(id);
+            out[id] = { show: legacy, required: legacy };
+        });
+        return out;
+    }
+
+    function anyAttachmentShown(rules) {
+        return ATTACHMENT_IDS.some(id => rules[id] && rules[id].show);
+    }
+    let map = null;
+    let startMarker = null, endMarker = null, routeLine = null;
+    window.currentRouteDistance = 0;
+    let wpStart = null, wpEnd = null;
+    const LONGDO_API_KEY = '5528d1b402a5fd11be6eec82fd167c4b';
+
+    async function init() {
+        const sel = document.getElementById('categorySelect');
+        sel.innerHTML = '<option value="">-- กรุณาเลือกหมวดการเบิก --</option>';
+        try {
+            const res = await fetch(`${API_BASE}/budget-categories`);
+            if (res.ok) categories = await res.json();
+        } catch (e) {}
+        if (!categories || !categories.length) {
+            categories = JSON.parse(localStorage.getItem('tuc_categories') || '[]');
+        }
+        categories.forEach(cat => {
+            sel.innerHTML += `<option value="${cat.id}">${cat.name}</option>`;
+        });
+        loadProfilesToDropdown();
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const editId = urlParams.get('edit');
+        if (editId) {
+            try {
+                const res = await fetch(`${API_BASE}/expenses`);
+                if (res.ok) {
+                    const all = await res.json();
+                    const expense = all.find(e => String(e.id) === editId);
+                    if (expense) {
+                        editingExpenseId = editId;
+                        document.getElementById('editModeBanner').classList.remove('hidden');
+                        document.getElementById('pageTitle').textContent = 'แก้ไขรายการเบิก';
+                        document.getElementById('submitBtn').textContent = 'อัปเดตรายการ';
+                        document.getElementById('profileSelectorBox').classList.add('hidden');
+                        await prefillForm(expense);
+                    }
+                }
+            } catch (e) { /* ignore */ }
+        }
+    }
+
+    let _profilesCache = [];
+
+    // ⭐️ ดึงโปรไฟล์ + build searchable combobox
+    async function loadProfilesToDropdown() {
+        try {
+            const res = await fetch('/profiles');
+            _profilesCache = await res.json();
+        } catch(e) { _profilesCache = []; }
+    }
+
+    function renderProfileDropdown(q) {
+        const dropdown = document.getElementById('profileDropdown');
+        const lower = (q || '').toLowerCase();
+        const filtered = lower
+            ? _profilesCache.filter(p =>
+                (p.profileName || '').toLowerCase().includes(lower) ||
+                (p.fullName || '').toLowerCase().includes(lower))
+            : _profilesCache;
+
+        dropdown.innerHTML = '';
+
+        // ตัวเลือก "ไม่ใช้โปรไฟล์"
+        const clearDiv = document.createElement('div');
+        clearDiv.className = 'px-4 py-2.5 hover:bg-slate-50 cursor-pointer border-b border-slate-100 text-sm text-slate-400 italic';
+        clearDiv.textContent = '— ไม่ใช้โปรไฟล์ (กรอกเองใหม่ทั้งหมด) —';
+        clearDiv.onclick = () => clearProfileSelection();
+        dropdown.appendChild(clearDiv);
+
+        if (filtered.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'px-4 py-3 text-center text-slate-400 text-sm';
+            empty.textContent = 'ไม่พบโปรไฟล์ที่ตรงกัน';
+            dropdown.appendChild(empty);
+        } else {
+            const shown = filtered.slice(0, 60);
+            shown.forEach(p => {
+                const div = document.createElement('div');
+                div.className = 'px-4 py-2.5 hover:bg-blue-50 cursor-pointer border-b border-slate-100 text-sm transition-colors flex items-center gap-2';
+                const initials = (p.profileName || '?').replace(/[^฀-๿a-zA-Z]/g, '').slice(0,1).toUpperCase();
+                div.innerHTML = `
+                    <span class="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold flex-shrink-0">${initials}</span>
+                    <div><div class="font-semibold text-slate-800">${p.profileName}</div><div class="text-xs text-slate-400">${p.fullName || ''}</div></div>`;
+                div.onclick = () => {
+                    document.getElementById('profileSearch').value = p.profileName;
+                    document.getElementById('profileClearBtn').classList.remove('hidden');
+                    dropdown.classList.add('hidden');
+                    applyProfileDataFromObj(p);
+                };
+                dropdown.appendChild(div);
+            });
+            if (filtered.length > 60) {
+                const more = document.createElement('div');
+                more.className = 'px-4 py-2 text-center text-slate-400 text-xs bg-slate-50';
+                more.textContent = `... และอีก ${filtered.length - 60} รายการ — พิมพ์เพื่อกรองให้แคบลง`;
+                dropdown.appendChild(more);
+            }
+        }
+    }
+
+    function openProfileDropdown() {
+        renderProfileDropdown(document.getElementById('profileSearch').value);
+        document.getElementById('profileDropdown').classList.remove('hidden');
+    }
+
+    function filterProfiles() {
+        renderProfileDropdown(document.getElementById('profileSearch').value);
+        document.getElementById('profileDropdown').classList.remove('hidden');
+        document.getElementById('profileClearBtn').classList.toggle(
+            'hidden', !document.getElementById('profileSearch').value);
+    }
+
+    function clearProfileSelection() {
+        document.getElementById('profileSearch').value = '';
+        document.getElementById('profileClearBtn').classList.add('hidden');
+        document.getElementById('profileDropdown').classList.add('hidden');
+    }
+
+    document.addEventListener('click', (e) => {
+        const search = document.getElementById('profileSearch');
+        const dropdown = document.getElementById('profileDropdown');
+        if (search && dropdown && !search.contains(e.target) && !dropdown.contains(e.target))
+            dropdown.classList.add('hidden');
+    });
+
+    // ⭐️ โหลดโปรไฟล์ลงฟอร์ม
+    function applyProfileDataFromObj(p) {
+        if(!p) return;
+        document.getElementById('requestedBy').value = p.fullName || '';
+        if (p.position) document.getElementById('position').value = p.position;
+        document.getElementById('affiliation').value = p.affiliation || '';
+        document.getElementById('addrNo').value = p.no || '';
+        document.getElementById('addrSoi').value = p.soi || '';
+        document.getElementById('addrRoad').value = p.road || '';
+        document.getElementById('addrSub').value = p.sub || '';
+        document.getElementById('addrDist').value = p.dist || '';
+        document.getElementById('addrProv').value = p.prov || '';
+        document.getElementById('addrZip').value = p.zip || '';
+        if(map && p.lat && p.lng) {
+            const newStart = L.latLng(p.lat, p.lng);
+            setWaypoint(0, newStart);
+            map.flyTo(newStart, 14);
+            document.getElementById('travelFrom').value = "ที่พัก (" + p.profileName + ")";
+            document.getElementById('startFromType').value = "ที่พัก";
+        }
+    }
+
+    function applyProfileData() {
+        // legacy compat — ไม่ใช้แล้วแต่เก็บไว้กันพัง
+    }
+
+    function makeMarkerIcon(isStart) {
+        const color = isStart ? '#22c55e' : '#ef4444';
+        return L.divIcon({
+            html: `<div style="width:16px;height:16px;background:${color};border:3px solid white;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,.45)"></div>`,
+            className: '', iconSize: [16, 16], iconAnchor: [8, 8]
+        });
+    }
+
+    async function drawRoute() {
+        if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
+        if (!wpStart || !wpEnd) return;
+        try {
+            const r = await fetch(`/map-route?flat=${wpStart.lat}&flon=${wpStart.lng}&tlat=${wpEnd.lat}&tlon=${wpEnd.lng}`);
+            const data = await r.json();
+            const features = (data.features || []).filter(f => f.geometry && f.geometry.type === 'LineString');
+            if (!features.length) return;
+            const coords = [];
+            let dist = 0;
+            features.forEach(f => {
+                f.geometry.coordinates.forEach(c => coords.push([c[1], c[0]]));
+                dist += parseFloat(f.properties.distance || 0);
+            });
+            routeLine = L.polyline(coords, { color: '#3b82f6', opacity: 0.9, weight: 6 }).addTo(map);
+            window.currentRouteDistance = dist / 1000;
+            map.fitBounds(routeLine.getBounds(), { padding: [50, 50] });
+        } catch(e) { console.error('route error', e); }
+    }
+
+    function setWaypoint(index, latLng) {
+        if (index === 0) {
+            wpStart = latLng;
+            if (!startMarker) {
+                startMarker = L.marker(latLng, { draggable: true, icon: makeMarkerIcon(true) })
+                    .bindTooltip('📍 จุดเริ่มต้น (ลากได้)', { permanent: true, direction: 'top' })
+                    .addTo(map);
+                startMarker.on('dragend', () => { wpStart = startMarker.getLatLng(); drawRoute(); });
+            } else {
+                startMarker.setLatLng(latLng);
+            }
+        } else {
+            wpEnd = latLng;
+            if (!endMarker) {
+                endMarker = L.marker(latLng, { draggable: true, icon: makeMarkerIcon(false) })
+                    .bindTooltip('🏁 ปลายทาง (ลากได้)', { permanent: true, direction: 'top' })
+                    .addTo(map);
+                endMarker.on('dragend', () => { wpEnd = endMarker.getLatLng(); drawRoute(); });
+            } else {
+                endMarker.setLatLng(latLng);
+            }
+        }
+        drawRoute();
+    }
+
+    function initMap() {
+        if (map !== null) { map.invalidateSize(); return; }
+
+        map = L.map('map').setView([13.7563, 100.5018], 12);
+
+        L.tileLayer(
+            'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+            { attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>', maxZoom: 19 }
+        ).addTo(map);
+
+        setupAutocomplete('travelFrom', 'fromSuggestions', 0);
+        setupAutocomplete('travelTo', 'toSuggestions', 1);
+
+        applyProfileData();
+    }
+
+    function setupAutocomplete(inputId, boxId, wpIndex) {
+        const input = document.getElementById(inputId);
+        const box = document.getElementById(boxId);
+        let timeout;
+        input.addEventListener('input', function() {
+            clearTimeout(timeout);
+            const q = this.value;
+            if(q.length < 2) { box.classList.add('hidden'); return; }
+            box.classList.remove('hidden');
+            box.innerHTML = `<div class="p-4 text-center text-slate-500 text-sm flex items-center justify-center gap-2"><svg class="animate-spin h-4 w-4 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>กำลังค้นหาข้อมูล...</div>`;
+            
+            timeout = setTimeout(async () => {
+                try {
+                    const res = await fetch(`/map-search?q=${encodeURIComponent(q)}`);
+                    const result = await res.json();
+                    box.innerHTML = '';
+                    
+                    if(result && result.data && result.data.length > 0) {
+                        result.data.forEach(item => {
+                            if(!item.lat || !item.lon) return;
+                            let div = document.createElement('div');
+                            div.className = 'p-3 hover:bg-blue-50 cursor-pointer border-b border-slate-100 text-sm text-slate-700 transition-colors';
+                            const title = item.name || '';
+                            const address = item.address || '';
+                            div.innerHTML = `<div class="font-bold">${title}</div><div class="text-xs text-slate-400 mt-1">${address}</div>`;
+                            div.onclick = function() {
+                                input.value = title;
+                                box.classList.add('hidden');
+                                const newLatLng = L.latLng(item.lat, item.lon);
+                                setWaypoint(wpIndex, newLatLng);
+                                map.flyTo(newLatLng, 14);
+                            };
+                            box.appendChild(div);
+                        });
+                    } else {
+                        // ไม่พบ — แนะนำ query ที่กว้างขึ้น (ไม่มั่วสถานที่)
+                        const suggestions = buildSmartMapSuggestions(q);
+                        box.innerHTML = `<div class="px-4 py-2.5 text-xs text-slate-500 border-b bg-amber-50 border-amber-100">
+                            ไม่พบ "<b>${q}</b>" — ลองค้นหาแบบกว้างขึ้น:</div>`;
+                        if (suggestions.length > 0) {
+                            suggestions.forEach(sq => {
+                                const sdiv = document.createElement('div');
+                                sdiv.className = 'px-4 py-2.5 hover:bg-blue-50 cursor-pointer border-b border-slate-100 text-sm text-blue-600 flex items-center gap-2 transition-colors';
+                                sdiv.innerHTML = `<svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>ค้นหา "<b>${sq}</b>"`;
+                                sdiv.onclick = () => { input.value = sq; input.dispatchEvent(new Event('input')); };
+                                box.appendChild(sdiv);
+                            });
+                        } else {
+                            box.innerHTML += `<div class="p-3 text-xs text-slate-400 text-center">ลองพิมพ์ชื่อ ตำบล อำเภอ หรือ จังหวัด แทนครับ</div>`;
+                        }
+                    }
+                } catch(e) { box.innerHTML = `<div class="p-4 text-center text-rose-500 text-sm">ค้นหาล้มเหลว โปรดลองอีกครั้ง</div>`; }
+            }, 800);
+        });
+        document.addEventListener('click', (e) => { if(e.target !== input && e.target !== box) box.classList.add('hidden'); });
+    }
+
+    function addTaxiEntry() {
+        const list    = document.getElementById('taxiEntriesList');
+        const fromVal = (document.getElementById('travelFrom').value || '').replace(/"/g, '&quot;');
+        const toVal   = (document.getElementById('travelTo').value   || '').replace(/"/g, '&quot;');
+        const div = document.createElement('div');
+        div.className = 'taxi-entry bg-slate-50 rounded-lg border border-slate-200 p-2.5';
+        div.innerHTML = `
+            <div class="grid grid-cols-2 gap-1.5 mb-1.5">
+                <div>
+                    <label class="text-[10px] text-slate-400 font-bold block mb-0.5">วันที่ <span class="text-rose-500">*</span></label>
+                    <input type="date" class="taxi-date w-full border border-slate-200 px-2 py-1.5 rounded text-xs outline-none focus:border-blue-400">
+                </div>
+                <div>
+                    <label class="text-[10px] text-slate-400 font-bold block mb-0.5">ทิศทาง</label>
+                    <select class="taxi-dir w-full border border-slate-200 px-2 py-1.5 rounded text-xs outline-none bg-white" onchange="onTaxiDirChange(this)">
+                        <option value="ขาไป">ขาไป</option>
+                        <option value="ขากลับ">ขากลับ</option>
+                        <option value="ไป-กลับ">ไป-กลับ (แยกยอด)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-[10px] text-slate-400 font-bold block mb-0.5">จาก</label>
+                    <input type="text" class="taxi-from w-full border border-slate-200 px-2 py-1.5 rounded text-xs outline-none focus:border-blue-400" value="${fromVal}" placeholder="สถานที่ต้นทาง">
+                </div>
+                <div>
+                    <label class="text-[10px] text-slate-400 font-bold block mb-0.5">ถึง</label>
+                    <input type="text" class="taxi-to w-full border border-slate-200 px-2 py-1.5 rounded text-xs outline-none focus:border-blue-400" value="${toVal}" placeholder="สถานที่ปลายทาง">
+                </div>
+            </div>
+            <div class="flex items-end gap-2">
+                <div class="flex-1 flex gap-1.5">
+                    <div class="taxi-out-wrap flex-1">
+                        <label class="taxi-out-label text-[10px] text-slate-400 font-bold block mb-0.5 hidden">ขาไป</label>
+                        <input type="number" min="0" step="any" class="taxi-amt-out w-full border border-slate-200 px-2 py-1.5 rounded text-xs outline-none focus:border-blue-400" placeholder="ยอดค่า Taxi (บาท)" oninput="onTaxiAmtChange(this)">
+                    </div>
+                    <div class="taxi-ret-wrap flex-1 hidden">
+                        <label class="text-[10px] text-slate-400 font-bold block mb-0.5">ขากลับ</label>
+                        <input type="number" min="0" step="any" class="taxi-amt-ret w-full border border-slate-200 px-2 py-1.5 rounded text-xs outline-none focus:border-blue-400" placeholder="ยอดขากลับ (บาท)" oninput="onTaxiAmtChange(this)">
+                    </div>
+                </div>
+                <button type="button" onclick="removeTaxiEntry(this)"
+                    class="text-slate-300 hover:text-rose-500 transition-colors flex-shrink-0 p-1 mb-0.5">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="taxi-err hidden text-[11px] text-rose-600 mt-1 font-semibold"></div>
+        `;
+        list.appendChild(div);
+    }
+
+    function onTaxiDirChange(select) {
+        const entry   = select.closest('.taxi-entry');
+        const outWrap = entry.querySelector('.taxi-out-wrap');
+        const retWrap = entry.querySelector('.taxi-ret-wrap');
+        const outLbl  = entry.querySelector('.taxi-out-label');
+        const outInp  = entry.querySelector('.taxi-amt-out');
+        const retInp  = entry.querySelector('.taxi-amt-ret');
+        const dir     = select.value;
+
+        if (dir === 'ไป-กลับ') {
+            outWrap.classList.remove('hidden');
+            retWrap.classList.remove('hidden');
+            outLbl.classList.remove('hidden');
+            outInp.placeholder = 'ขาไป (บาท)';
+        } else if (dir === 'ขากลับ') {
+            outWrap.classList.add('hidden');
+            retWrap.classList.remove('hidden');
+            outLbl.classList.add('hidden');
+            outInp.value = '';
+        } else {
+            outWrap.classList.remove('hidden');
+            retWrap.classList.add('hidden');
+            outLbl.classList.add('hidden');
+            outInp.placeholder = 'ยอดค่า Taxi (บาท)';
+            retInp.value = '';
+        }
+        entry.querySelector('.taxi-err').classList.add('hidden');
+        calculateTravelTotal();
+    }
+
+    function removeTaxiEntry(btn) {
+        btn.closest('.taxi-entry').remove();
+        calculateTravelTotal();
+    }
+
+    function addExtraActivity() {
+        const list = document.getElementById('extraActivitiesList');
+        const placeholder = list.querySelector('p.italic');
+        if (placeholder) placeholder.remove();
+        const div = document.createElement('div');
+        div.className = 'extra-activity flex gap-2 items-center';
+        div.innerHTML = `
+            <input type="text" class="extra-act-text flex-1 border border-slate-200 px-2.5 py-1.5 rounded-lg text-sm outline-none focus:border-blue-400" placeholder="ระบุกิจกรรม...">
+            <button type="button" onclick="removeExtraActivity(this)" class="text-slate-300 hover:text-rose-500 transition-colors p-1 flex-shrink-0">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>`;
+        list.appendChild(div);
+    }
+
+    function removeExtraActivity(btn) {
+        const list = document.getElementById('extraActivitiesList');
+        btn.closest('.extra-activity').remove();
+        if (!list.querySelector('.extra-activity')) {
+            list.innerHTML = '<p class="text-xs text-slate-400 italic">ยังไม่มีรายการ — กดปุ่ม "เพิ่มแถว" ด้านบน</p>';
+        }
+    }
+
+    function onTaxiAmtChange(input) {
+        const entry  = input.closest('.taxi-entry');
+        const errDiv = entry.querySelector('.taxi-err');
+        const amt    = parseFloat(input.value) || 0;
+        if (taxiMaxPerTrip !== Infinity && amt > taxiMaxPerTrip) {
+            errDiv.textContent = `เกินวงเงินที่อนุมัติ (สูงสุด ${taxiMaxPerTrip.toLocaleString()} บาท/เที่ยว)`;
+            errDiv.classList.remove('hidden');
+            input.classList.add('border-rose-400');
+        } else {
+            input.classList.remove('border-rose-400');
+            const anyOver = [...entry.querySelectorAll('.taxi-amt-out, .taxi-amt-ret')]
+                .some(inp => (parseFloat(inp.value) || 0) > taxiMaxPerTrip);
+            if (!anyOver) errDiv.classList.add('hidden');
+        }
+        calculateTravelTotal();
+    }
+
+    function getTaxiTotal() {
+        let total = 0;
+        document.querySelectorAll('.taxi-entry').forEach(entry => {
+            const dir = entry.querySelector('.taxi-dir').value;
+            if (dir === 'ขากลับ') {
+                total += parseFloat(entry.querySelector('.taxi-amt-ret').value) || 0;
+            } else if (dir === 'ไป-กลับ') {
+                total += (parseFloat(entry.querySelector('.taxi-amt-out').value) || 0)
+                       + (parseFloat(entry.querySelector('.taxi-amt-ret').value) || 0);
+            } else {
+                total += parseFloat(entry.querySelector('.taxi-amt-out').value) || 0;
+            }
+        });
+        return total;
+    }
+
+    function collectTaxiEntries() {
+        const entries = [];
+        document.querySelectorAll('.taxi-entry').forEach(div => {
+            const dir = div.querySelector('.taxi-dir').value;
+            const e = {
+                date:      div.querySelector('.taxi-date').value,
+                direction: dir,
+                from:      div.querySelector('.taxi-from').value,
+                to:        div.querySelector('.taxi-to').value,
+            };
+            if (dir === 'ขากลับ') {
+                e.amount = parseFloat(div.querySelector('.taxi-amt-ret').value) || 0;
+            } else if (dir === 'ไป-กลับ') {
+                e.amountOut = parseFloat(div.querySelector('.taxi-amt-out').value) || 0;
+                e.amountRet = parseFloat(div.querySelector('.taxi-amt-ret').value) || 0;
+                e.amount    = e.amountOut + e.amountRet;
+            } else {
+                e.amount = parseFloat(div.querySelector('.taxi-amt-out').value) || 0;
+            }
+            entries.push(e);
+        });
+        return entries;
+    }
+
+    window.saveMapDistance = function(tripType) {
+        if (!window.currentRouteDistance) return alert('กรุณารอให้ระบบคำนวณเส้นทางบนแผนที่เสร็จก่อนครับ');
+        const dist = window.currentRouteDistance.toFixed(2);
+        
+        if (tripType === 'outbound') {
+            document.getElementById('distOutbound').value = dist;
+            document.getElementById('distOutbound').classList.add('bg-emerald-100');
+            setTimeout(() => document.getElementById('distOutbound').classList.remove('bg-emerald-100'), 500);
+        } else {
+            document.getElementById('distReturn').value = dist;
+            document.getElementById('distReturn').classList.add('bg-amber-100');
+            setTimeout(() => document.getElementById('distReturn').classList.remove('bg-amber-100'), 500);
+        }
+        calculateTravelTotal();
+    }
+
+    window.calculateTravelTotal = function() {
+        const hotel = (parseFloat(document.getElementById('hotelRate').value)||0) * (parseFloat(document.getElementById('hotelNights').value)||0);
+        const fuelRate = parseFloat(document.getElementById('fuelRate').value)||0;
+        const out = parseFloat(document.getElementById('distOutbound').value)||0;
+        const ret = parseFloat(document.getElementById('distReturn').value)||0;
+        const carType = document.getElementById('carType')?.value;
+        
+        let fuelDist = 0;
+        if(carType === 'ขาไป') fuelDist = out;
+        else if(carType === 'ขากลับ') fuelDist = ret;
+        else if(carType === 'ไป-กลับ') fuelDist = out + ret;
+
+        const fuelTotal = fuelRate * fuelDist;
+        
+        const taxiTotal = getTaxiTotal();
+
+        const air = parseFloat(document.getElementById('airfareCost').value)||0;
+        const toll = parseFloat(document.getElementById('tollCost').value)||0;
+        const other = parseFloat(document.getElementById('otherCost').value)||0;
+        
+        const total = hotel + fuelTotal + taxiTotal + air + toll + other;
+        document.getElementById('totalAmount').innerHTML = new Intl.NumberFormat('th-TH', { style: 'decimal', minimumFractionDigits: 2 }).format(total) + ' <span class="text-2xl">฿</span>';
+        document.getElementById('totalAmount').dataset.value = total;
+    }
+
+    function updateFormUI() {
+        const templates = window.currentPdfTemplates || [];
+        const hasTravel  = templates.some(t => TRAVEL_TEMPLATE_IDS.includes(t));
+        const hasGeneral = templates.includes('GENERAL_RECEIPT');
+        const hasNormal  = templates.includes('NORMAL') || templates.length === 0;
+
+        document.getElementById('addressSection').classList.toggle('hidden', !hasTravel);
+        document.getElementById('travelTimeBox').classList.toggle('hidden', !hasTravel);
+        document.getElementById('travelDetailsBox').classList.toggle('hidden', !hasTravel);
+        document.getElementById('travelCostBox').classList.toggle('hidden', !hasTravel);
+        document.getElementById('extraEntriesBox').classList.toggle('hidden', !hasTravel);
+        document.getElementById('generalReceiptSection').classList.toggle('hidden', !hasGeneral);
+        document.getElementById('descBox').classList.toggle('hidden', !hasNormal || hasTravel);
+        document.getElementById('dynamicInputs').classList.toggle('hidden', !hasNormal || hasTravel);
+
+        if (hasTravel) {
+            setTimeout(() => { initMap(); calculateTravelTotal(); }, 300);
+        }
+        if (hasNormal && !hasTravel) {
+            document.getElementById('descLabel').innerHTML = 'รายละเอียดกิจกรรม / สิ่งที่ซื้อ <span class="text-rose-500">*จำเป็น</span>';
+            document.getElementById('description').placeholder = 'ระบุรายละเอียด เช่น: ค่าอาหารรับรองแขก 10 ท่าน';
+            calculatePreview();
+        }
+        if (hasGeneral && !hasTravel && !hasNormal) {
+            calcGeneralReceiptTotal();
+        }
+    }
+
+    window.toggleMapUpload = function() {
+        const mode = document.querySelector('input[name="mapCaptureMode"]:checked')?.value;
+        const manualInput = document.getElementById('mapManualUpload');
+        if (mode === 'manual') manualInput.classList.remove('hidden');
+        else manualInput.classList.add('hidden');
+    }
+
+    function generateInputs() {
+        const catId = document.getElementById('categorySelect').value;
+        const category = categories.find(c => c.id === catId);
+        const container = document.getElementById('dynamicInputs');
+        const eviBox = document.getElementById('evidenceBox');
+        const eviDiv = document.getElementById('evidenceInputs');
+        
+        if (!category) {
+            container.innerHTML = ''; eviBox.classList.add('hidden');
+            document.getElementById('totalAmount').innerHTML = '0.00 <span class="text-2xl">฿</span>';
+            applyCategoryPdfTemplate(null);
+            return;
+        }
+
+        const rules = getAttachmentRules(category);
+        const catTaxi = category.taxiMaxPerTrip;
+        taxiMaxPerTrip = (catTaxi != null && catTaxi > 0) ? catTaxi : Infinity;
+        applyCategoryPdfTemplate(category);
+
+        container.innerHTML = `<div class="bg-blue-50 text-blue-700 p-3 rounded-lg text-sm mb-4 font-mono border border-blue-100">สมการที่ใช้: ${category.formulaString}</div>`;
+        
+        (category.activeVariables || []).forEach(v => {
+            container.innerHTML += `
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-1">${v}</label>
+                    <input type="number" step="any" placeholder="ระบุจำนวน..." 
+                           class="formula-input w-full border-2 border-slate-200 p-3 rounded-xl text-lg font-semibold text-blue-700 bg-slate-50 outline-none shadow-inner focus:border-blue-500" 
+                           data-var="${v}" oninput="calculatePreview()">
+                </div>
+            `;
+        });
+
+        eviDiv.innerHTML = '';
+        if (anyAttachmentShown(rules)) {
+            eviBox.classList.remove('hidden');
+            const reqTag = (r) => r.required ? '<span class="text-rose-500">*จำเป็น</span>' : '<span class="text-slate-500 font-normal text-xs">(ไม่บังคับ)</span>';
+            ATTACHMENT_IDS.forEach(field => {
+                const r = rules[field];
+                if (!r.show) return;
+                if (field === 'LOCATION') {
+                    eviDiv.innerHTML += `
+                    <div class="bg-blue-50 p-5 rounded-xl border border-blue-200 mb-4 shadow-sm">
+                        <label class="block text-sm font-black text-blue-900 mb-3">📍 ภาพแคปหน้าจอแผนที่ / เส้นทาง (Google Maps ฯลฯ) ${reqTag(r)}</label>
+                        <div class="flex flex-col gap-3 bg-white p-3 rounded-lg border border-blue-100">
+                            <label class="flex items-center gap-2 text-sm font-bold text-slate-700 cursor-pointer">
+                                <input type="radio" name="mapCaptureMode" value="auto" checked onchange="toggleMapUpload()" class="w-4 h-4 text-blue-600"> 
+                                📸 ให้ระบบแคปหน้าจอแผนที่ด้านบนให้อัตโนมัติ (สัดส่วนสวยงาม)
+                            </label>
+                            <label class="flex items-center gap-2 text-sm font-bold text-slate-600 cursor-pointer">
+                                <input type="radio" name="mapCaptureMode" value="manual" onchange="toggleMapUpload()" class="w-4 h-4 text-slate-400"> 
+                                📁 อัปโหลดรูปภาพแผนที่ด้วยตัวเอง (เลือกได้หลายไฟล์)
+                            </label>
+                        </div>
+                        <input type="file" id="mapManualUpload" accept="image/*" multiple class="hidden mt-3 w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200 transition-all">
+                    </div>`;
+                    return;
+                }
+                let label = '';
+                if (field === 'RECEIPT') label = '📎 ภาพถ่ายใบเสร็จรับเงิน (แนบได้หลายไฟล์)';
+                if (field === 'TAX_INVOICE') label = '🧾 ภาพถ่ายใบกำกับภาษี (แนบได้หลายไฟล์)';
+                if (field === 'PHOTO') label = '📸 ภาพถ่ายกิจกรรมประกอบ (แนบได้หลายไฟล์)';
+                const reqClass = r.required ? 'required-file' : '';
+                eviDiv.innerHTML += `
+                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-4">
+                        <label class="block text-sm font-bold text-slate-600 mb-2">${label} ${reqTag(r)}</label>
+                        <input type="file" accept="image/*" multiple data-field="${field}" data-label="${label}" class="general-file-upload ${reqClass} text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-slate-200 file:text-slate-700 hover:file:bg-slate-300 transition-all">
+                    </div>`;
+            });
+        } else { eviBox.classList.add('hidden'); }
+        
+        const templates = window.currentPdfTemplates || [];
+        if (templates.includes('NORMAL') || templates.length === 0) calculatePreview();
+    }
+
+    function calculatePreview() {
+        const templates = window.currentPdfTemplates || [];
+        if (templates.some(t => TRAVEL_TEMPLATE_IDS.includes(t))) return;
+        const catId = document.getElementById('categorySelect').value;
+        const category = categories.find(c => c.id === catId);
+        if (!category) return;
+
+        let formula = category.formulaString;
+        const inputs = document.querySelectorAll('.formula-input');
+        
+        inputs.forEach(input => {
+            const val = input.value || 0;
+            const varName = input.dataset.var;
+            formula = formula.split(varName).join(val);
+        });
+
+        try {
+            const result = new Function(`return ${formula}`)();
+            document.getElementById('totalAmount').innerHTML = new Intl.NumberFormat('th-TH', { style: 'decimal', minimumFractionDigits: 2 }).format(result) + ' <span class="text-2xl">฿</span>';
+            document.getElementById('totalAmount').dataset.value = result;
+        } catch (e) { document.getElementById('totalAmount').innerHTML = '<span class="text-lg text-slate-400">กรุณากรอกตัวเลข...</span>'; }
+    }
+
+    function addGeneralReceiptRow() {
+        const tbody = document.getElementById('generalReceiptBody');
+        const tr = document.createElement('tr');
+        tr.className = 'gr-row';
+        tr.innerHTML = `
+            <td class="px-3 py-2">
+                <input type="date" class="gr-date w-full border border-slate-200 px-2 py-1.5 rounded text-sm outline-none focus:border-blue-400">
+            </td>
+            <td class="px-3 py-2">
+                <input type="text" class="gr-desc w-full border border-slate-200 px-2 py-1.5 rounded text-sm outline-none focus:border-blue-400" placeholder="เช่น ค่าอาหารกลางวัน">
+            </td>
+            <td class="px-3 py-2">
+                <input type="number" min="0" step="any" class="gr-amt w-full border border-slate-200 px-2 py-1.5 rounded text-sm text-right font-mono outline-none focus:border-blue-400" placeholder="0.00" oninput="calcGeneralReceiptTotal()">
+            </td>
+            <td class="px-2 py-2 text-center">
+                <button type="button" onclick="removeGeneralReceiptRow(this)" class="text-slate-300 hover:text-rose-500 transition-colors p-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    }
+
+    function removeGeneralReceiptRow(btn) {
+        btn.closest('.gr-row').remove();
+        calcGeneralReceiptTotal();
+    }
+
+    function calcGeneralReceiptTotal() {
+        let total = 0;
+        document.querySelectorAll('.gr-amt').forEach(inp => { total += parseFloat(inp.value) || 0; });
+        document.getElementById('generalReceiptTotal').textContent =
+            total.toLocaleString(undefined, { minimumFractionDigits: 2 }) + ' บาท';
+        const templates = window.currentPdfTemplates || [];
+        const hasTravel = templates.some(t => TRAVEL_TEMPLATE_IDS.includes(t));
+        const hasNormal = templates.includes('NORMAL');
+        if (!hasTravel && !hasNormal) {
+            document.getElementById('totalAmount').innerHTML =
+                total.toLocaleString(undefined, { minimumFractionDigits: 2 }) + ' <span class="text-2xl">฿</span>';
+            document.getElementById('totalAmount').dataset.value = total;
+        }
+    }
+
+    function collectGeneralReceiptItems() {
+        const items = [];
+        document.querySelectorAll('.gr-row').forEach(row => {
+            items.push({
+                date:        row.querySelector('.gr-date').value,
+                description: row.querySelector('.gr-desc').value,
+                amount:      parseFloat(row.querySelector('.gr-amt').value) || 0
+            });
+        });
+        return items;
+    }
+
+    const fileToBase64 = (file) => new Promise((resolve, reject) => {
+        const reader = new FileReader(); reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result); reader.onerror = error => reject(error);
+    });
+
+    async function submitExpense() {
+        const catId = document.getElementById('categorySelect').value;
+        const requester = document.getElementById('requestedBy').value;
+        const descriptionValue = document.getElementById('description').value;
+        const templates = window.currentPdfTemplates || [];
+        const hasTravel  = templates.some(t => TRAVEL_TEMPLATE_IDS.includes(t));
+        const hasGeneral = templates.includes('GENERAL_RECEIPT');
+        const hasNormal  = templates.includes('NORMAL') || (!hasTravel && !hasGeneral);
+
+        if (!catId) return alert("กรุณาเลือกหมวดหมู่ให้ครบถ้วน");
+        if (!requester) return alert("กรุณาระบุชื่อผู้ขอเบิก");
+
+        const category = categories.find(c => c.id === catId);
+        const rules = getAttachmentRules(category);
+        if (rules.LOCATION && rules.LOCATION.required && !hasTravel) {
+            return alert("❌ หมวดนี้บังคับแนบหลักฐานแผนที่ กรุณาตรวจสอบการตั้งค่าหมวดงบประมาณ");
+        }
+
+        const position = document.getElementById('position')?.value || '';
+        let metadata = {
+            _pdfTemplates: templates, _budgetCategoryId: catId, _position: position,
+            _activityName: document.getElementById('activityName')?.value || '',
+            _affiliation:  document.getElementById('affiliation')?.value || ''
+        };
+
+        if (hasTravel) {
+            const travelFrom = document.getElementById('travelFrom').value;
+            const travelTo = document.getElementById('travelTo').value;
+            if (!travelFrom.trim() || !travelTo.trim()) return alert("❌ กรุณาระบุสถานที่ 'จุดเริ่มต้น' และ 'จุดหมาย' ให้ครบถ้วน");
+            const dateStart = document.getElementById('dateStart').value;
+            const dateEnd   = document.getElementById('dateEnd').value;
+            if (!dateStart) return alert("❌ กรุณาระบุวันที่ออกเดินทาง");
+            if (!dateEnd)   return alert("❌ กรุณาระบุวันที่กลับถึงที่พัก");
+            metadata._addr = {
+                no: document.getElementById('addrNo')?.value || '', road: document.getElementById('addrRoad')?.value || '',
+                soi: document.getElementById('addrSoi')?.value || '', sub: document.getElementById('addrSub')?.value || '',
+                dist: document.getElementById('addrDist')?.value || '', prov: document.getElementById('addrProv')?.value || '',
+                zip: document.getElementById('addrZip')?.value || ''
+            };
+            metadata._travel = {
+                startFromType: document.getElementById('startFromType')?.value || '',
+                startDate: document.getElementById('dateStart')?.value || '', startTime: document.getElementById('timeStart')?.value || '',
+                endDate: document.getElementById('dateEnd')?.value || '', endTime: document.getElementById('timeEnd')?.value || '',
+                from: travelFrom, to: travelTo, toProv: document.getElementById('targetProv')?.value || '',
+                distOut: document.getElementById('distOutbound')?.value || 0, distRet: document.getElementById('distReturn')?.value || 0
+            };
+            metadata._costs = {
+                hotel: { type: document.getElementById('hotelType')?.value || '', name: document.getElementById('hotelName')?.value || '', rate: document.getElementById('hotelRate')?.value || 0, nights: document.getElementById('hotelNights')?.value || 0 },
+                fuelRate: document.getElementById('fuelRate')?.value || 0,
+                taxiEntries: collectTaxiEntries(),
+                airAmount: document.getElementById('airfareCost')?.value || 0,
+                tollAmount: document.getElementById('tollCost')?.value || 0,
+                otherAmount: document.getElementById('otherCost')?.value || 0
+            };
+            metadata._carType = document.getElementById('carType')?.value || 'ไม่ระบุ';
+            metadata._extraAddr = document.getElementById('extraAddrLine')?.value.trim() || '';
+            metadata._extraActivities = [...document.querySelectorAll('.extra-act-text')]
+                .map(i => i.value.trim()).filter(Boolean);
+
+            // Validate taxi entries
+            const taxiEntries = collectTaxiEntries();
+            for (const e of taxiEntries) {
+                if (!e.date) return alert('กรุณาระบุวันที่ในทุกรายการ Taxi');
+                if (e.direction === 'ไป-กลับ') {
+                    if ((e.amountOut || 0) > taxiMaxPerTrip) return alert(`ยอดค่า Taxi ขาไป (${e.amountOut} บาท) เกินวงเงินที่อนุมัติสูงสุด ${taxiMaxPerTrip} บาท/เที่ยว`);
+                    if ((e.amountRet || 0) > taxiMaxPerTrip) return alert(`ยอดค่า Taxi ขากลับ (${e.amountRet} บาท) เกินวงเงินที่อนุมัติสูงสุด ${taxiMaxPerTrip} บาท/เที่ยว`);
+                } else {
+                    if (e.amount > taxiMaxPerTrip) return alert(`ยอดค่า Taxi (${e.amount} บาท) เกินวงเงินที่อนุมัติสูงสุด ${taxiMaxPerTrip} บาท/เที่ยว`);
+                }
+            }
+        } else if (hasNormal) {
+            if (!descriptionValue.trim()) return alert("❌ กรุณาระบุรายละเอียดกิจกรรม หรือสิ่งที่ซื้อ ให้ชัดเจน");
+            document.querySelectorAll('.formula-input').forEach(input => { metadata[input.dataset.var] = parseFloat(input.value) || 0; });
+        }
+
+        if (hasGeneral) {
+            const grItems = collectGeneralReceiptItems();
+            if (grItems.length === 0) return alert("❌ กรุณาเพิ่มรายการค่าใช้จ่ายในตาราง FM-SAM-003-06 อย่างน้อย 1 รายการ");
+            metadata._generalReceiptItems = grItems;
+        }
+
+        const mapCaptureModeElem = document.querySelector('input[name="mapCaptureMode"]:checked');
+        const locRule = rules.LOCATION || {};
+        if (locRule.show && locRule.required && hasTravel && mapCaptureModeElem) {
+            if (mapCaptureModeElem.value === 'auto') {
+                const dO = parseFloat(metadata._travel.distOut) || 0;
+                const dR = parseFloat(metadata._travel.distRet) || 0;
+                if (dO === 0 && dR === 0) return alert("❌ กรุณากดปุ่มบันทึกระยะทางจากแผนที่ เพื่อแคปรูปอัตโนมัติ");
+            } else if (mapCaptureModeElem.value === 'manual') {
+                const manualInput = document.getElementById('mapManualUpload');
+                if (!manualInput || !manualInput.files || manualInput.files.length === 0) return alert("❌ กรุณาอัปโหลดรูปภาพแผนที่");
+            }
+        }
+
+        const requiredFiles = document.querySelectorAll('.general-file-upload.required-file');
+        for (const input of requiredFiles) {
+            if (!input.files || input.files.length === 0) return alert("❌ ไม่สามารถบันทึกได้! \nกรุณาแนบไฟล์: " + input.dataset.label);
+        }
+
+        const finalAmount = parseFloat(document.getElementById('totalAmount').dataset.value || 0);
+        if (finalAmount <= 0) return alert("ยอดเบิกต้องมากกว่า 0 บาท");
+
+        const btn = document.getElementById('submitBtn');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '⏳ กำลังประมวลผลไฟล์...'; btn.disabled = true;
+
+        const uploadedImages = [];
+
+        if (locRule.show && hasTravel && mapCaptureModeElem) {
+            const mode = mapCaptureModeElem.value;
+            const manualInput = document.getElementById('mapManualUpload');
+            const dO = parseFloat(metadata._travel.distOut) || 0;
+            const dR = parseFloat(metadata._travel.distRet) || 0;
+            let shouldCaptureMap = locRule.required;
+            if (!shouldCaptureMap) {
+                if (mode === 'auto' && (dO > 0 || dR > 0)) shouldCaptureMap = true;
+                if (mode === 'manual' && manualInput && manualInput.files && manualInput.files.length > 0) shouldCaptureMap = true;
+            }
+            if (shouldCaptureMap) {
+                if (mode === 'auto') {
+                    btn.innerHTML = '📸 กำลังแคปหน้าจอแผนที่อัตโนมัติ...';
+                    try {
+                        await new Promise(r => setTimeout(r, 800)); 
+                        const mapElem = document.getElementById('map');
+                        const canvas = await html2canvas(mapElem, { useCORS: true, allowTaint: true, scale: 2 });
+                        uploadedImages.push(canvas.toDataURL('image/jpeg', 0.85));
+                    } catch (err) {
+                        btn.innerHTML = originalText; btn.disabled = false;
+                        return alert("เกิดข้อผิดพลาดในการแคปหน้าจอแผนที่ กรุณาเปลี่ยนเป็น 'อัปโหลดรูปภาพเอง'");
+                    }
+                } else if (manualInput && manualInput.files) {
+                    for (let i = 0; i < manualInput.files.length; i++) uploadedImages.push(await fileToBase64(manualInput.files[i]));
+                }
+            }
+        }
+
+        for (const input of document.querySelectorAll('.general-file-upload')) {
+            if (input.files) {
+                for (let i = 0; i < input.files.length; i++) uploadedImages.push(await fileToBase64(input.files[i]));
+            }
+        }
+
+        btn.innerHTML = '☁️ กำลังบันทึกเข้าสู่ระบบ...';
+
+        let descForRecord = descriptionValue;
+        if (hasTravel) descForRecord = "เบิกค่าเดินทางไปปฏิบัติงาน";
+        else if (hasGeneral && !hasNormal) descForRecord = "เบิกค่าใช้จ่าย (ใบรับรองทั่วไป)";
+
+        const payload = {
+            projectId: null,
+            requestedBy: requester,
+            description: descForRecord,
+            status: "OBLIGATED", inputMetadata: metadata, attachments: { images: uploadedImages }, amount: finalAmount
+        };
+
+        let savedViaApi = false;
+        try {
+            let res;
+            if (editingExpenseId) {
+                res = await fetch(`${API_BASE}/expenses/${editingExpenseId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+            } else {
+                res = await fetch(`${API_BASE}/expenses`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+            }
+            if (res && res.ok) savedViaApi = true;
+        } catch (e) { /* ไม่มีเซิร์ฟเวอร์หรือเครือข่ายล้ม */ }
+
+        if (savedViaApi) {
+            alert(editingExpenseId ? "✅ อัปเดตข้อมูลสำเร็จ!" : "🎉 บันทึกข้อมูลสำเร็จ!");
+            window.location.href = 'history.html';
+            return;
+        }
+
+        try {
+            const arr = JSON.parse(localStorage.getItem(LOCAL_EXPENSES_KEY) || '[]');
+            const row = Object.assign({}, payload, {
+                createdAt: new Date().toISOString(),
+                _savedLocally: true
+            });
+            arr.unshift(row);
+            localStorage.setItem(LOCAL_EXPENSES_KEY, JSON.stringify(arr));
+            alert("✅ บันทึกในเครื่องแล้ว (ไม่มี API / เซิร์ฟเวอร์ไม่ตอบ)\nรายการจะไปแสดงในหน้า「ประวัติการเบิก」จากข้อมูล LocalStorage");
+            window.location.href = 'history.html';
+        } catch (e2) {
+            alert("บันทึกไม่สำเร็จ (LocalStorage เต็มหรือถูกบล็อก)");
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+    }
+    async function prefillForm(expense) {
+        const meta = expense.inputMetadata || {};
+        document.getElementById('requestedBy').value = expense.requestedBy || '';
+        document.getElementById('position').value     = meta._position     || '';
+        document.getElementById('affiliation').value  = meta._affiliation  || '';
+        document.getElementById('activityName').value = meta._activityName || '';
+
+        const catSel = document.getElementById('categorySelect');
+        catSel.value = meta._budgetCategoryId || '';
+        generateInputs();
+
+        // Restore pdfTemplates from saved metadata (new format or old compat)
+        if (Array.isArray(meta._pdfTemplates) && meta._pdfTemplates.length > 0) {
+            window.currentPdfTemplates = [...meta._pdfTemplates];
+        } else if (meta._pdfTemplate) {
+            const old = meta._pdfTemplate;
+            if (old === 'TRAVEL_BOTH')    window.currentPdfTemplates = ['REPORT', 'TRANSPORT_RECEIPT'];
+            else if (old === 'TRAVEL_REPORT')  window.currentPdfTemplates = ['REPORT'];
+            else if (old === 'TRAVEL_RECEIPT') window.currentPdfTemplates = ['TRANSPORT_RECEIPT'];
+            else window.currentPdfTemplates = ['NORMAL'];
+        }
+        updateFormUI();
+
+        const templates = window.currentPdfTemplates || [];
+        const hasTravel  = templates.some(t => TRAVEL_TEMPLATE_IDS.includes(t));
+        const hasGeneral = templates.includes('GENERAL_RECEIPT');
+
+        if (hasTravel) {
+            const tr   = meta._travel || {};
+            const c    = meta._costs  || {};
+            const addr = meta._addr   || {};
+
+            document.getElementById('addrNo').value    = addr.no   || '';
+            document.getElementById('addrRoad').value  = addr.road || '';
+            document.getElementById('addrSoi').value   = addr.soi  || '';
+            document.getElementById('addrSub').value   = addr.sub  || '';
+            document.getElementById('addrDist').value  = addr.dist || '';
+            document.getElementById('addrProv').value  = addr.prov || '';
+            document.getElementById('addrZip').value   = addr.zip  || '';
+
+            document.getElementById('startFromType').value = tr.startFromType || 'ที่พัก';
+            document.getElementById('dateStart').value     = tr.startDate || '';
+            document.getElementById('timeStart').value     = tr.startTime || '';
+            document.getElementById('dateEnd').value       = tr.endDate   || '';
+            document.getElementById('timeEnd').value       = tr.endTime   || '';
+            document.getElementById('targetProv').value    = tr.toProv    || '';
+            document.getElementById('travelFrom').value    = tr.from      || '';
+            document.getElementById('travelTo').value      = tr.to        || '';
+            document.getElementById('distOutbound').value  = tr.distOut   || 0;
+            document.getElementById('distReturn').value    = tr.distRet   || 0;
+            if (tr.distOut || tr.distRet) {
+                window.currentRouteDistance = parseFloat(tr.distOut || tr.distRet || 0);
+            }
+
+            document.getElementById('carType').value   = meta._carType   || 'ไม่ระบุ';
+            document.getElementById('fuelRate').value  = c.fuelRate       || 4;
+            document.getElementById('hotelType').value = (c.hotel && c.hotel.type)   || 'พักเดี่ยว';
+            document.getElementById('hotelName').value = (c.hotel && c.hotel.name)   || '';
+            document.getElementById('hotelRate').value = (c.hotel && c.hotel.rate)   || '';
+            document.getElementById('hotelNights').value = (c.hotel && c.hotel.nights) || '';
+            document.getElementById('airfareCost').value = c.airAmount  || '';
+            document.getElementById('tollCost').value    = c.tollAmount || '';
+            document.getElementById('otherCost').value   = c.otherAmount || '';
+
+            // Taxi entries
+            const taxiList = document.getElementById('taxiEntriesList');
+            taxiList.innerHTML = '';
+            if (Array.isArray(c.taxiEntries)) {
+                for (const entry of c.taxiEntries) {
+                    addTaxiEntry();
+                    const row = taxiList.lastElementChild;
+                    row.querySelector('.taxi-date').value = entry.date || '';
+                    row.querySelector('.taxi-from').value = entry.from || '';
+                    row.querySelector('.taxi-to').value   = entry.to   || '';
+                    const dirSel = row.querySelector('.taxi-dir');
+                    dirSel.value = entry.direction || 'ขาไป';
+                    onTaxiDirChange(dirSel);
+                    if (entry.direction === 'ขากลับ') {
+                        row.querySelector('.taxi-amt-ret').value = entry.amount || '';
+                    } else if (entry.direction === 'ไป-กลับ') {
+                        row.querySelector('.taxi-amt-out').value = entry.amountOut || '';
+                        row.querySelector('.taxi-amt-ret').value = entry.amountRet || '';
+                    } else {
+                        row.querySelector('.taxi-amt-out').value = entry.amount || '';
+                    }
+                }
+            }
+            // Extra bottom entries
+            document.getElementById('extraAddrLine').value = meta._extraAddr || '';
+            const extraList = document.getElementById('extraActivitiesList');
+            extraList.innerHTML = '<p class="text-xs text-slate-400 italic">ยังไม่มีรายการ — กดปุ่ม "เพิ่มแถว" ด้านบน</p>';
+            if (Array.isArray(meta._extraActivities) && meta._extraActivities.length > 0) {
+                meta._extraActivities.forEach(act => {
+                    addExtraActivity();
+                    extraList.lastElementChild.querySelector('.extra-act-text').value = act;
+                });
+            }
+
+            calculateTravelTotal();
+        } else {
+            document.getElementById('description').value = expense.description || '';
+            document.querySelectorAll('.formula-input').forEach(inp => {
+                if (meta[inp.dataset.var] !== undefined) inp.value = meta[inp.dataset.var];
+            });
+            calculatePreview();
+        }
+
+        if (hasGeneral && Array.isArray(meta._generalReceiptItems)) {
+            const tbody = document.getElementById('generalReceiptBody');
+            tbody.innerHTML = '';
+            meta._generalReceiptItems.forEach(item => {
+                addGeneralReceiptRow();
+                const row = tbody.lastElementChild;
+                row.querySelector('.gr-date').value = item.date || '';
+                row.querySelector('.gr-desc').value = item.description || '';
+                row.querySelector('.gr-amt').value  = item.amount || '';
+            });
+            calcGeneralReceiptTotal();
+        }
+    }
+
+    function buildSmartMapSuggestions(q) {
+        // แยก query เป็น tokens แล้วสร้าง sub-query ที่กว้างขึ้น
+        const parts = q.trim().split(/\s+/).filter(Boolean);
+        if (parts.length <= 1) return [];
+
+        const locPrefixes = ['ตำบล','แขวง','อำเภอ','เขต','จังหวัด','ซอย','ถนน','หมู่บ้าน','หมู่ที่','ต.','อ.','จ.'];
+        const suggestions = [];
+
+        // หา index แรกที่เป็น keyword ที่อยู่
+        let firstLocIdx = parts.findIndex(p => locPrefixes.some(pre => p.startsWith(pre)));
+
+        if (firstLocIdx > 0) {
+            // ตัดส่วนหน้า (เลขที่บ้าน ฯลฯ) ออก เหลือแค่ ตำบล อำเภอ จังหวัด
+            suggestions.push(parts.slice(firstLocIdx).join(' '));
+        }
+        if (parts.length >= 3) {
+            // สองคำสุดท้าย (มักเป็น อำเภอ + จังหวัด)
+            const last2 = parts.slice(-2).join(' ');
+            if (!suggestions.includes(last2)) suggestions.push(last2);
+        }
+        // คำสุดท้าย (มักเป็นจังหวัด)
+        const last1 = parts[parts.length - 1];
+        if (!suggestions.includes(last1)) suggestions.push(last1);
+
+        return suggestions.filter(s => s !== q).slice(0, 3);
+    }
+
+    init();
+    </script>
+</body>
+</html>

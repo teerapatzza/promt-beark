@@ -1,0 +1,23 @@
+services:
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    volumes:
+      - db_data:/app/data
+    environment:
+      - DB_PATH=/app/data/prompt-berk.db
+      - PORT=3000
+
+  frontend:
+    build: .
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      - BACKEND_HOST=backend
+      - BACKEND_PORT=3000
+
+volumes:
+  db_data:

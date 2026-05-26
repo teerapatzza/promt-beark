@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>คู่มือการเข้าใช้ (เซิร์ฟเวอร์) - Prompt-Berk</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Sarabun', sans-serif; }</style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen p-6 md:p-10">
+    <div class="max-w-3xl mx-auto bg-white rounded-2xl shadow border border-slate-200 p-8">
+        <a href="index.html" class="text-blue-600 font-bold text-sm hover:underline">← กลับเมนูหลัก</a>
+        <h1 class="text-2xl font-black text-slate-900 mt-4 mb-2">การเข้าใช้บนเซิร์ฟเวอร์</h1>
+        <p class="text-slate-500 text-sm mb-6">สำหรับผู้ประสานงานและ IT</p>
+
+        <div class="rounded-xl bg-blue-50 border border-blue-200 p-4 mb-6">
+            <p class="text-sm font-bold text-blue-900 mb-1">ที่อยู่เข้าใช้งานของคุณตอนนี้</p>
+            <p class="font-mono text-blue-800 break-all" id="hereUrl">—</p>
+        </div>
+
+        <h2 class="font-bold text-slate-800 border-b pb-2 mb-3">คนอื่นเข้ายังไง</h2>
+        <ol class="list-decimal pl-5 space-y-2 text-sm text-slate-700 mb-6">
+            <li>ต้องเข้าถึงเครือข่ายเดียวกับเซิร์ฟเวอร์ (LAN / VPN / IP ที่ IT เปิด)</li>
+            <li>เปิดเบราว์เซอร์ แล้วพิมพ์ <span class="font-mono bg-slate-100 px-1 rounded">http://&lt;IP-เซิร์ฟเวอร์&gt;:8080/</span> (หรือพอร์ตที่ตั้งใน Docker)</li>
+            <li>เริ่มที่หน้าแรก แล้วเลือกเมนู เช่น 「สร้างรายการเบิกใหม่」「ตั้งค่าระบบ (Admin)」</li>
+        </ol>
+
+        <h2 class="font-bold text-slate-800 border-b pb-2 mb-3">ข้อจำกัดที่ควรรู้</h2>
+        <ul class="space-y-3 text-sm text-slate-700 mb-6">
+            <li class="flex gap-2"><span class="text-amber-600 font-bold">•</span><span><b>ข้อมูลอยู่ในเบราว์เซอร์:</b> หมวดงบจากแอดมิน โปรไฟล์ และรายการเบิก (เมื่อไม่มี API) เก็บใน <b>LocalStorage</b> ต่อเครื่อง — ไม่ใช่ฐานข้อมูลกลางบนเซิร์ฟเวอร์</span></li>
+            <li class="flex gap-2"><span class="text-amber-600 font-bold">•</span><span><b>กติกาเดียวกันทั้งทีม:</b> ให้ฝ่ายการเงิน (หรือผู้กำหนด) ตั้งค่าแอดมินบนเครื่องหนึ่ง แล้วถ่ายโอนค่าไปเครื่องอื่นตามขั้นตอนที่องค์กรกำหนด (หรือรอฟีเจอร์ export/import ในอนาคต)</span></li>
+            <li class="flex gap-2"><span class="text-amber-600 font-bold">•</span><span><b>ไม่มีระบบ login</b> ในแอปนี้ — ใครรู้ URL ก็เข้าได้ ควรใช้ในอินทราเน็ตหรือจำกัดไฟร์วอลล์</span></li>
+            <li class="flex gap-2"><span class="text-amber-600 font-bold">•</span><span><b>คีย์แผนที่ Longdo</b> อยู่ในโค้ดหน้าเว็บ — หากเปิดสู่สาธารณะควรปรับตามนโยบายความปลอดภัย</span></li>
+            <li class="flex gap-2"><span class="text-amber-600 font-bold">•</span><span><b>HTTPS:</b> แนะนำให้ IT ใส่ reverse proxy (เช่น TLS ที่ Nginx/Caddy ด้านหน้า) สำหรับใช้งานจริงในองค์กร</span></li>
+        </ul>
+
+        <h2 class="font-bold text-slate-800 border-b pb-2 mb-3">Docker (สำหรับ IT)</h2>
+        <pre class="bg-slate-900 text-slate-100 text-xs p-4 rounded-xl overflow-x-auto">docker compose up -d --build</pre>
+        <p class="text-xs text-slate-500 mt-2">รายละเอียดเพิ่มเติมอยู่ในไฟล์ <span class="font-mono">DEPLOYMENT.md</span> ในโฟลเดอร์โปรเจกต์ (ไม่ได้อยู่ใน image ถ้าไม่ได้ copy เพิ่ม)</p>
+    </div>
+    <script>
+        document.getElementById('hereUrl').textContent = window.location.origin + '/';
+    </script>
+</body>
+</html>

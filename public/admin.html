@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ตั้งค่าระบบ (Admin) - Prompt-Berk</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Sarabun', sans-serif; }
+        .nav-item { transition: background 0.15s, color 0.15s; }
+        .nav-item.active { background: rgba(255,255,255,0.12); color: #fff; }
+        .nav-item:not(.active) { color: #94a3b8; }
+        .nav-item:not(.active):hover { background: rgba(255,255,255,0.07); color: #cbd5e1; }
+        .att-drag-over { outline: 2px dashed #3b82f6; background: #eff6ff !important; }
+        .att-row-dragging { opacity: 0.35; }
+        .drag-handle { cursor: grab; }
+        .drag-handle:active { cursor: grabbing; }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-800">
+
+<div class="flex h-screen overflow-hidden">
+
+    <!-- ── Sidebar ─────────────────────────────────────── -->
+    <aside class="w-56 bg-slate-900 flex flex-col flex-shrink-0 h-full overflow-y-auto">
+        <div class="px-5 pt-6 pb-5 border-b border-slate-700/60">
+            <div class="text-white font-black text-lg tracking-tight">Prompt-Berk</div>
+            <div class="text-slate-400 text-xs mt-0.5 font-medium">ตั้งค่าระบบ</div>
+        </div>
+
+        <nav class="flex-1 py-4 px-3 space-y-0.5">
+            <button onclick="showPanel('categories')" id="nav-categories"
+                class="nav-item active w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold text-left">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                </svg>
+                หมวดหมู่งบประมาณ
+            </button>
+        </nav>
+
+        <div class="p-4 border-t border-slate-700/60">
+            <a href="index.html"
+                class="flex items-center gap-2 text-slate-400 hover:text-slate-200 text-sm font-medium transition-colors py-1">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                </svg>
+                กลับหน้าหลัก
+            </a>
+        </div>
+    </aside>
+
+    <!-- ── Main content ────────────────────────────────── -->
+    <main class="flex-1 overflow-y-auto bg-slate-100">
+
+        <!-- Panel: Categories -->
+        <div id="panel-categories">
+            <div class="px-6 py-4 border-b border-slate-200 bg-white sticky top-0 z-10">
+                <h1 class="text-lg font-bold text-slate-800">หมวดหมู่งบประมาณ</h1>
+                <p class="text-slate-500 text-xs mt-0.5">สร้างและแก้ไขหมวดหมู่ กำหนดสูตรคำนวณ และเอกสารแนบที่จำเป็น</p>
+            </div>
+
+            <div class="p-6 grid grid-cols-1 xl:grid-cols-5 gap-5">
+
+                <!-- Form column (xl: 2 cols) -->
+                <div class="xl:col-span-2 space-y-4">
+
+                    <!-- Category fields -->
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+                        <div class="flex items-center justify-between mb-4">
+                            <h2 id="formPanelTitle" class="font-bold text-slate-700">เพิ่มหมวดหมู่ใหม่</h2>
+                        </div>
+
+                        <div id="editModeBanner"
+                            class="hidden mb-4 p-3 rounded-xl bg-amber-50 border border-amber-200 text-sm text-amber-900 flex items-center justify-between gap-2">
+                            <span class="font-semibold">กำลังแก้ไขหมวดหมู่</span>
+                            <button type="button" onclick="cancelEditCategory()"
+                                class="text-xs font-bold px-3 py-1 rounded-lg bg-white border border-amber-300 hover:bg-amber-100 transition-colors">
+                                ยกเลิก
+                            </button>
+                        </div>
+
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wide">รหัสหมวดหมู่ (ID)</label>
+                                <input type="text" id="catId" placeholder="เช่น TRAVEL, FOOD_01"
+                                    class="w-full border border-slate-200 px-3 py-2 rounded-lg text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none uppercase font-mono transition">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wide">ชื่อหมวดหมู่</label>
+                                <input type="text" id="catName" placeholder="เช่น ค่าเดินทางไปปฏิบัติงาน"
+                                    class="w-full border border-slate-200 px-3 py-2 rounded-lg text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wide">ตัวแปรที่ใช้ (คั่นด้วยลูกน้ำ)</label>
+                                <input type="text" id="catVars" placeholder="เช่น จำนวนคน, เรทราคา"
+                                    class="w-full border border-slate-200 px-3 py-2 rounded-lg text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wide">สมการคำนวณ (Formula)</label>
+                                <textarea id="catFormula" rows="2" placeholder="เช่น จำนวนคน * เรทราคา"
+                                    class="w-full border border-slate-200 px-3 py-2 rounded-lg text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none font-mono transition resize-none"></textarea>
+                                <p class="text-[10px] text-rose-500 mt-0.5">ต้องใช้ชื่อตัวแปรให้ตรงกับช่องด้านบน</p>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 mb-2 uppercase tracking-wide">เอกสาร PDF ที่สร้าง</label>
+                                <div class="space-y-2 p-3 rounded-xl bg-slate-50 border border-slate-200">
+                                    <label class="flex items-center gap-2.5 cursor-pointer select-none">
+                                        <input type="checkbox" id="catTplNormal" class="cat-tpl-cb w-4 h-4 text-blue-600 rounded" value="NORMAL" onchange="onTplCheckChange()">
+                                        <span class="text-xs text-slate-700 font-medium">บันทึกข้อความ (ทั่วไป)</span>
+                                    </label>
+                                    <label class="flex items-center gap-2.5 cursor-pointer select-none">
+                                        <input type="checkbox" id="catTplReport" class="cat-tpl-cb w-4 h-4 text-blue-600 rounded" value="REPORT" onchange="onTplCheckChange()">
+                                        <span class="text-xs text-slate-700 font-medium">FM-SAM-001-04 ใบรายงานการเดินทาง</span>
+                                    </label>
+                                    <label class="flex items-center gap-2.5 cursor-pointer select-none">
+                                        <input type="checkbox" id="catTplTransport" class="cat-tpl-cb w-4 h-4 text-blue-600 rounded" value="TRANSPORT_RECEIPT" onchange="onTplCheckChange()">
+                                        <span class="text-xs text-slate-700 font-medium">FM-SAM-095-00 ใบรับรองค่าพาหนะ</span>
+                                    </label>
+                                    <label class="flex items-center gap-2.5 cursor-pointer select-none">
+                                        <input type="checkbox" id="catTplGeneral" class="cat-tpl-cb w-4 h-4 text-blue-600 rounded" value="GENERAL_RECEIPT" onchange="onTplCheckChange()">
+                                        <span class="text-xs text-slate-700 font-medium">FM-SAM-003-06 ใบรับรองทั่วไป (เงินสด/อาหาร)</span>
+                                    </label>
+                                </div>
+                                <p class="text-[10px] text-slate-400 mt-1">เลือกได้หลายรายการ — ฟอร์มเบิกจะปรับช่องกรอกตามนี้</p>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wide">วงเงิน Taxi สูงสุดต่อเที่ยว</label>
+                                <div class="flex items-center gap-2">
+                                    <input type="number" id="catTaxiMax" min="1" step="1" placeholder="เช่น 600"
+                                        class="w-28 border border-slate-200 px-3 py-2 rounded-lg text-sm font-mono outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition text-center">
+                                    <span class="text-sm text-slate-500">บาท/เที่ยว</span>
+                                    <label class="flex items-center gap-1.5 text-xs text-slate-500 ml-1 cursor-pointer select-none">
+                                        <input type="checkbox" id="catTaxiUnlimited" onchange="onTaxiUnlimitedChange()" class="w-3.5 h-3.5 cursor-pointer">
+                                        ไม่จำกัด
+                                    </label>
+                                </div>
+                                <p class="text-[10px] text-slate-400 mt-0.5">เว้นว่างถ้าหมวดนี้ไม่มีการเบิก Taxi</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Attachment order & rules -->
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+                        <div class="flex items-center justify-between mb-1">
+                            <h3 class="font-bold text-slate-700 text-sm">เอกสารแนบ</h3>
+                            <span class="text-[10px] text-slate-400 flex items-center gap-1">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"/>
+                                </svg>
+                                ลากเพื่อเรียงลำดับ
+                            </span>
+                        </div>
+                        <p class="text-[11px] text-slate-500 mb-3">ติ๊ก <b>แสดง</b> เพื่อให้มีช่องแนบ &bull; ติ๊ก <b>บังคับ</b> เมื่อต้องการให้แนบก่อนบันทึก</p>
+                        <div class="rounded-xl border border-slate-200 overflow-hidden">
+                            <table class="w-full text-xs">
+                                <thead class="bg-slate-50 border-b border-slate-200">
+                                    <tr class="text-[11px] uppercase text-slate-400 font-bold">
+                                        <th class="px-3 py-2 text-left">ประเภท</th>
+                                        <th class="px-2 py-2 text-center w-14">แสดง</th>
+                                        <th class="px-2 py-2 text-center w-14">บังคับ</th>
+                                        <th class="px-2 py-2 text-center w-14">เรียง</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="attachmentTableBody" class="divide-y divide-slate-100">
+                                    <!-- rendered by renderAttachmentRows() -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <button type="button" id="btnSaveCategory" onclick="saveCategory()"
+                        class="w-full bg-slate-800 text-white font-bold py-2.5 rounded-xl hover:bg-slate-900 transition-colors shadow text-sm">
+                        บันทึกหมวดหมู่
+                    </button>
+                </div>
+
+                <!-- Table column (xl: 3 cols) -->
+                <div class="xl:col-span-3">
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
+                            <h2 class="font-bold text-slate-700 text-sm">หมวดหมู่ที่ใช้งานอยู่</h2>
+                            <button onclick="loadDemoData()"
+                                class="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors">
+                                โหลดข้อมูลตัวอย่าง
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left">
+                                <thead class="text-[11px] uppercase text-slate-400 bg-slate-50 border-b border-slate-100">
+                                    <tr>
+                                        <th class="px-4 py-2.5 font-bold">รหัส / ชื่อ</th>
+                                        <th class="px-4 py-2.5 font-bold">ตัวแปร &amp; สมการ</th>
+                                        <th class="px-4 py-2.5 font-bold">ช่องแนบ</th>
+                                        <th class="px-4 py-2.5 font-bold text-center w-20">จัดการ</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="categoryTableBody" class="divide-y divide-slate-100 text-sm"></tbody>
+                            </table>
+                        </div>
+                        <div class="px-5 py-3 bg-slate-50 border-t border-slate-100 text-[11px] text-slate-500">
+                            ข้อมูลถูกบันทึกบนเซิร์ฟเวอร์ (SQLite) — ทุกคนที่เข้าใช้จะเห็นหมวดหมู่เดียวกัน
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+    </main>
+</div>
+
+<script>
+    // ── Constants ──────────────────────────────────────────
+    const ATTACHMENT_IDS = ['LOCATION', 'RECEIPT', 'TAX_INVOICE', 'PHOTO'];
+    const ATT_LABELS = {
+        LOCATION:    'แผนที่ / เส้นทาง',
+        RECEIPT:     'ใบเสร็จรับเงิน',
+        TAX_INVOICE: 'ใบกำกับภาษี',
+        PHOTO:       'ภาพถ่ายกิจกรรม'
+    };
+    const PDF_TEMPLATE_LABELS = {
+        NORMAL:            'บันทึกข้อความ',
+        REPORT:            'ใบรายงาน',
+        TRANSPORT_RECEIPT: 'รับรองพาหนะ',
+        GENERAL_RECEIPT:   'รับรองทั่วไป'
+    };
+    const TRAVEL_TEMPLATE_IDS = ['REPORT', 'TRANSPORT_RECEIPT'];
+
+    function normalizePdfTemplates(cat) {
+        if (Array.isArray(cat.pdfTemplates) && cat.pdfTemplates.length > 0) return [...cat.pdfTemplates];
+        const old = cat.pdfTemplate || '';
+        if (old === 'TRAVEL_BOTH')    return ['REPORT', 'TRANSPORT_RECEIPT'];
+        if (old === 'TRAVEL_REPORT')  return ['REPORT'];
+        if (old === 'TRAVEL_RECEIPT') return ['TRANSPORT_RECEIPT'];
+        if (old === 'NORMAL')         return ['NORMAL'];
+        return [];
+    }
+
+    function getPdfTemplatesFromForm() {
+        return [...document.querySelectorAll('.cat-tpl-cb:checked')].map(cb => cb.value);
+    }
+
+    function setPdfTemplatesInForm(templates) {
+        document.querySelectorAll('.cat-tpl-cb').forEach(cb => {
+            cb.checked = templates.includes(cb.value);
+        });
+    }
+
+    function onTplCheckChange() {
+        const templates = getPdfTemplatesFromForm();
+        if (templates.some(t => TRAVEL_TEMPLATE_IDS.includes(t))) {
+            const locationRow = document.querySelector('[data-att="LOCATION"]');
+            if (locationRow) {
+                const showCb = locationRow.querySelector('.att-show');
+                if (!showCb.checked) { showCb.checked = true; showCb.dispatchEvent(new Event('change')); }
+            }
+        }
+    }
+
+    let categories = [];
+    let editingId = null;
+    let currentAttachmentOrder = [...ATTACHMENT_IDS];
+    let dragSrcIndex = null;
+
+
+    // ── Attachment rows ────────────────────────────────────
+    function renderAttachmentRows(order, rulesMap) {
+        rulesMap = rulesMap || {};
+        currentAttachmentOrder = [...order];
+        const tbody = document.getElementById('attachmentTableBody');
+        tbody.innerHTML = '';
+
+        order.forEach((id, idx) => {
+            const r = rulesMap[id] || { show: false, required: false };
+            const tr = document.createElement('tr');
+            tr.className = 'attachment-row hover:bg-slate-50';
+            tr.draggable = true;
+            tr.dataset.att = id;
+
+            tr.innerHTML = `
+                <td class="px-3 py-2 text-slate-700 select-none">
+                    <div class="flex items-center gap-2 drag-handle">
+                        <svg class="w-3.5 h-3.5 text-slate-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 12h16M4 16h16"/>
+                        </svg>
+                        <span class="text-xs">${ATT_LABELS[id] || id}</span>
+                    </div>
+                </td>
+                <td class="px-2 py-2 text-center">
+                    <input type="checkbox" class="att-show w-4 h-4 text-blue-600 rounded cursor-pointer"
+                        ${r.show ? 'checked' : ''} aria-label="แสดงช่อง">
+                </td>
+                <td class="px-2 py-2 text-center">
+                    <input type="checkbox" class="att-req w-4 h-4 text-rose-600 rounded cursor-pointer"
+                        ${r.show && r.required ? 'checked' : ''}
+                        ${r.show ? '' : 'disabled'}
+                        aria-label="บังคับแนบ">
+                </td>
+                <td class="px-2 py-2 text-center">
+                    <div class="inline-flex flex-col gap-0.5">
+                        <button type="button" onclick="moveAttRow(${idx}, -1)"
+                            class="text-slate-300 hover:text-slate-700 transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
+                            ${idx === 0 ? 'disabled' : ''}>
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 15l7-7 7 7"/>
+                            </svg>
+                        </button>
+                        <button type="button" onclick="moveAttRow(${idx}, 1)"
+                            class="text-slate-300 hover:text-slate-700 transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
+                            ${idx === order.length - 1 ? 'disabled' : ''}>
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </button>
+                    </div>
+                </td>
+            `;
+
+            const showCb = tr.querySelector('.att-show');
+            const reqCb  = tr.querySelector('.att-req');
+            showCb.addEventListener('change', () => {
+                if (!showCb.checked) reqCb.checked = false;
+                reqCb.disabled = !showCb.checked;
+                if (id === 'LOCATION' && showCb.checked) {
+                    const tplReport   = document.getElementById('catTplReport');
+                    const tplTransport = document.getElementById('catTplTransport');
+                    if (tplReport && !tplReport.checked)   tplReport.checked = true;
+                    if (tplTransport && !tplTransport.checked) tplTransport.checked = true;
+                }
+            });
+
+            tr.addEventListener('dragstart', e => {
+                dragSrcIndex = idx;
+                tr.classList.add('att-row-dragging');
+                e.dataTransfer.effectAllowed = 'move';
+            });
+            tr.addEventListener('dragend', () => tr.classList.remove('att-row-dragging'));
+            tr.addEventListener('dragover', e => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                tbody.querySelectorAll('.att-drag-over').forEach(el => el.classList.remove('att-drag-over'));
+                tr.classList.add('att-drag-over');
+            });
+            tr.addEventListener('dragleave', () => tr.classList.remove('att-drag-over'));
+            tr.addEventListener('drop', e => {
+                e.preventDefault();
+                tr.classList.remove('att-drag-over');
+                if (dragSrcIndex === null || dragSrcIndex === idx) return;
+                const rules = snapshotAttachmentRules();
+                const newOrder = [...currentAttachmentOrder];
+                const [moved] = newOrder.splice(dragSrcIndex, 1);
+                newOrder.splice(idx, 0, moved);
+                renderAttachmentRows(newOrder, rules);
+                dragSrcIndex = null;
+            });
+
+            tbody.appendChild(tr);
+        });
+    }
+
+    function moveAttRow(idx, dir) {
+        const newIdx = idx + dir;
+        if (newIdx < 0 || newIdx >= currentAttachmentOrder.length) return;
+        const rules = snapshotAttachmentRules();
+        const newOrder = [...currentAttachmentOrder];
+        [newOrder[idx], newOrder[newIdx]] = [newOrder[newIdx], newOrder[idx]];
+        renderAttachmentRows(newOrder, rules);
+    }
+
+    function snapshotAttachmentRules() {
+        const out = {};
+        document.querySelectorAll('.attachment-row').forEach(row => {
+            const id   = row.dataset.att;
+            const show = row.querySelector('.att-show').checked;
+            const req  = show && row.querySelector('.att-req').checked;
+            out[id] = { show, required: req };
+        });
+        return out;
+    }
+
+    function collectAttachmentRulesFromForm() {
+        return snapshotAttachmentRules();
+    }
+
+    // ── Category form helpers ──────────────────────────────
+    function onTaxiUnlimitedChange() {
+        const cb  = document.getElementById('catTaxiUnlimited');
+        const inp = document.getElementById('catTaxiMax');
+        inp.disabled = cb.checked;
+        if (cb.checked) inp.value = '';
+    }
+
+    function setFormEditMode(isEdit) {
+        document.getElementById('formPanelTitle').textContent = isEdit ? 'แก้ไขหมวดหมู่' : 'เพิ่มหมวดหมู่ใหม่';
+        document.getElementById('editModeBanner').classList.toggle('hidden', !isEdit);
+        document.getElementById('btnSaveCategory').textContent = isEdit ? 'อัปเดตหมวดหมู่' : 'บันทึกหมวดหมู่';
+    }
+
+    function getAttachmentRules(cat) {
+        if (!cat) return {};
+        if (cat.attachmentRules && typeof cat.attachmentRules === 'object') {
+            const out = {};
+            ATTACHMENT_IDS.forEach(id => {
+                const r    = cat.attachmentRules[id] || {};
+                const show = !!r.show;
+                out[id] = { show, required: show && !!r.required };
+            });
+            return out;
+        }
+        const out = {};
+        ATTACHMENT_IDS.forEach(id => {
+            const legacy = Array.isArray(cat.requiredFields) && cat.requiredFields.includes(id);
+            out[id] = { show: legacy, required: legacy };
+        });
+        return out;
+    }
+
+    function requiredFieldsFromRules(rules) {
+        return currentAttachmentOrder.filter(id => rules[id] && rules[id].required);
+    }
+
+    function loadCategoryIntoForm(cat) {
+        document.getElementById('catId').value          = cat.id || '';
+        document.getElementById('catName').value        = cat.name || '';
+        document.getElementById('catVars').value        = (cat.activeVariables || []).join(', ');
+        document.getElementById('catFormula').value     = cat.formulaString || '';
+        setPdfTemplatesInForm(normalizePdfTemplates(cat));
+        const taxiMax = cat.taxiMaxPerTrip;
+        const isUnlimited = taxiMax === null;
+        document.getElementById('catTaxiUnlimited').checked = isUnlimited;
+        document.getElementById('catTaxiMax').value   = (taxiMax != null && taxiMax > 0) ? taxiMax : '';
+        document.getElementById('catTaxiMax').disabled = isUnlimited;
+        const rules = getAttachmentRules(cat);
+        const order = (cat.attachmentOrder && cat.attachmentOrder.length) ? cat.attachmentOrder : [...ATTACHMENT_IDS];
+        renderAttachmentRows(order, rules);
+    }
+
+    function clearCategoryForm() {
+        document.getElementById('catId').value          = '';
+        document.getElementById('catName').value        = '';
+        document.getElementById('catVars').value        = '';
+        document.getElementById('catFormula').value     = '';
+        setPdfTemplatesInForm([]);
+        document.getElementById('catTaxiMax').value     = '';
+        document.getElementById('catTaxiMax').disabled  = false;
+        document.getElementById('catTaxiUnlimited').checked = false;
+        renderAttachmentRows([...ATTACHMENT_IDS], {});
+    }
+
+    function cancelEditCategory() {
+        editingId = null;
+        clearCategoryForm();
+        setFormEditMode(false);
+    }
+
+    function beginEditCategory(id) {
+        const cat = categories.find(c => c.id === id);
+        if (!cat) return;
+        editingId = id;
+        loadCategoryIntoForm(cat);
+        setFormEditMode(true);
+        document.getElementById('panel-categories').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    // ── Category table ─────────────────────────────────────
+    function formatAttachmentCell(cat) {
+        const rules = getAttachmentRules(cat);
+        const order = (cat.attachmentOrder && cat.attachmentOrder.length) ? cat.attachmentOrder : ATTACHMENT_IDS;
+        const parts = [];
+        order.forEach(id => {
+            const r = rules[id];
+            if (!r || !r.show) return;
+            const cls    = r.required ? 'bg-rose-100 text-rose-800' : 'bg-slate-100 text-slate-600';
+            const suffix = r.required ? ' *' : '';
+            parts.push(`<span class="${cls} px-2 py-0.5 rounded text-[10px] font-bold">${ATT_LABELS[id] || id}${suffix}</span>`);
+        });
+        return parts.length ? parts.join(' ') : '<span class="text-slate-300 text-xs">ไม่มีช่องแนบ</span>';
+    }
+
+    function pdfTemplateSummary(cat) {
+        const templates = normalizePdfTemplates(cat);
+        if (templates.length === 0) return 'ไม่ระบุ';
+        return templates.map(t => PDF_TEMPLATE_LABELS[t] || t).join(' + ');
+    }
+
+    async function renderCategories() {
+        const tbody = document.getElementById('categoryTableBody');
+        tbody.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-slate-400 text-sm">กำลังโหลดข้อมูล...</td></tr>`;
+        try {
+            const res = await fetch('/budget-categories');
+            if (!res.ok) throw new Error('server error');
+            categories = await res.json();
+        } catch (e) {
+            tbody.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-rose-500 font-bold text-sm">ไม่สามารถโหลดข้อมูลได้ กรุณาตรวจสอบการเชื่อมต่อกับเซิร์ฟเวอร์</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = '';
+        if (categories.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-slate-400 text-sm">ยังไม่มีข้อมูลหมวดหมู่</td></tr>`;
+            return;
+        }
+
+        categories.forEach(cat => {
+            const reqBadges = formatAttachmentCell(cat);
+            const safeId    = cat.id.replace(/'/g, "\\'");
+            tbody.innerHTML += `
+                <tr class="hover:bg-slate-50 transition-colors">
+                    <td class="px-4 py-3">
+                        <div class="font-mono text-[11px] text-slate-400">${cat.id}</div>
+                        <div class="font-semibold text-slate-800 text-sm">${cat.name}</div>
+                    </td>
+                    <td class="px-4 py-3">
+                        <div class="text-[11px] text-emerald-700 font-semibold mb-0.5">${(cat.activeVariables || []).join(', ') || '—'}</div>
+                        <code class="text-[11px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">${cat.formulaString}</code>
+                        <div class="text-[11px] text-amber-700 font-semibold mt-0.5">PDF: ${pdfTemplateSummary(cat)}</div>
+                    </td>
+                    <td class="px-4 py-3">
+                        <div class="flex flex-wrap gap-1">${reqBadges}</div>
+                    </td>
+                    <td class="px-4 py-3 text-center">
+                        <div class="inline-flex items-center gap-1">
+                            <button type="button" onclick="beginEditCategory('${safeId}')"
+                                class="text-slate-300 hover:text-blue-600 transition-colors p-1.5 rounded-lg hover:bg-blue-50" title="แก้ไข">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                </svg>
+                            </button>
+                            <button type="button" onclick="deleteCategory('${safeId}')"
+                                class="text-slate-300 hover:text-rose-500 transition-colors p-1.5 rounded-lg hover:bg-rose-50" title="ลบ">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        });
+    }
+
+    async function saveCategory() {
+        const id      = document.getElementById('catId').value.trim().toUpperCase();
+        const name    = document.getElementById('catName').value.trim();
+        const varsStr = document.getElementById('catVars').value.trim();
+        const formula = document.getElementById('catFormula').value.trim();
+
+        if (!id || !name || !varsStr || !formula) {
+            alert('กรุณากรอกข้อมูลให้ครบทุกช่อง');
+            return;
+        }
+
+        const activeVariables  = varsStr.split(',').map(v => v.trim()).filter(v => v);
+        const attachmentRules  = collectAttachmentRulesFromForm();
+        const attachmentOrder  = [...currentAttachmentOrder];
+        const requiredFields   = requiredFieldsFromRules(attachmentRules);
+        const pdfTemplates     = getPdfTemplatesFromForm();
+        if (attachmentRules.LOCATION && attachmentRules.LOCATION.show && !pdfTemplates.some(t => TRAVEL_TEMPLATE_IDS.includes(t))) {
+            pdfTemplates.push('REPORT', 'TRANSPORT_RECEIPT');
+        }
+
+        const taxiUnlimited = document.getElementById('catTaxiUnlimited').checked;
+        const taxiMaxVal    = parseFloat(document.getElementById('catTaxiMax').value);
+        const taxiMaxPerTrip = taxiUnlimited ? null : (taxiMaxVal > 0 ? taxiMaxVal : undefined);
+
+        const newCat = {
+            id, name, activeVariables, formulaString: formula,
+            attachmentRules, attachmentOrder, requiredFields,
+            pdfTemplates: pdfTemplates.length > 0 ? pdfTemplates : undefined,
+            taxiMaxPerTrip
+        };
+
+        const btn = document.getElementById('btnSaveCategory');
+        btn.disabled = true;
+        btn.textContent = 'กำลังบันทึก...';
+
+        try {
+            let res;
+            if (editingId) {
+                res = await fetch(`/budget-categories/${editingId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newCat)
+                });
+            } else {
+                res = await fetch('/budget-categories', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newCat)
+                });
+                if (res.status === 409) {
+                    alert('รหัสหมวดหมู่นี้มีอยู่แล้ว กรุณาใช้รหัสอื่น');
+                    return;
+                }
+            }
+            if (!res.ok) throw new Error('server error');
+            editingId = null;
+            clearCategoryForm();
+            setFormEditMode(false);
+            await renderCategories();
+        } catch (e) {
+            alert('เกิดข้อผิดพลาด กรุณาลองใหม่หรือตรวจสอบการเชื่อมต่อ');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = editingId ? 'อัปเดตหมวดหมู่' : 'บันทึกหมวดหมู่';
+        }
+    }
+
+    async function deleteCategory(id) {
+        if (!confirm('แน่ใจหรือไม่ว่าต้องการลบหมวดหมู่นี้?')) return;
+        if (editingId === id) cancelEditCategory();
+        try {
+            const res = await fetch(`/budget-categories/${id}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error('server error');
+            await renderCategories();
+        } catch (e) {
+            alert('เกิดข้อผิดพลาดในการลบ');
+        }
+    }
+
+    async function loadDemoData() {
+        if (!confirm('โหลดข้อมูลตัวอย่าง? (หมวดหมู่ที่มีรหัสซ้ำจะถูกข้ามไป)')) return;
+        const demoData = [
+            {
+                id: 'CAT_TRAVEL', name: 'เบิกค่าเดินทางไปปฏิบัติงาน',
+                activeVariables: [], formulaString: '0',
+                attachmentRules: {
+                    LOCATION:    { show: true,  required: true  },
+                    RECEIPT:     { show: true,  required: true  },
+                    TAX_INVOICE: { show: false, required: false },
+                    PHOTO:       { show: false, required: false }
+                },
+                attachmentOrder: ['LOCATION', 'RECEIPT', 'TAX_INVOICE', 'PHOTO'],
+                requiredFields: ['LOCATION', 'RECEIPT'], pdfTemplates: ['REPORT', 'TRANSPORT_RECEIPT']
+            },
+            {
+                id: 'CAT_FOOD', name: 'เบิกค่าอาหารรับรองแขก',
+                activeVariables: ['จำนวนคน', 'ราคาต่อหัว'], formulaString: 'จำนวนคน * ราคาต่อหัว',
+                attachmentRules: {
+                    LOCATION:    { show: false, required: false },
+                    RECEIPT:     { show: true,  required: true  },
+                    TAX_INVOICE: { show: true,  required: false },
+                    PHOTO:       { show: true,  required: true  }
+                },
+                attachmentOrder: ['RECEIPT', 'TAX_INVOICE', 'PHOTO', 'LOCATION'],
+                requiredFields: ['RECEIPT', 'PHOTO'], pdfTemplates: ['NORMAL']
+            },
+            {
+                id: 'CAT_ALLOWANCE', name: 'เบิกค่าเบี้ยเลี้ยง',
+                activeVariables: ['จำนวนวัน', 'เรทเบี้ยเลี้ยงต่อวัน'], formulaString: 'จำนวนวัน * เรทเบี้ยเลี้ยงต่อวัน',
+                attachmentRules: {
+                    LOCATION:    { show: false, required: false },
+                    RECEIPT:     { show: false, required: false },
+                    TAX_INVOICE: { show: false, required: false },
+                    PHOTO:       { show: false, required: false }
+                },
+                attachmentOrder: ['LOCATION', 'RECEIPT', 'TAX_INVOICE', 'PHOTO'],
+                requiredFields: [], pdfTemplates: ['NORMAL']
+            }
+        ];
+        for (const cat of demoData) {
+            try {
+                await fetch('/budget-categories', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(cat)
+                });
+            } catch (e) { /* skip */ }
+        }
+        cancelEditCategory();
+        await renderCategories();
+        alert('โหลดข้อมูลตัวอย่างเรียบร้อยแล้ว');
+    }
+
+    function showPanel(name) { /* single-panel layout — reserved for future multi-panel expansion */ }
+
+    // ── Init ───────────────────────────────────────────────
+    renderAttachmentRows([...ATTACHMENT_IDS], {});
+    renderCategories();
+</script>
+</body>
+</html>

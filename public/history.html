@@ -1,0 +1,1198 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>ประวัติการเบิกจ่าย - TUC Finance</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        body { font-family: 'Sarabun', sans-serif; }
+        #pdf-wrapper { position: fixed; top: 200%; left: -9999px; width: 0; height: 0; overflow: hidden; z-index: -9999; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        /* ⭐️ เพิ่ม page-break-inside: avoid; บังคับไม่ให้ PDF หั่นครึ่งเนื้อหาในหน้านี้เด็ดขาด */
+        .pdf-page { width: 190mm; box-sizing: border-box; padding: 10px 20px; position: relative; font-family: 'Sarabun', sans-serif; background: white; font-size: 13.5px; color: black; page-break-inside: avoid; }
+        .html2pdf__page-break { page-break-before: always; }
+        
+        .solid-line { border-bottom: 1px solid #000; display: inline-block; text-align: center; }
+        .dot-line { border-bottom: 1px dotted #000; display: inline-block; text-align: center; }
+        .pdf-table { width: 100%; border-collapse: collapse; font-size: 13.5px; line-height: 1.5; }
+        .pdf-table th, .pdf-table td { border: 1px solid #000; padding: 5px 8px; }
+        .no-border-bottom { border-bottom: none !important; }
+        .no-border-top { border-top: none !important; }
+        .avoid-break { page-break-inside: avoid; display: block; }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-800">
+
+    <!-- Sticky header -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-20">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex items-center gap-3">
+            <a href="index.html" class="text-slate-400 hover:text-slate-700 transition-colors p-1 -m-1 rounded-lg">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                </svg>
+            </a>
+            <div class="h-5 w-px bg-slate-200"></div>
+            <div>
+                <h1 class="text-base font-bold text-slate-800 leading-none">ประวัติการขอเบิกงบประมาณ</h1>
+                <p class="text-xs text-slate-400 mt-0.5">ตรวจสอบสถานะรายการและออกเอกสาร PDF</p>
+            </div>
+        </div>
+    </header>
+
+    <div class="max-w-7xl mx-auto px-6 py-8">
+
+        <!-- Filter bar -->
+        <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1.5">ค้นหาผู้ขอเบิก</label>
+                    <input type="text" list="requesterList" id="sReq" oninput="draw()" placeholder="พิมพ์ชื่อ..."
+                        class="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition text-sm">
+                    <datalist id="requesterList"></datalist>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1.5">ค้นหากิจกรรม</label>
+                    <input type="text" list="projectList" id="sProj" oninput="draw()" placeholder="พิมพ์ชื่อกิจกรรม..."
+                        class="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition text-sm">
+                    <datalist id="projectList"></datalist>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1.5">กรองตามวันที่</label>
+                    <input type="date" id="sDate" onchange="draw()"
+                        class="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition text-sm">
+                </div>
+                <div class="flex flex-col justify-end">
+                    <div class="bg-blue-600 px-4 py-3 rounded-xl flex items-center justify-between text-white">
+                        <span class="text-xs font-semibold opacity-90">รายการที่พบ</span>
+                        <div class="flex items-baseline gap-1">
+                            <span id="count" class="text-2xl font-black">0</span>
+                            <span class="text-xs opacity-80">รายการ</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left whitespace-nowrap">
+                    <thead class="bg-slate-800 text-white text-sm">
+                        <tr>
+                            <th class="p-5 font-bold text-center w-16">ลำดับ</th>
+                            <th class="p-5 font-bold">วันที่ขอเบิก</th>
+                            <th class="p-5 font-bold">ผู้ขอเบิก</th>
+                            <th class="p-5 font-bold">กิจกรรม / รายการ</th>
+                            <th class="p-5 font-bold text-right">ยอดเงิน (บาท)</th>
+                            <th class="p-5 font-bold text-center">รูปแนบ</th>
+                            <th class="p-5 font-bold text-center">ดำเนินการ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody" class="divide-y divide-slate-100 text-sm"></tbody>
+                </table>
+            </div>
+            <div id="emptyState" class="hidden flex-col items-center justify-center py-16 text-slate-400">
+                <svg class="w-14 h-14 mb-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                </svg>
+                <p class="text-base font-bold text-slate-500">ไม่พบข้อมูลที่ค้นหา</p>
+                <p class="text-sm text-slate-400 mt-1">ลองปรับเงื่อนไขการค้นหาใหม่อีกครั้ง</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="detailsModal" class="fixed inset-0 z-[9999] bg-black/50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh] border border-slate-200">
+            <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
+                <div class="flex items-center gap-2">
+                    <div class="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center">
+                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-base font-bold text-slate-800">ตรวจสอบข้อมูลการกรอกฟอร์ม</h3>
+                </div>
+                <button onclick="closeDetailsModal()" class="text-slate-400 hover:text-slate-700 hover:bg-slate-100 w-8 h-8 rounded-lg flex items-center justify-center transition-colors text-xl font-bold outline-none">&times;</button>
+            </div>
+            <div class="p-5 overflow-y-auto bg-slate-50 space-y-4" id="detailsContent"></div>
+            <div class="px-5 py-3 border-t border-slate-100 bg-white flex justify-end">
+                <button onclick="closeDetailsModal()"
+                    class="bg-slate-700 text-white px-5 py-2 rounded-xl text-sm font-bold hover:bg-slate-800 transition-colors">
+                    ปิดหน้าต่าง
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="pdf-wrapper">
+        <div id="pdf-container"></div>
+    </div>
+
+    <script>
+        let raw = [];
+
+        async function load() {
+            let fromApi = [];
+            try {
+                const res = await fetch('/expenses');
+                if (res && res.ok) fromApi = await res.json();
+            } catch (e) { /* ไม่มี API */ }
+            let fromLocal = [];
+            try {
+                fromLocal = JSON.parse(localStorage.getItem('tuc_expenses') || '[]');
+                if (!Array.isArray(fromLocal)) fromLocal = [];
+            } catch (e2) { fromLocal = []; }
+            raw = [...fromLocal, ...fromApi];
+            populateDropdowns();
+            draw();
+        }
+
+        function populateDropdowns() {
+            const reqList = document.getElementById('requesterList');
+            const projList = document.getElementById('projectList');
+            reqList.innerHTML = '';
+            projList.innerHTML = '';
+            const uniqueRequesters = [...new Set(raw.map(x => x.requestedBy).filter(Boolean))];
+            
+            const uniqueActivities = [...new Set(raw.map(x => x.inputMetadata && x.inputMetadata._activityName ? x.inputMetadata._activityName : ''))].filter(x => x !== '');
+            
+            uniqueRequesters.forEach(r => reqList.innerHTML += `<option value="${r}">`);
+            uniqueActivities.forEach(a => projList.innerHTML += `<option value="${a}">`);
+        }
+
+        function draw() {
+            const searchReq = document.getElementById('sReq').value.toLowerCase();
+            const searchProj = document.getElementById('sProj').value.toLowerCase();
+            const searchDate = document.getElementById('sDate').value;
+            const tbody = document.getElementById('tbody');
+            const emptyState = document.getElementById('emptyState');
+            tbody.innerHTML = '';
+
+            const filtered = raw.filter(x => {
+                const actName = (x.inputMetadata && x.inputMetadata._activityName) ? x.inputMetadata._activityName : '';
+                const matchReq = (x.requestedBy || '').toLowerCase().includes(searchReq);
+                const matchProj = actName.toLowerCase().includes(searchProj);
+                const matchDate = searchDate ? (x.createdAt && String(x.createdAt).startsWith(searchDate)) : true;
+                return matchReq && matchProj && matchDate;
+            });
+
+            document.getElementById('count').innerText = filtered.length;
+            if(filtered.length === 0) {
+                emptyState.classList.remove('hidden'); emptyState.classList.add('flex');
+            } else {
+                emptyState.classList.add('hidden'); emptyState.classList.remove('flex');
+            }
+
+            filtered.forEach((x, index) => {
+                const rowDate = x.createdAt ? new Date(x.createdAt).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
+                const reqName = x.requestedBy || '';
+                const amt = typeof x.amount === 'number' ? x.amount : parseFloat(x.amount) || 0;
+                
+                const actName = (x.inputMetadata && x.inputMetadata._activityName) ? x.inputMetadata._activityName : '';
+                const actDisplay = actName ? actName : '<span class="text-amber-600 border border-amber-200 bg-amber-50 px-2 py-0.5 rounded-md text-sm">ไม่ระบุกิจกรรม</span>';
+                
+                let imgCount = 0;
+                if(x.attachments && x.attachments.images) imgCount = x.attachments.images.length;
+                let eviHtml = '<span class="text-slate-300 text-xs">—</span>';
+                if(imgCount > 0) eviHtml = `<span class="inline-flex items-center gap-1 bg-emerald-50 border border-emerald-200 text-emerald-700 px-2.5 py-1 rounded-lg text-xs font-bold"><svg class='w-3 h-3' fill='none' stroke='currentColor' viewBox='0 0 24 24'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z'/></svg>${imgCount} รูป</span>`;
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50 transition-colors border-b border-slate-100">
+                        <td class="p-4 text-center text-slate-400 text-sm">${index + 1}</td>
+                        <td class="p-4 text-slate-600 text-sm">${rowDate}</td>
+                        <td class="p-4 font-semibold text-slate-800 text-sm">
+                            <div class="flex items-center gap-2">
+                                <div class="w-7 h-7 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold flex-shrink-0">${reqName ? reqName.charAt(0) : '?'}</div>
+                                ${reqName || '—'}
+                            </div>
+                        </td>
+                        <td class="p-4">
+                            <div class="font-semibold text-slate-800 text-sm">${actDisplay}</div>
+                            <div class="text-xs text-slate-400 mt-0.5">${x.description || 'ค่าใช้จ่ายทั่วไป'}</div>
+                        </td>
+                        <td class="p-4 text-right font-bold text-slate-900 text-sm font-mono">
+                            ${amt.toLocaleString(undefined, {minimumFractionDigits: 2})}
+                        </td>
+                        <td class="p-4 text-center">${eviHtml}</td>
+                        <td class="p-4">
+                            <div class="flex items-center justify-center gap-1.5">
+                                <button onclick='openDetailsModal(${JSON.stringify(x).replace(/'/g, "\\'")})' title="ดูข้อมูล"
+                                    class="bg-white border border-slate-200 text-slate-600 hover:text-blue-600 hover:border-blue-200 px-2.5 py-1.5 rounded-lg transition-all text-xs font-semibold flex items-center gap-1 shadow-sm">
+                                    <svg class='w-3.5 h-3.5' fill='none' stroke='currentColor' viewBox='0 0 24 24'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z'/></svg>
+                                    ตรวจสอบ
+                                </button>
+                                ${x.id && !x._savedLocally ? `
+                                <a href="expense.html?edit=${x.id}"
+                                    class="bg-white border border-amber-200 text-amber-700 hover:bg-amber-50 px-2.5 py-1.5 rounded-lg transition-all text-xs font-semibold flex items-center gap-1 shadow-sm">
+                                    <svg class='w-3.5 h-3.5' fill='none' stroke='currentColor' viewBox='0 0 24 24'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z'/></svg>
+                                    แก้ไข
+                                </a>
+                                <button onclick='deleteExpense(${x.id})'
+                                    class="bg-white border border-red-200 text-red-600 hover:bg-red-50 px-2.5 py-1.5 rounded-lg transition-all text-xs font-semibold flex items-center gap-1 shadow-sm">
+                                    <svg class='w-3.5 h-3.5' fill='none' stroke='currentColor' viewBox='0 0 24 24'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16'/></svg>
+                                    ลบ
+                                </button>` : ''}
+                                <button onclick='exportPDF(${JSON.stringify(x).replace(/'/g, "\\'")})'
+                                    class="bg-blue-600 text-white hover:bg-blue-700 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1 shadow-sm active:scale-[0.97]">
+                                    <svg class='w-3.5 h-3.5' fill='none' stroke='currentColor' viewBox='0 0 24 24'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4'/></svg>
+                                    PDF
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function renderInput(label, value, icon = '') {
+            return `
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">${icon} ${label}</label>
+                    <div class="w-full border border-slate-200 bg-slate-50 p-2.5 rounded-lg text-sm text-slate-800 font-medium">${value || '-'}</div>
+                </div>
+            `;
+        }
+
+        function openDetailsModal(data) {
+            const meta = data.inputMetadata || {};
+            const templates = resolveTemplates(meta);
+            const hasTravel  = templates.some(t => ['REPORT', 'TRANSPORT_RECEIPT'].includes(t));
+            const hasGeneral = templates.includes('GENERAL_RECEIPT');
+
+            let html = ``;
+
+            if (hasTravel) {
+                const tr = meta._travel || {};
+                const c = meta._costs || { hotel:{} };
+                const addr = meta._addr || {};
+
+                html += `
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                    <h4 class="font-bold text-slate-700 mb-3 border-b pb-2">ข้อมูลผู้ขอเบิก & กิจกรรม</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        ${renderInput('ชื่อผู้ขอเบิก', data.requestedBy)}
+                        ${renderInput('สังกัด / กลุ่มงาน', meta._affiliation)}
+                        <div class="md:col-span-2">${renderInput('กิจกรรม', meta._activityName)}</div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                    <h4 class="font-bold text-slate-700 mb-3 border-b pb-2">ข้อมูลที่อยู่ผู้เดินทาง</h4>
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+                        ${renderInput('เลขที่', addr.no)}
+                        ${renderInput('ซอย', addr.soi)}
+                        ${renderInput('ถนน', addr.road)}
+                        ${renderInput('ตำบล/แขวง', addr.sub)}
+                        ${renderInput('อำเภอ/เขต', addr.dist)}
+                        <div class="col-span-2">${renderInput('จังหวัด', addr.prov)}</div>
+                        ${renderInput('รหัสไปรษณีย์', addr.zip)}
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                    <h4 class="font-bold text-slate-700 mb-3 border-b pb-2">กำหนดการเดินทาง</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            ${renderInput('ออกเดินทางจาก', tr.startFromType)}
+                            <div class="grid grid-cols-2 gap-2 mt-2">
+                                ${renderInput('วันที่', formatDateDisplay(tr.startDate))}
+                                ${renderInput('เวลา', tr.startTime)}
+                            </div>
+                        </div>
+                        <div>
+                            ${renderInput('ปลายทาง (จังหวัด)', tr.toProv)}
+                            <div class="grid grid-cols-2 gap-2 mt-2">
+                                ${renderInput('วันที่', formatDateDisplay(tr.endDate))}
+                                ${renderInput('เวลา', tr.endTime)}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                    <h4 class="font-bold text-slate-700 mb-3 border-b pb-2">รูปแบบการเดินทาง (ระยะทาง)</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        ${renderInput('🚕 การเดินทางด้วย Taxi', (() => {
+                            const ents = Array.isArray(c.taxiEntries) ? c.taxiEntries : [];
+                            if (ents.length > 0) {
+                                const dirs = [...new Set(ents.map(e => e.direction).filter(Boolean))];
+                                return dirs.join(', ') || 'มีรายการ Taxi';
+                            }
+                            return meta._taxiType || '-';
+                        })())}
+                        ${renderInput('🚘 การเดินทางด้วยรถส่วนตัว', meta._carType)}
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        ${renderInput('จุดเริ่มต้น', tr.from)}
+                        ${renderInput('จุดหมาย', tr.to)}
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        ${renderInput('ระยะทางขาไป', tr.distOut + ' กม.')}
+                        ${renderInput('ระยะทางขากลับ', tr.distRet + ' กม.')}
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                    <h4 class="font-bold text-slate-700 mb-3 border-b pb-2">รายละเอียดค่าใช้จ่าย</h4>
+                    
+                    <div class="bg-slate-50 p-3 rounded-lg border border-slate-100 mb-3">
+                        <div class="text-xs font-bold text-slate-700 mb-2">🏨 1. ค่าที่พัก</div>
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-2">
+                            ${renderInput('ประเภท', c.hotel.type)}
+                            ${renderInput('ชื่อโรงแรม', c.hotel.name)}
+                            ${renderInput('เรท/คืน', c.hotel.rate)}
+                            ${renderInput('จำนวนคืน', c.hotel.nights)}
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        ${renderInput('🚘 ค่าน้ำมันรถ (บ./กม.)', c.fuelRate)}
+                        ${renderInput('🚕 ค่า Taxi รวม (บาท)', (() => {
+                            const ents = Array.isArray(c.taxiEntries) ? c.taxiEntries : [];
+                            const total = ents.length > 0
+                                ? ents.reduce((s, e) => s + (parseFloat(e.amount)||0), 0)
+                                : (parseFloat(c.taxiOutAmt||0) + parseFloat(c.taxiRetAmt||0));
+                            return total > 0 ? total.toLocaleString(undefined,{minimumFractionDigits:2}) : '-';
+                        })())}
+                        ${renderInput('✈️ ค่าตั๋วเครื่องบิน (บาท)', c.airAmount)}
+                        ${renderInput('🛣️ ค่าทางด่วน/ที่จอด (บาท)', c.tollAmount)}
+                        ${renderInput('🍔 ค่าเบี้ยเลี้ยง/อื่นๆ (บาท)', c.otherAmount)}
+                    </div>
+                    ${Array.isArray(c.taxiEntries) && c.taxiEntries.length > 0 ? `
+                    <div class="mt-2">
+                        <div class="text-xs font-bold text-slate-700 mb-1">รายการ Taxi</div>
+                        <table class="w-full text-xs border border-slate-200 rounded-lg overflow-hidden">
+                            <thead class="bg-slate-50 text-slate-500 font-bold">
+                                <tr>
+                                    <th class="px-2 py-1.5 text-left">วันที่</th>
+                                    <th class="px-2 py-1.5 text-left">ทิศทาง</th>
+                                    <th class="px-2 py-1.5 text-left">จาก → ถึง</th>
+                                    <th class="px-2 py-1.5 text-right">จำนวน</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                ${c.taxiEntries.map(e => `<tr>
+                                    <td class="px-2 py-1.5">${e.date ? formatDateDisplay(e.date) : '—'}</td>
+                                    <td class="px-2 py-1.5">${e.direction || '—'}</td>
+                                    <td class="px-2 py-1.5">${e.from || ''} → ${e.to || ''}</td>
+                                    <td class="px-2 py-1.5 text-right font-mono">${e.amount ? parseFloat(e.amount).toLocaleString(undefined,{minimumFractionDigits:2}) : '—'}</td>
+                                </tr>`).join('')}
+                            </tbody>
+                        </table>
+                    </div>` : ''}
+                </div>
+                `;
+            }
+
+            if (hasGeneral) {
+                const grItems = Array.isArray(meta._generalReceiptItems) ? meta._generalReceiptItems : [];
+                const grTotal = grItems.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
+                html += `
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                    <h4 class="font-bold text-slate-700 mb-3 border-b pb-2">ใบรับรองแทนใบเสร็จรับเงิน – ทั่วไป (FM-SAM-003-06)</h4>
+                    ${renderInput('ชื่อผู้ขอเบิก', data.requestedBy)}
+                    <div class="mt-2">${renderInput('ตำแหน่ง', meta._position)}</div>
+                    <div class="mt-3 overflow-x-auto">
+                        <table class="w-full text-xs border border-slate-200 rounded-lg overflow-hidden">
+                            <thead class="bg-slate-50 text-slate-500 font-bold">
+                                <tr>
+                                    <th class="px-3 py-2 text-left">วัน เดือน ปี</th>
+                                    <th class="px-3 py-2 text-left">รายละเอียด</th>
+                                    <th class="px-3 py-2 text-right">จำนวนเงิน</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                ${grItems.map(r => `<tr>
+                                    <td class="px-3 py-1.5">${r.date ? formatDateDisplay(r.date) : '—'}</td>
+                                    <td class="px-3 py-1.5">${r.description || '—'}</td>
+                                    <td class="px-3 py-1.5 text-right font-mono">${r.amount ? r.amount.toLocaleString(undefined, {minimumFractionDigits: 2}) : '—'}</td>
+                                </tr>`).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="mt-2 text-right text-sm font-bold text-slate-700">รวม: ${grTotal.toLocaleString(undefined, {minimumFractionDigits: 2})} บาท</div>
+                </div>`;
+            }
+
+            if (!hasTravel && !hasGeneral) {
+                html += `
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                    <h4 class="font-bold text-slate-700 mb-3 border-b pb-2">ข้อมูลการเบิกจ่ายทั่วไป</h4>
+                    ${renderInput('ชื่อผู้ขอเบิก', data.requestedBy)}
+                    <div class="mt-3">${renderInput('รายการ / กิจกรรม', data.description)}</div>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                    <h4 class="font-bold text-slate-700 mb-3 border-b pb-2">ตัวแปรที่ระบุ</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                `;
+                for (const [key, value] of Object.entries(meta)) {
+                    if(!key.startsWith('_')) {
+                        html += renderInput(key, value);
+                    }
+                }
+                html += `</div></div>`;
+            }
+
+            html += `
+                <div class="bg-emerald-50 border border-emerald-200 p-4 rounded-xl flex justify-between items-center">
+                    <span class="font-bold text-emerald-800 text-lg">ยอดเบิกสุทธิรวม</span>
+                    <span class="font-black text-emerald-600 text-2xl">${data.amount.toLocaleString()} ฿</span>
+                </div>
+            `;
+
+            document.getElementById('detailsContent').innerHTML = html;
+            document.getElementById('detailsModal').classList.remove('hidden');
+        }
+
+        function closeDetailsModal() {
+            document.getElementById('detailsModal').classList.add('hidden');
+        }
+
+        function getThaiBahtText(amount) {
+            if (!amount || amount === 0) return "ศูนย์บาทถ้วน";
+            let amountStr = parseFloat(amount).toFixed(2).toString();
+            let splitStr = amountStr.split('.');
+            let baht = splitStr[0];
+            let satang = splitStr[1];
+
+            const thainum = ["ศูนย์", "หนึ่ง", "สอง", "สาม", "สี่", "ห้า", "หก", "เจ็ด", "แปด", "เก้า"];
+            const thaidigit = ["", "สิบ", "ร้อย", "พัน", "หมื่น", "แสน", "ล้าน"];
+
+            function convert(str) {
+                if (str === "00" || str === "0") return "";
+                let res = "";
+                let len = str.length;
+                for (let i = 0; i < len; i++) {
+                    let n = parseInt(str.charAt(i));
+                    if (n !== 0) {
+                        if (i === len - 1 && n === 1 && len > 1 && str.charAt(len-2) !== '0') { res += "เอ็ด"; } 
+                        else if (i === len - 2 && n === 2) { res += "ยี่" + thaidigit[len - i - 1]; } 
+                        else if (i === len - 2 && n === 1) { res += thaidigit[len - i - 1]; } 
+                        else { res += thainum[n] + thaidigit[len - i - 1]; }
+                    }
+                }
+                return res;
+            }
+
+            let bahtText = convert(baht);
+            let satangText = convert(satang);
+
+            let result = "";
+            if (bahtText !== "") result += bahtText + "บาท";
+            if (satangText !== "") result += satangText + "สตางค์";
+            else result += "ถ้วน";
+
+            return result;
+        }
+
+        function formatNumber(num) {
+            if(!num || num === 0) return '';
+            return num.toLocaleString(undefined, {minimumFractionDigits: 2});
+        }
+
+        function formatDateDisplay(dStr) {
+            if(!dStr) return '';
+            const d = new Date(dStr);
+            return d.toLocaleDateString('th-TH', { year: 'numeric', month: '2-digit', day: '2-digit' });
+        }
+
+        function resolveTemplates(meta) {
+            if (Array.isArray(meta._pdfTemplates) && meta._pdfTemplates.length > 0) return meta._pdfTemplates;
+            const old = meta._pdfTemplate || 'NORMAL';
+            if (old === 'TRAVEL_BOTH')    return ['REPORT', 'TRANSPORT_RECEIPT'];
+            if (old === 'TRAVEL_REPORT')  return ['REPORT'];
+            if (old === 'TRAVEL_RECEIPT') return ['TRANSPORT_RECEIPT'];
+            return ['NORMAL'];
+        }
+
+        function exportPDF(data) {
+            const dateObj = new Date(data.createdAt);
+            const dateStr = formatDateDisplay(dateObj);
+            const formatAmt = data.amount.toLocaleString(undefined, {minimumFractionDigits: 2});
+            const amtText = getThaiBahtText(data.amount);
+            const meta = data.inputMetadata || {};
+
+            const actName = meta._activityName || '';
+            const position = meta._position || '';
+            const templates = resolveTemplates(meta);
+            const hasTravel   = templates.some(t => ['REPORT', 'TRANSPORT_RECEIPT'].includes(t));
+            const hasGeneral  = templates.includes('GENERAL_RECEIPT');
+            const hasNormal   = templates.includes('NORMAL');
+
+            let templateHtml = '';
+
+            if (hasTravel) {
+                const tr = meta._travel || {};
+                const c = meta._costs || { hotel:{}, fuelRate:0, taxiOutAmt:0, taxiRetAmt:0, airAmount:0, tollAmount:0, otherAmount:0 };
+                const addr = meta._addr || {};
+                
+                const distOut = parseFloat(tr.distOut || 0);
+                const distRet = parseFloat(tr.distRet || 0);
+                const fRate = parseFloat(c.fuelRate || 0);
+
+                const taxiType = meta._taxiType || 'ไม่ระบุ'; // backward compat
+                const carType = meta._carType || 'ไม่ระบุ';
+
+                // Support new taxiEntries array format + backward compat with old taxiOutAmt/taxiRetAmt
+                const taxiEntries = Array.isArray(c.taxiEntries) ? c.taxiEntries : [];
+                const taxiTotal = taxiEntries.length > 0
+                    ? taxiEntries.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0)
+                    : (parseFloat(c.taxiOutAmt || 0) + parseFloat(c.taxiRetAmt || 0));
+
+                const hasTaxiOut = taxiEntries.length > 0
+                    ? taxiEntries.some(e => e.direction === 'ขาไป' || e.direction === 'ไป-กลับ')
+                    : (taxiType === 'ขาไป' || taxiType === 'ไป-กลับ');
+                const hasTaxiRet = taxiEntries.length > 0
+                    ? taxiEntries.some(e => e.direction === 'ขากลับ' || e.direction === 'ไป-กลับ')
+                    : (taxiType === 'ขากลับ' || taxiType === 'ไป-กลับ');
+                const firstTaxiOut = taxiEntries.find(e => e.direction === 'ขาไป' || e.direction === 'ไป-กลับ');
+                const firstTaxiRet = taxiEntries.find(e => e.direction === 'ขากลับ' || e.direction === 'ไป-กลับ');
+                
+                let fuelDist = 0;
+                if(carType === 'ขาไป') fuelDist = distOut;
+                else if(carType === 'ขากลับ') fuelDist = distRet;
+                else if(carType === 'ไป-กลับ') fuelDist = distOut + distRet;
+                const fuelTotal = fuelDist * fRate;
+
+                const tollTotal = parseFloat(c.tollAmount || 0);
+                const otherTotal = parseFloat(c.otherAmount || 0);
+                const airTotal = parseFloat(c.airAmount || 0);
+                const hotelTotal = (parseFloat(c.hotel.rate||0) * parseFloat(c.hotel.nights||0)) || 0;
+                
+                const receiptTotal = taxiTotal + fuelTotal + tollTotal + otherTotal;
+                const receiptAmtText = getThaiBahtText(receiptTotal);
+                
+                const date1 = new Date(`${tr.startDate}T${tr.startTime||'00:00'}`);
+                const date2 = new Date(`${tr.endDate}T${tr.endTime||'00:00'}`);
+                let diffDays = 0, diffHrs = 0;
+                if(!isNaN(date1) && !isNaN(date2) && date2 > date1) {
+                    const diffTime = Math.abs(date2 - date1);
+                    diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                    diffHrs = Math.floor((diffTime % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                }
+
+                const fontCircleEmpty = '◯';
+                const fontCircleCheck = '◉';
+
+                // 📄 1. หน้าใบรายงานการเดินทาง (FM-SAM-001-04)
+                if (templates.includes('REPORT')) {
+                    const startTypeWork = tr.startFromType === 'ที่ทำงาน' ? '☑' : '☐';
+                    const startTypeHome = tr.startFromType === 'ที่พัก' ? '☑' : '☐';
+                    const hotelSingle = c.hotel.type === 'พักเดี่ยว' ? '☑' : '☐';
+                    const hotelDouble = c.hotel.type === 'พักคู่' ? '☑' : '☐';
+
+                    templateHtml += `
+                    <div class="pdf-page">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px;">
+                            <img src="/logo.png" style="height: 60px;" onerror="this.style.display='none'">
+                            <div style="text-align: right; font-size: 12px; line-height: 1.4; font-weight: bold;">
+                                FM-SAM-001-04<br>
+                                ใบรายงานการเดินทางไปปฏิบัติงาน<br>
+                                วันที่ประกาศใช้ : 15/12/2568<br>
+                                รอบทบทวน : 15/12/2570
+                            </div>
+                        </div>
+
+                        <h2 style="text-align: center; font-weight: bold; font-size: 18px; margin-bottom: 10px;">ใบรายงานการเดินทางไปปฏิบัติงาน</h2>
+                        
+                        <div style="display: flex; justify-content: flex-end; align-items: baseline; margin-bottom: 10px;">
+                            <span style="margin-right: 10px;">วันที่</span>
+                            <span style="width: 150px; border-bottom: 1px solid #000; text-align: center;">${dateStr}</span>
+                        </div>
+
+                        <div style="line-height: 1.8;">
+                            <div style="display: flex; align-items: baseline; margin-bottom: 5px;">
+                                <span style="white-space: nowrap;">ข้าพเจ้า</span><span style="flex-grow: 1; border-bottom: 1px solid #000; text-align: center; margin: 0 10px;">${data.requestedBy}</span>
+                                <span style="white-space: nowrap;">สังกัด</span><span style="flex-grow: 1; border-bottom: 1px solid #000; text-align: center; margin-left: 10px;">${meta._affiliation || ''}</span>
+                            </div>
+                            
+                            <div style="display: flex; align-items: baseline; margin-bottom: 5px;">
+                                <span style="white-space: nowrap;">เลขที่</span><span style="flex-grow: 0.5; border-bottom: 1px solid #000; text-align: center; margin: 0 10px;">${addr.no || ''}</span>
+                                <span style="white-space: nowrap;">ถนน</span><span style="flex-grow: 1; border-bottom: 1px solid #000; text-align: center; margin: 0 10px;">${addr.road || ''}</span>
+                                <span style="white-space: nowrap;">ซอย</span><span style="flex-grow: 1; border-bottom: 1px solid #000; text-align: center; margin: 0 10px;">${addr.soi || ''}</span>
+                                <span style="white-space: nowrap;">ตำบล/แขวง</span><span style="flex-grow: 1; border-bottom: 1px solid #000; text-align: center; margin-left: 10px;">${addr.sub || ''}</span>
+                            </div>
+
+                            <div style="display: flex; align-items: baseline; margin-bottom: 5px;">
+                                <span style="white-space: nowrap;">อำเภอ/เขต</span><span style="flex-grow: 1; border-bottom: 1px solid #000; text-align: center; margin: 0 10px;">${addr.dist || ''}</span>
+                                <span style="white-space: nowrap;">จังหวัด</span><span style="flex-grow: 1; border-bottom: 1px solid #000; text-align: center; margin: 0 10px;">${addr.prov || ''}</span>
+                                <span style="white-space: nowrap;">ได้รับอนุมัติให้เดินทางไปปฏิบัติงาน ณ จังหวัด</span><span style="flex-grow: 1; border-bottom: 1px solid #000; text-align: center; margin-left: 10px;">${tr.toProv || ''}</span>
+                            </div>
+                            
+                            <div style="display: flex; align-items: baseline; margin-bottom: 5px;">
+                                <span style="white-space: nowrap;">ในระหว่างวันที่</span><span style="flex-grow: 1; border-bottom: 1px solid #000; text-align: center; margin: 0 10px;">${formatDateDisplay(tr.startDate)} - ${formatDateDisplay(tr.endDate)}</span>
+                                <span style="white-space: nowrap;">โดยออกเดินทางจาก ( <span style="font-family: Arial; font-size: 16px;">${startTypeHome}</span> ) ที่พัก &nbsp;&nbsp;( <span style="font-family: Arial; font-size: 16px;">${startTypeWork}</span> ) ที่ทำงาน</span>
+                            </div>
+                            
+                            <div style="display: flex; align-items: baseline; margin-bottom: 5px;">
+                                <span style="white-space: nowrap;">วันที่</span><span style="width: 100px; border-bottom: 1px solid #000; text-align: center; margin: 0 10px;">${formatDateDisplay(tr.startDate)}</span>
+                                <span style="white-space: nowrap;">เวลา</span><span style="width: 60px; border-bottom: 1px solid #000; text-align: center; margin: 0 10px;">${tr.startTime || ''}</span>
+                                <span style="white-space: nowrap;">กลับถึงที่พักวันที่</span><span style="width: 100px; border-bottom: 1px solid #000; text-align: center; margin: 0 10px;">${formatDateDisplay(tr.endDate)}</span>
+                                <span style="white-space: nowrap;">เวลา</span><span style="width: 60px; border-bottom: 1px solid #000; text-align: center; margin: 0 10px;">${tr.endTime || ''}</span>
+                                <span style="white-space: nowrap;">รวมเป็นเวลา</span><span style="width: 40px; border-bottom: 1px solid #000; text-align: center; margin: 0 10px;">${diffDays}</span><span style="white-space: nowrap;">วัน</span>
+                                <span style="width: 40px; border-bottom: 1px solid #000; text-align: center; margin: 0 10px;">${diffHrs}</span><span style="white-space: nowrap;">ชั่วโมง</span>
+                            </div>
+                            
+                            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 10px; margin-top: 5px;">
+                                <div>โดยมีค่าใช้จ่ายดังนี้</div>
+                                <div style="color: red; font-size: 10px;">(กรณีเบิกค่าเบี้ยเลี้ยง ค่าล่วงเวลาโปรดกรอกรวมเวลาและชม.การเดินทาง)</div>
+                            </div>
+                        </div>
+
+                        <table style="width: 100%; border: none; font-size: 13.5px; line-height: 1.8;">
+                            <tr><td colspan="5" style="border: none; padding: 0;"><b>1. ค่าที่พัก ประเภท</b></td></tr>
+                            <tr>
+                                <td style="width: 30px; border: none; padding: 0;"></td>
+                                <td colspan="4" style="border: none; padding: 0;">
+                                    1.1 &nbsp;&nbsp; ( <span style="font-family: Arial; font-size: 16px;">${hotelSingle}</span> ) พักเดี่ยว 
+                                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ( <span style="font-family: Arial; font-size: 16px;">${hotelDouble}</span> ) พักคู่ กับ <span class="solid-line" style="width: 250px;"></span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="border: none; padding: 0;"></td>
+                                <td colspan="4" style="border: none; padding: 0;">
+                                    1.2 &nbsp;&nbsp; ชื่อโรงแรม <span class="solid-line" style="width: 250px;">${c.hotel.name || ''}</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="border: none; padding: 0;"></td>
+                                <td style="border: none; padding: 0; padding-left: 25px;">อัตราที่พัก เดี่ยว <span class="solid-line" style="width: 60px;">${c.hotel.type === 'พักเดี่ยว' ? c.hotel.rate : ''}</span> บาท X <span class="solid-line" style="width: 40px;">${c.hotel.type === 'พักเดี่ยว' ? c.hotel.nights : ''}</span> คืน</td>
+                                <td style="width: 60px; text-align: right; border: none; padding: 0;">เป็นเงิน</td>
+                                <td style="width: 110px; border-bottom: 1px solid #000; text-align: right; padding: 0 5px;">${c.hotel.type === 'พักเดี่ยว' && hotelTotal > 0 ? formatNumber(hotelTotal) : ''}</td>
+                                <td style="width: 40px; text-align: right; border: none; padding: 0;">บาท</td>
+                            </tr>
+                            <tr>
+                                <td style="border: none; padding: 0;"></td>
+                                <td style="border: none; padding: 0; padding-left: 95px;">คู่ <span class="solid-line" style="width: 60px;">${c.hotel.type === 'พักคู่' ? c.hotel.rate : ''}</span> บาท X <span class="solid-line" style="width: 40px;">${c.hotel.type === 'พักคู่' ? c.hotel.nights : ''}</span> คืน</td>
+                                <td style="text-align: right; border: none; padding: 0;">เป็นเงิน</td>
+                                <td style="border-bottom: 1px solid #000; text-align: right; padding: 0 5px;">${c.hotel.type === 'พักคู่' && hotelTotal > 0 ? formatNumber(hotelTotal) : ''}</td>
+                                <td style="text-align: right; border: none; padding: 0;">บาท</td>
+                            </tr>
+                            <tr>
+                                <td style="border: none; padding: 0;"></td>
+                                <td style="border: none; padding: 0; padding-left: 25px;">(ใบสำคัญที่ <span class="solid-line" style="width: 150px;"></span>)</td>
+                                <td style="text-align: right; border: none; padding: 0;">รวมเป็นเงิน</td>
+                                <td style="border-bottom: 1px solid #000; text-align: right; padding: 0 5px;">${hotelTotal > 0 ? formatNumber(hotelTotal) : ''}</td>
+                                <td style="text-align: right; border: none; padding: 0;">บาท</td>
+                            </tr>
+                            
+                            <tr><td colspan="5" style="border: none; height: 10px;"></td></tr>
+
+                            <tr><td colspan="5" style="border: none; padding: 0;"><b>2. ค่าพาหนะ</b></td></tr>
+                            <tr>
+                                <td style="border: none; padding: 0;"></td>
+                                <td style="border: none; padding: 0; padding-left: 5px;">2.1 &nbsp;&nbsp; ค่าโดยสารพาหนะต่างๆ (ค่าพาหนะทุกประเภทนอกเหนือจาก 2.2, 2.3)</td>
+                                <td style="text-align: right; border: none; padding: 0;">เป็นเงิน</td>
+                                <td style="border-bottom: 1px solid #000; text-align: right; padding: 0 5px;">${taxiTotal > 0 ? formatNumber(taxiTotal) : ''}</td>
+                                <td style="text-align: right; border: none; padding: 0;">บาท</td>
+                            </tr>
+                            <tr>
+                                <td style="border: none; padding: 0;"></td>
+                                <td style="border: none; padding: 0; padding-left: 5px;">2.2 &nbsp;&nbsp; ค่าน้ำมันรถ</td>
+                                <td style="text-align: right; border: none; padding: 0;">เป็นเงิน</td>
+                                <td style="border-bottom: 1px solid #000; text-align: right; padding: 0 5px;">${fuelTotal > 0 ? formatNumber(fuelTotal) : ''}</td>
+                                <td style="text-align: right; border: none; padding: 0;">บาท</td>
+                            </tr>
+                            <tr>
+                                <td style="border: none; padding: 0;"></td>
+                                <td style="border: none; padding: 0; padding-left: 5px;">2.3 &nbsp;&nbsp; ค่าตั๋วเครื่องบิน</td>
+                                <td style="text-align: right; border: none; padding: 0;">เป็นเงิน</td>
+                                <td style="border-bottom: 1px solid #000; text-align: right; padding: 0 5px;">${airTotal > 0 ? formatNumber(airTotal) : ''}</td>
+                                <td style="text-align: right; border: none; padding: 0;">บาท</td>
+                            </tr>
+                            <tr>
+                                <td style="border: none; padding: 0;"></td>
+                                <td style="border: none; padding: 0; padding-left: 30px;">(รวมภาษีสนามบิน)</td>
+                                <td colspan="3" style="border: none; padding: 0;"></td>
+                            </tr>
+
+                            <tr><td colspan="5" style="border: none; height: 10px;"></td></tr>
+
+                            <tr><td colspan="5" style="border: none; padding: 0;"><b>3. ค่าใช้จ่ายอื่นๆ (ระบุรายการ)</b></td></tr>
+                            <tr>
+                                <td style="border: none; padding: 0;"></td>
+                                <td style="border: none; padding: 0; padding-left: 5px;">3.1 &nbsp;&nbsp; <span class="solid-line" style="width: 300px; text-align:left;">${(tollTotal+otherTotal) > 0 ? 'ค่าเบี้ยเลี้ยง / ค่าทางด่วน / อื่นๆ' : ''}</span></td>
+                                <td style="text-align: right; border: none; padding: 0;">เป็นเงิน</td>
+                                <td style="border-bottom: 1px solid #000; text-align: right; padding: 0 5px;">${(tollTotal+otherTotal) > 0 ? formatNumber(tollTotal+otherTotal) : ''}</td>
+                                <td style="text-align: right; border: none; padding: 0;">บาท</td>
+                            </tr>
+                            <tr>
+                                <td style="border: none; padding: 0;"></td>
+                                <td style="border: none; padding: 0; padding-left: 5px;">3.2 &nbsp;&nbsp; <span class="solid-line" style="width: 300px; text-align:left;"></span></td>
+                                <td style="text-align: right; border: none; padding: 0;">เป็นเงิน</td>
+                                <td style="border-bottom: 1px solid #000; text-align: right; padding: 0 5px;"></td>
+                                <td style="text-align: right; border: none; padding: 0;">บาท</td>
+                            </tr>
+                        </table>
+
+                        <table style="width: 100%; border: none; font-size: 13.5px; line-height: 1.8; margin-top: 10px;">
+                            <tr>
+                                <td style="width: 60%; border: none; padding: 0; text-align: right;"><b>รวมเป็นเงิน</b></td>
+                                <td style="width: 110px; border-bottom: 1px solid #000; text-align: right; padding: 0 5px; font-weight: bold;">${formatAmt}</td>
+                                <td style="width: 40px; text-align: right; border: none; padding: 0;"><b>บาท</b></td>
+                            </tr>
+                            <tr>
+                                <td colspan="3" style="border: none; padding: 0; text-align: right;">
+                                    ( <span style="display:inline-block; width: 250px; text-align: center;">${amtText}</span> )
+                                </td>
+                            </tr>
+                        </table>
+
+                        <div class="avoid-break" style="margin-top: 25px;">
+                            <div style="display: block; font-size: 14px; line-height: 1.8; margin-bottom: 25px;">
+                                ข้าพเจ้าขอรับรองว่าหลักฐานการจ่าย และรายงานการเดินทางข้างต้นเป็นความจริง<br>
+                                และจำนวนเงินที่ขอเบิกถูกต้องตามระเบียบ
+                            </div>
+                            
+                            <div style="text-align: center; margin-left: 45%;">
+                                ลงชื่อ <span class="solid-line" style="width: 200px;"></span> ผู้เดินทาง<br>
+                                ( <span class="solid-line" style="width: 180px; border-bottom: none; font-weight:bold;">${data.requestedBy}</span> )<br>
+                                <span class="solid-line" style="width: 180px; border-bottom: none;">${dateStr}</span>
+                            </div>
+                        </div>
+                        
+                    </div>`;
+                    
+                    if (templates.includes('TRANSPORT_RECEIPT') || templates.includes('GENERAL_RECEIPT') || hasNormal) {
+                        templateHtml += `<div class="html2pdf__page-break"></div>`;
+                    }
+                }
+
+                // 📄 2. หน้าใบรับรองแทนใบเสร็จ – ค่าพาหนะ (FM-SAM-095-00)
+                if (templates.includes('TRANSPORT_RECEIPT')) {
+                    const chkTaxiOtw = hasTaxiOut && !hasTaxiRet ? fontCircleCheck : fontCircleEmpty;
+                    const chkTaxiRet = hasTaxiRet && !hasTaxiOut ? fontCircleCheck : fontCircleEmpty;
+                    const chkTaxiRnd = hasTaxiOut && hasTaxiRet  ? fontCircleCheck : fontCircleEmpty;
+
+                    const chkCarOtw = carType === 'ขาไป' ? fontCircleCheck : fontCircleEmpty;
+                    const chkCarRet = carType === 'ขากลับ' ? fontCircleCheck : fontCircleEmpty;
+                    const chkCarRnd = carType === 'ไป-กลับ' ? fontCircleCheck : fontCircleEmpty;
+
+                    const chkCarSelected = carType !== 'ไม่ระบุ' ? '☑' : '☐';
+
+                    templateHtml += `
+                    <div class="pdf-page">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
+                            <img src="/logo.png" style="height: 65px;" onerror="this.style.display='none'">
+                            <div style="text-align: right; font-size: 11px; line-height: 1.5; font-weight:bold;">
+                                FM-SAM-095-00<br>
+                                ใบรับรองแทนใบเสร็จรับเงิน - ค่าพาหนะ<br>
+                                วันที่ประกาศใช้ 11/05/2569<br>
+                                รอบทบทวน 11/05/2571<br>
+                                ชั้นความลับ : เอกสารภายใน
+                            </div>
+                        </div>
+
+                        <h2 style="text-align: center; font-weight: bold; font-size: 18px; margin-bottom: 15px;">ใบรับรองแทนใบเสร็จรับเงิน - ค่าพาหนะ</h2>
+
+                        <table class="pdf-table">
+                            <thead>
+                                <tr style="background: white;">
+                                    <th style="width: 13%; text-align: center;">วัน เดือน ปี</th>
+                                    <th style="width: 68%; text-align: center;">รายละเอียดรายจ่าย</th>
+                                    <th style="width: 19%; text-align: center;">จำนวนเงิน</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- row 1: กิจกรรม -->
+                                <tr>
+                                    <td style="border-bottom: none; text-align: center; vertical-align: top;" rowspan="18">${dateStr}</td>
+                                    <td style="border-bottom: 1px solid #000;">
+                                        <b>กิจกรรม</b> &nbsp;&nbsp;&nbsp; ${actName}
+                                    </td>
+                                    <td style="border-bottom: 1px solid #000;"></td>
+                                </tr>
+                                <!-- row 2: ค่า Taxi header -->
+                                <tr>
+                                    <td style="border-top: none; border-bottom: none;">
+                                        <span style="display:inline-block; width: 60px;">ค่า Taxi</span>
+                                        <span style="font-family: Arial; font-size: 18px; vertical-align: middle;">${chkTaxiOtw}</span> ขาไป &nbsp;&nbsp;&nbsp;&nbsp;
+                                        <span style="font-family: Arial; font-size: 18px; vertical-align: middle;">${chkTaxiRet}</span> ขากลับ &nbsp;&nbsp;&nbsp;&nbsp;
+                                        <span style="font-family: Arial; font-size: 18px; vertical-align: middle;">${chkTaxiRnd}</span> ไป-กลับ
+                                    </td>
+                                    <td style="border-top: none; border-bottom: none; text-align: right; vertical-align: middle;" rowspan="4">
+                                        ${taxiTotal > 0 ? formatNumber(taxiTotal) : ''}
+                                    </td>
+                                </tr>
+                                <!-- row 3: จาก/ถึง taxi 1 (ขาไป) -->
+                                <tr>
+                                    <td style="border-top: none; border-bottom: none;">
+                                        จาก <span style="padding-left: 10px;">${firstTaxiOut ? firstTaxiOut.from : ''}</span>
+                                        <span style="float: right; padding-right: 80px;">ถึง ${firstTaxiOut ? firstTaxiOut.to : ''}</span>
+                                    </td>
+                                </tr>
+                                <!-- row 4: จาก/ถึง taxi 2 (ขากลับ — ถ้า ไป-กลับ ให้สลับทิศ) -->
+                                <tr>
+                                    <td style="border-top: none; border-bottom: none;">
+                                        จาก <span style="padding-left: 10px;">${firstTaxiRet ? (firstTaxiRet.direction === 'ไป-กลับ' ? firstTaxiRet.to : firstTaxiRet.from) : ''}</span>
+                                        <span style="float: right; padding-right: 80px;">ถึง ${firstTaxiRet ? (firstTaxiRet.direction === 'ไป-กลับ' ? firstTaxiRet.from : firstTaxiRet.to) : ''}</span>
+                                    </td>
+                                </tr>
+                                <!-- row 5: จาก/ถึง taxi 3 (ใหม่) -->
+                                <tr>
+                                    <td style="border-top: none; border-bottom: 1px solid #000;">
+                                        จาก <span style="padding-left: 10px;"></span>
+                                        <span style="float: right; padding-right: 80px;">ถึง</span>
+                                    </td>
+                                </tr>
+                                <!-- row 6: ค่าน้ำมันเชื้อเพลิง header -->
+                                <tr>
+                                    <td style="border-top: 1px solid #000; border-bottom: none;">
+                                        <span style="font-family: Arial; font-size: 18px; vertical-align: middle;">${chkCarSelected}</span> ค่าน้ำมันเชื้อเพลิง &nbsp;
+                                        <span style="font-family: Arial; font-size: 18px; vertical-align: middle;">${chkCarOtw}</span> ขาไป &nbsp;&nbsp;&nbsp;&nbsp;
+                                        <span style="font-family: Arial; font-size: 18px; vertical-align: middle;">${chkCarRet}</span> ขากลับ &nbsp;&nbsp;&nbsp;&nbsp;
+                                        <span style="font-family: Arial; font-size: 18px; vertical-align: middle;">${chkCarRnd}</span> ไป-กลับ
+                                    </td>
+                                    <td style="border-top: 1px solid #000; border-bottom: none; text-align: right; vertical-align: middle;" rowspan="5">
+                                        ${fuelTotal > 0 ? formatNumber(fuelTotal) : ''}
+                                    </td>
+                                </tr>
+                                <!-- row 7: จาก/ถึง fuel 1 -->
+                                <tr>
+                                    <td style="border-top: none; border-bottom: none;">
+                                        จาก <span style="padding-left: 10px;">${carType === 'ขาไป' || carType === 'ไป-กลับ' ? tr.from : ''}</span>
+                                        <span style="float: right; padding-right: 80px;">ถึง ${carType === 'ขาไป' || carType === 'ไป-กลับ' ? tr.to : ''}</span>
+                                    </td>
+                                </tr>
+                                <!-- row 8: ระยะทาง fuel 1 -->
+                                <tr>
+                                    <td style="border-top: none; border-bottom: none;">
+                                        ระยะทาง &nbsp;<span style="display:inline-block; width:40px; text-align:center;">${carType === 'ขาไป' || carType === 'ไป-กลับ' ? distOut : ''}</span> ก.ม. x
+                                        เที่ยว &nbsp;<span style="display:inline-block; width:20px; text-align:center;">${carType === 'ขาไป' || carType === 'ไป-กลับ' ? '1' : ''}</span> เที่ยว x
+                                        <span style="display:inline-block; width:30px; text-align:center;">${carType === 'ขาไป' || carType === 'ไป-กลับ' ? fRate : ''}</span> บาท
+                                    </td>
+                                </tr>
+                                <!-- row 9: จาก/ถึง fuel 2 -->
+                                <tr>
+                                    <td style="border-top: none; border-bottom: none;">
+                                        จาก <span style="padding-left: 10px;">${carType === 'ขากลับ' || carType === 'ไป-กลับ' ? tr.to : ''}</span>
+                                        <span style="float: right; padding-right: 80px;">ถึง ${carType === 'ขากลับ' || carType === 'ไป-กลับ' ? tr.from : ''}</span>
+                                    </td>
+                                </tr>
+                                <!-- row 10: ระยะทาง fuel 2 -->
+                                <tr>
+                                    <td style="border-top: none; border-bottom: 1px solid #000;">
+                                        ระยะทาง &nbsp;<span style="display:inline-block; width:40px; text-align:center;">${carType === 'ขากลับ' || carType === 'ไป-กลับ' ? distRet : ''}</span> ก.ม. x
+                                        เที่ยว &nbsp;<span style="display:inline-block; width:20px; text-align:center;">${carType === 'ขากลับ' || carType === 'ไป-กลับ' ? '1' : ''}</span> เที่ยว x
+                                        <span style="display:inline-block; width:30px; text-align:center;">${carType === 'ขากลับ' || carType === 'ไป-กลับ' ? fRate : ''}</span> บาท
+                                    </td>
+                                </tr>
+                                <!-- row 11: ค่าทางด่วน -->
+                                <tr>
+                                    <td style="border-top: 1px solid #000; border-bottom: 1px solid #000;">
+                                        <span style="font-family: Arial; font-size: 18px; vertical-align: middle;">${tollTotal > 0 ? '&#9673;' : '&#9711;'}</span> ค่าทางด่วน
+                                    </td>
+                                    <td style="border-top: 1px solid #000; border-bottom: 1px solid #000; text-align: right;">
+                                        ${tollTotal > 0 ? formatNumber(tollTotal) : ''}
+                                    </td>
+                                </tr>
+                                <!-- row 12: ค่าที่จอดรถ (แยกแถว) -->
+                                <tr>
+                                    <td style="border-top: none; border-bottom: 1px solid #000;">
+                                        <span style="font-family: Arial; font-size: 18px; vertical-align: middle;">&#9711;</span> ค่าที่จอดรถ
+                                    </td>
+                                    <td style="border-top: none; border-bottom: 1px solid #000;"></td>
+                                </tr>
+                                <!-- row 13: ค่าใช้จ่ายอื่นๆ -->
+                                <tr>
+                                    <td style="border-top: none; border-bottom: 1px solid #000;">
+                                        <span style="font-family: Arial; font-size: 18px; vertical-align: middle;">${otherTotal > 0 ? '&#9673;' : '&#9711;'}</span> ค่าใช้จ่ายอื่นๆ (โปรดระบุ)
+                                    </td>
+                                    <td style="border-top: none; border-bottom: 1px solid #000; text-align: right;">
+                                        ${otherTotal > 0 ? formatNumber(otherTotal) : ''}
+                                    </td>
+                                </tr>
+                                <!-- row 14: ที่อยู่ (ใหม่) -->
+                                <tr>
+                                    <td style="border-top: none; border-bottom: 1px solid #000; padding: 6px 8px;">
+                                        ที่อยู่
+                                    </td>
+                                    <td style="border-top: none; border-bottom: 1px solid #000;"></td>
+                                </tr>
+                                <!-- row 15: กิจกรรม (แถวที่ 2) -->
+                                <tr>
+                                    <td style="border-top: none; border-bottom: 1px solid #000;">
+                                        <b>กิจกรรม</b>
+                                    </td>
+                                    <td style="border-top: none; border-bottom: 1px solid #000;"></td>
+                                </tr>
+                                <!-- rows 16-18: แถวว่างสำหรับรายการเพิ่มเติม -->
+                                <tr>
+                                    <td style="border-bottom: 1px solid #000; height: 22px;"></td>
+                                    <td style="border-bottom: 1px solid #000;"></td>
+                                </tr>
+                                <tr>
+                                    <td style="border-bottom: 1px solid #000; height: 22px;"></td>
+                                    <td style="border-bottom: 1px solid #000;"></td>
+                                </tr>
+                                <tr>
+                                    <td style="border-bottom: 1px solid #000; height: 22px;"></td>
+                                    <td style="border-bottom: 1px solid #000;"></td>
+                                </tr>
+                                <!-- รวมทั้งสิ้น -->
+                                <tr style="font-weight: bold;">
+                                    <td style="border-top: 1px solid #000; border-bottom: 1px solid #000; text-align: right;" colspan="2">
+                                        รวมทั้งสิ้น
+                                    </td>
+                                    <td style="border-top: 1px solid #000; border-bottom: 1px solid #000; text-align: right;">
+                                        ${formatNumber(receiptTotal)}
+                                    </td>
+                                </tr>
+                                <!-- จำนวนเงินตัวอักษร -->
+                                <tr>
+                                    <td colspan="3" style="text-align: center; border-top: none; padding: 6px 8px;">
+                                        จำนวนเงินตัวอักษร ( ${receiptAmtText} )
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <div class="avoid-break" style="margin-top: 15px;">
+                            <div style="display: flex; align-items: baseline; margin-bottom: 8px;">
+                                ข้าพเจ้า <span class="solid-line" style="width: 250px; margin: 0 10px;">${data.requestedBy}</span>
+                                ตำแหน่ง <span class="solid-line" style="width: 180px; margin: 0 10px;">${position}</span>
+                            </div>
+                            <div style="margin-top: 5px; line-height: 1.6; margin-bottom: 25px;">
+                                ขอรับรองว่า รายจ่ายข้างต้นนี้ข้าพเจ้าได้จ่ายไปในงานของสถาบันรับรองคุณภาพสถานพยาบาล และไม่อาจเรียก<br>
+                                ใบเสร็จรับเงินจากผู้รับเงิน
+                            </div>
+                            <div style="text-align: center; margin-top: 10px;">
+                                ลงชื่อ <span class="solid-line" style="width: 200px;"></span><br><br>
+                                ( <span class="solid-line" style="width: 160px; border: none; font-weight: bold;">${data.requestedBy}</span> )<br><br>
+                                วันที่ <span class="solid-line" style="width: 160px; border: none;">${dateStr}</span>
+                            </div>
+                        </div>
+                    </div>`;
+
+                    if (hasGeneral || hasNormal) {
+                        templateHtml += `<div class="html2pdf__page-break"></div>`;
+                    } else if (data.attachments && data.attachments.images && data.attachments.images.length > 0) {
+                        templateHtml += `<div class="html2pdf__page-break"></div>`;
+                    }
+                }
+
+            }
+
+            // 📄 3. ใบรับรองแทนใบเสร็จรับเงิน – ทั่วไป (FM-SAM-003-06)
+            if (hasGeneral) {
+                const grItems = Array.isArray(meta._generalReceiptItems) ? meta._generalReceiptItems : [];
+                const grTotal = grItems.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
+                const grAmtText = getThaiBahtText(grTotal);
+
+                let grRowsHtml = grItems.map(row => `
+                    <tr>
+                        <td style="text-align: center; vertical-align: top; padding: 5px 8px; border: 1px solid #000;">${row.date ? formatDateDisplay(row.date) : ''}</td>
+                        <td style="padding: 5px 8px; border: 1px solid #000;">${row.description || ''}</td>
+                        <td style="text-align: right; padding: 5px 8px; border: 1px solid #000; font-family: monospace;">${row.amount ? formatNumber(row.amount) : ''}</td>
+                    </tr>
+                `).join('');
+
+                // Pad to at least 5 rows for empty lines
+                const padRows = Math.max(0, 5 - grItems.length);
+                for (let i = 0; i < padRows; i++) {
+                    grRowsHtml += `<tr><td style="height: 26px; border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td></tr>`;
+                }
+
+                templateHtml += `
+                <div class="pdf-page">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
+                        <img src="/logo.png" style="height: 65px;" onerror="this.style.display='none'">
+                        <div style="text-align: right; font-size: 11px; line-height: 1.5; font-weight: bold;">
+                            FM-SAM-003-06<br>
+                            ใบรับรองแทนใบเสร็จรับเงิน (ทั่วไป)<br>
+                            วันที่ประกาศใช้ 11/05/2569<br>
+                            รอบทบทวน 11/05/2571<br>
+                            ชั้นความลับ : เอกสารภายใน
+                        </div>
+                    </div>
+
+                    <h2 style="text-align: center; font-weight: bold; font-size: 18px; margin-bottom: 15px;">ใบรับรองแทนใบเสร็จรับเงิน</h2>
+
+                    <table class="pdf-table">
+                        <thead>
+                            <tr style="background: white;">
+                                <th style="width: 18%; text-align: center;">วัน เดือน ปี</th>
+                                <th style="text-align: center;">รายละเอียดรายจ่าย</th>
+                                <th style="width: 22%; text-align: center;">จำนวนเงิน (บาท)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${grRowsHtml}
+                            <tr style="font-weight: bold;">
+                                <td colspan="2" style="text-align: right; border: 1px solid #000; padding: 5px 8px;">รวมทั้งสิ้น</td>
+                                <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; font-family: monospace;">${formatNumber(grTotal)}</td>
+                            </tr>
+                            <tr>
+                                <td colspan="3" style="text-align: center; border: 1px solid #000; padding: 5px 8px;">
+                                    จำนวนเงินตัวอักษร ( ${grAmtText} )
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="avoid-break" style="margin-top: 15px;">
+                        <div style="display: flex; align-items: baseline; margin-bottom: 8px;">
+                            ข้าพเจ้า <span class="solid-line" style="width: 250px; margin: 0 10px;">${data.requestedBy}</span>
+                            ตำแหน่ง <span class="solid-line" style="width: 180px; margin: 0 10px;">${position}</span>
+                        </div>
+                        <div style="margin-top: 5px; line-height: 1.6; margin-bottom: 25px;">
+                            ขอรับรองว่า รายจ่ายข้างต้นนี้ข้าพเจ้าได้จ่ายไปในงานของสถาบันรับรองคุณภาพสถานพยาบาล และไม่อาจเรียก<br>
+                            ใบเสร็จรับเงินจากผู้รับเงิน
+                        </div>
+                        <div style="text-align: center; margin-top: 10px;">
+                            ลงชื่อ <span class="solid-line" style="width: 200px;"></span><br><br>
+                            ( <span class="solid-line" style="width: 160px; border: none; font-weight: bold;">${data.requestedBy}</span> )<br><br>
+                            วันที่ <span class="solid-line" style="width: 160px; border: none;">${dateStr}</span>
+                        </div>
+                    </div>
+                </div>`;
+
+                if (data.attachments && data.attachments.images && data.attachments.images.length > 0) {
+                    templateHtml += `<div class="html2pdf__page-break"></div>`;
+                }
+            }
+
+            if (!hasTravel && !hasGeneral) {
+                // (สำหรับเบิกจ่ายทั่วไป NORMAL)
+                const safeDescription = data.description || ''; 
+                const descName = safeDescription.replace('เบิกหมวด ', '').replace('เบิกจ่ายหมวด ', '') || 'ค่าใช้จ่าย';
+                
+                let metadataHtml = '';
+                if (Object.keys(meta).length > 0) {
+                    metadataHtml = Object.entries(meta)
+                        .filter(([k,v]) => !k.startsWith('_')) 
+                        .map(([k,v]) => `<li style="margin-bottom: 4px;">${k} : ${v}</li>`).join('');
+                }
+
+                templateHtml = `
+                <div class="pdf-page">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                        <img src="/logo.png" alt="โลโก้" style="height: 85px; width: auto; object-fit: contain;" onerror="this.style.display='none'">
+                        <div class="text-right">
+                            <h1 class="text-3xl font-black mb-1">บันทึกข้อความ</h1>
+                            <p class="text-base">สถาบันรับรองคุณภาพสถานพยาบาล (องค์การมหาชน)</p>
+                        </div>
+                    </div>
+
+                    <div class="border-b-2 border-black pb-5 mb-8 text-lg">
+                        <div class="flex gap-4 mb-3">
+                            <div class="w-2/3"><span class="font-bold">ส่วนราชการ:</span> สถาบันรับรองคุณภาพสถานพยาบาล (องค์การมหาชน)</div>
+                            <div class="w-1/3"><span class="font-bold">วันที่:</span> <span class="solid-line" style="width: 150px;">${dateStr}</span></div>
+                        </div>
+                        <div><span class="font-bold">เรื่อง:</span> ขออนุมัติเบิกจ่ายงบประมาณโครงการ</div>
+                    </div>
+
+                    <div class="mb-8 text-lg"><span class="font-bold">เรียน</span> ผู้อำนวยการสถาบันรับรองคุณภาพสถานพยาบาล</div>
+
+                    <div class="text-lg" style="line-height: 2.4; margin-bottom: 2rem;">
+                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ด้วย ข้าพเจ้า <span class="solid-line" style="width: 250px;">${data.requestedBy}</span> 
+                        มีความประสงค์ขออนุมัติเบิกจ่ายงบประมาณ 
+                        เพื่อใช้ในรายการ <span class="solid-line" style="width: 300px;">${descName}</span> 
+                        ภายใต้กิจกรรม <span class="solid-line" style="width: 300px;">${actName}</span> 
+                        รวมเป็นจำนวนเงินทั้งสิ้น <span class="solid-line" style="font-size: 1.15rem; width: 120px;">${formatAmt}</span> บาท 
+                        ( <span class="solid-line" style="width: 250px; border-bottom: none;">${amtText}</span> ) 
+                        โดยมีรายละเอียดและหลักฐานประกอบการเบิกจ่ายแนบมาพร้อมนี้
+                    </div>
+                    
+                    <div class="text-base mb-8 p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                        <b>รายละเอียดตัวแปรเพิ่มเติม:</b><br>
+                        <ul style="padding-left: 20px; margin-top: 5px;">${metadataHtml}</ul>
+                    </div>
+
+                    <div class="text-lg" style="line-height: 2.4; margin-bottom: 5rem;">
+                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;จึงเรียนมาเพื่อโปรดพิจารณาอนุมัติ
+                    </div>
+
+                    <div class="flex justify-end mt-16 text-lg">
+                        <div class="text-center w-80">
+                            <div class="mb-4">(ลงชื่อ).......................................................</div>
+                            <div class="mb-1">( <span class="solid-line" style="width: 180px;">${data.requestedBy}</span> )</div>
+                            <div>ผู้ขออนุมัติเบิกจ่าย</div>
+                        </div>
+                    </div>
+                </div>`;
+
+                if (data.attachments && data.attachments.images && data.attachments.images.length > 0) {
+                    templateHtml += `<div class="html2pdf__page-break"></div>`;
+                }
+            }
+
+            let imagesHtml = '';
+            if(data.attachments && data.attachments.images && data.attachments.images.length > 0) {
+                data.attachments.images.forEach((base64Img, i) => {
+                    // ⭐️ หน้าที่เป็นรูปภาพก็ป้องกันการหั่นครึ่ง และตั้งค่าหลบการตัดหน้า
+                    imagesHtml += `
+                    <div class="pdf-page avoid-break" style="padding-top: 20px;">
+                        <div style="font-size: 1.25rem; font-weight: bold; margin-bottom: 20px; border-bottom: 2px solid #334155; padding-bottom: 10px; text-align: left;">
+                            เอกสารหลักฐานแนบประกอบการเบิกจ่าย (ภาพที่ ${i + 1})
+                        </div>
+                        <div style="width: 100%; text-align: center;">
+                            <img src="${base64Img}" style="max-width: 100%; max-height: 220mm; object-fit: contain; border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);" />
+                        </div>
+                    </div>`;
+                    
+                    if (i < data.attachments.images.length - 1) {
+                        imagesHtml += `<div class="html2pdf__page-break"></div>`;
+                    }
+                });
+            }
+
+            const container = document.getElementById('pdf-container');
+            container.innerHTML = `
+                <div id="formal-doc" style="background: white; color: black; margin: 0; padding: 0;">
+                    ${templateHtml}
+                    ${imagesHtml}
+                </div>
+            `;
+
+            const element = document.getElementById('formal-doc');
+            const btn = event.currentTarget;
+            const originalText = btn.innerHTML;
+            
+            btn.innerHTML = '⏳ กำลังเตรียมเอกสาร...'; 
+            btn.disabled = true;
+
+            setTimeout(() => {
+                btn.innerHTML = '⏳ กำลังสร้าง PDF...';
+                // ⭐️ เพิ่มโหมด pagebreak: css เข้าไปเพื่อให้ html2pdf ทำตามคำสั่ง avoid-break ที่เขียนไว้ใน CSS
+                const opt = {
+                    margin:       [5, 5, 5, 5], 
+                    filename:     `ใบเบิก_${data.requestedBy.replace(/\s+/g, '_')}_${dateObj.getTime()}.pdf`,
+                    image:        { type: 'jpeg', quality: 0.98 },
+                    html2canvas:  { scale: 2, useCORS: true, logging: false }, 
+                    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+                    pagebreak:    { mode: ['css'] }
+                };
+
+                html2pdf().set(opt).from(element).save().then(() => {
+                    btn.innerHTML = originalText; btn.disabled = false;
+                    container.innerHTML = ''; 
+                }).catch(() => {
+                    alert("เกิดข้อผิดพลาดในการสร้าง PDF");
+                    btn.innerHTML = originalText; btn.disabled = false;
+                    container.innerHTML = ''; 
+                });
+            }, 1000); 
+        }
+        
+        async function deleteExpense(id) {
+            if (!confirm('ต้องการลบรายการนี้ใช่ไหม? ไม่สามารถกู้คืนได้')) return;
+            try {
+                const res = await fetch(`/expenses/${id}`, { method: 'DELETE' });
+                if (!res.ok) throw new Error();
+                raw = raw.filter(x => x.id !== id);
+                draw();
+            } catch(e) {
+                alert('ไม่สามารถลบได้ กรุณาลองใหม่');
+            }
+        }
+
+        load();
+    </script>
+</body>
+</html>

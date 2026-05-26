@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir \"d:\\\\Manny\\\\promt-beark\")",
+      "Bash(Get-ChildItem -Path \"D:\\\\Manny\\\\promt-beark\" -Recurse -File)",
+      "Bash(Select-Object FullName)",
+      "Bash(Sort-Object FullName)",
+      "PowerShell(node --version)",
+      "PowerShell(npm --version)",
+      "PowerShell(node --version 2>$null)",
+      "PowerShell(npm --version 2>$null)",
+      "PowerShell(docker --version 2>$null)",
+      "PowerShell(python --version 2>$null)",
+      "PowerShell(pip --version 2>$null)",
+      "PowerShell(pip install python-pptx --quiet)",
+      "PowerShell(docker --version)",
+      "PowerShell(docker compose version)",
+      "PowerShell(wsl --update)",
+      "PowerShell(wsl --install --no-distribution)",
+      "Bash(docker compose *)",
+      "Bash(curl -s http://localhost:8080/health)",
+      "Bash(curl -s http://localhost:8080/budget-categories)",
+      "Bash(curl -s http://localhost:8080/expenses)",
+      "Bash(curl -s http://localhost:8080/)",
+      "Bash(curl -s http://localhost:8080/expense.html)",
+      "Bash(curl -s http://localhost:8080/history.html)",
+      "Bash(curl -s http://localhost:8080/admin.html)",
+      "Bash(python3 -m json.tool)",
+      "Bash(curl -s -X POST http://localhost:8080/budget-categories -H 'Content-Type: application/json' -d '{ *)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('ID:', d.get\\('id'\\), '| pdfTemplates:', d.get\\('pdfTemplates'\\)\\)\")",
+      "Bash(python3 -c ' *)"
+    ]
+  }
+}

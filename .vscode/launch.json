@@ -1,0 +1,23 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "chrome",
+            "request": "launch",
+            "name": "Chrome: localhost:8080 (serve public/)",
+            "url": "http://127.0.0.1:8080/",
+            "webRoot": "${workspaceFolder}/public",
+            "preLaunchTask": "serve-public-8080"
+        },
+        {
+            "type": "chrome",
+            "request": "launch",
+            "name": "Chrome: localhost only (เซิร์ฟเวอร์รันเองแล้ว)",
+            "url": "http://127.0.0.1:8080/",
+            "webRoot": "${workspaceFolder}/public"
+        }
+    ]
+}
