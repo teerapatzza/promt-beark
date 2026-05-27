@@ -621,10 +621,33 @@
 
         map = L.map('map').setView([13.7563, 100.5018], 12);
 
-        L.tileLayer(
+        const _streetLayer = L.tileLayer(
             'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-            { attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>', maxZoom: 19 }
-        ).addTo(map);
+            { attribution: '&copy; OpenStreetMap', maxZoom: 19 }
+        );
+        const _satelliteLayer = L.tileLayer(
+            'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+            { attribution: '&copy; Esri World Imagery', maxZoom: 19 }
+        );
+        _satelliteLayer.addTo(map);
+
+        const _layerToggle = L.control({ position: 'topright' });
+        _layerToggle.onAdd = function() {
+            const div = L.DomUtil.create('div', '');
+            div.innerHTML = '<button id="expLayerBtn" style="background:white;border:2px solid rgba(0,0,0,0.3);padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;box-shadow:0 1px 4px rgba(0,0,0,.2)">🗺️ ถนน</button>';
+            L.DomEvent.disableClickPropagation(div);
+            div.querySelector('#expLayerBtn').onclick = function() {
+                if (map.hasLayer(_satelliteLayer)) {
+                    map.removeLayer(_satelliteLayer); _streetLayer.addTo(map);
+                    this.textContent = '🛰️ ดาวเทียม';
+                } else {
+                    map.removeLayer(_streetLayer); _satelliteLayer.addTo(map);
+                    this.textContent = '🗺️ ถนน';
+                }
+            };
+            return div;
+        };
+        _layerToggle.addTo(map);
 
         setupAutocomplete('travelFrom', 'fromSuggestions', 0);
         setupAutocomplete('travelTo', 'toSuggestions', 1);

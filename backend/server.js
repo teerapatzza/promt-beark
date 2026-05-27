@@ -184,10 +184,26 @@ app.get('/map-search', async (req, res) => {
   const q = (req.query.q || '').trim();
   if (!q) return res.status(400).json({ error: 'q is required' });
   try {
-    const url = `https://search.longdo.com/mapsearch/json/search?keyword=${encodeURIComponent(q)}&limit=6&key=${LONGDO_API_KEY}`;
-    const r = await fetch(url);
+    const longdoUrl = `https://search.longdo.com/mapsearch/json/search?keyword=${encodeURIComponent(q)}&limit=6&key=${LONGDO_API_KEY}`;
+    const r = await fetch(longdoUrl);
     const data = await r.json();
-    res.json(data);
+    if (data.data && data.data.length > 0) return res.json(data);
+
+    // Fallback: Nominatim (OpenStreetMap)
+    const nomUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=6&countrycodes=th&accept-language=th`;
+    const nr = await fetch(nomUrl, { headers: { 'User-Agent': 'promt-beark-app/1.0' } });
+    const ndata = await nr.json();
+    if (ndata && ndata.length > 0) {
+      return res.json({
+        data: ndata.map(item => ({
+          name: item.display_name.split(',')[0].trim(),
+          address: item.display_name,
+          lat: item.lat,
+          lon: item.lon
+        }))
+      });
+    }
+    return res.json({ data: [] });
   } catch (e) {
     res.status(502).json({ error: 'upstream error' });
   }
