@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>เข้าสู่ระบบ — Prompt-Berk</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+      background: linear-gradient(135deg, #1a237e 0%, #283593 50%, #3949ab 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.25);
+      width: 100%;
+      max-width: 420px;
+      padding: 40px 36px;
+    }
+
+    .logo {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+    .logo h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: #1a237e;
+      letter-spacing: -0.5px;
+    }
+    .logo p {
+      color: #888;
+      font-size: 0.88rem;
+      margin-top: 4px;
+    }
+
+    .tabs {
+      display: flex;
+      border-bottom: 2px solid #e0e0e0;
+      margin-bottom: 28px;
+    }
+    .tab {
+      flex: 1;
+      text-align: center;
+      padding: 10px 0;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.95rem;
+      color: #999;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    .tab.active {
+      color: #1a237e;
+      border-bottom-color: #1a237e;
+    }
+
+    .form-group {
+      margin-bottom: 18px;
+    }
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #555;
+      margin-bottom: 6px;
+    }
+    input[type="email"], input[type="password"] {
+      width: 100%;
+      padding: 11px 14px;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input:focus { border-color: #3949ab; }
+
+    .btn {
+      width: 100%;
+      padding: 13px;
+      background: #1a237e;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.2s;
+      margin-top: 4px;
+    }
+    .btn:hover { background: #283593; }
+    .btn:disabled { background: #9fa8da; cursor: not-allowed; }
+
+    .error-box {
+      background: #ffebee;
+      color: #c62828;
+      border: 1px solid #ef9a9a;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 0.88rem;
+      margin-bottom: 16px;
+      display: none;
+    }
+    .success-box {
+      background: #e8f5e9;
+      color: #2e7d32;
+      border: 1px solid #a5d6a7;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 0.88rem;
+      margin-bottom: 16px;
+      display: none;
+    }
+
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    .hint {
+      text-align: center;
+      font-size: 0.8rem;
+      color: #aaa;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <h1>Prompt-Berk</h1>
+    <p>ระบบเบิกค่าใช้จ่าย</p>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('login')">เข้าสู่ระบบ</div>
+    <div class="tab" onclick="switchTab('register')">สมัครใช้งาน</div>
+  </div>
+
+  <!-- Login Panel -->
+  <div class="panel active" id="panel-login">
+    <div class="error-box" id="login-error"></div>
+    <div class="form-group">
+      <label for="login-email">อีเมล</label>
+      <input type="email" id="login-email" placeholder="your@email.com" autocomplete="email">
+    </div>
+    <div class="form-group">
+      <label for="login-password">รหัสผ่าน</label>
+      <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="btn" id="login-btn" onclick="doLogin()">เข้าสู่ระบบ</button>
+    <p class="hint">ลืมรหัสผ่าน? ติดต่อ admin เพื่อ reset</p>
+  </div>
+
+  <!-- Register Panel -->
+  <div class="panel" id="panel-register">
+    <div class="error-box" id="register-error"></div>
+    <div class="success-box" id="register-success"></div>
+    <div class="form-group">
+      <label for="reg-email">อีเมล</label>
+      <input type="email" id="reg-email" placeholder="your@email.com" autocomplete="email">
+    </div>
+    <div class="form-group">
+      <label for="reg-password">รหัสผ่าน</label>
+      <input type="password" id="reg-password" placeholder="อย่างน้อย 6 ตัวอักษร" autocomplete="new-password">
+    </div>
+    <div class="form-group">
+      <label for="reg-confirm">ยืนยันรหัสผ่าน</label>
+      <input type="password" id="reg-confirm" placeholder="••••••••" autocomplete="new-password">
+    </div>
+    <button class="btn" id="register-btn" onclick="doRegister()">สมัครใช้งาน</button>
+  </div>
+</div>
+
+<script>
+  // If already logged in, redirect
+  fetch('/auth/me').then(r => {
+    if (r.ok) window.location.replace('/');
+  });
+
+  function switchTab(tab) {
+    document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', (i === 0) === (tab === 'login')));
+    document.querySelectorAll('.panel').forEach((p, i) => p.classList.toggle('active', (i === 0) === (tab === 'login')));
+  }
+
+  function showError(id, msg) {
+    const el = document.getElementById(id);
+    el.textContent = msg;
+    el.style.display = 'block';
+  }
+  function hideError(id) { document.getElementById(id).style.display = 'none'; }
+
+  // Enter key support
+  document.getElementById('login-password').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+  document.getElementById('reg-confirm').addEventListener('keydown', e => { if (e.key === 'Enter') doRegister(); });
+
+  async function doLogin() {
+    hideError('login-error');
+    const email = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password').value;
+    if (!email || !password) return showError('login-error', 'กรุณากรอกอีเมลและรหัสผ่าน');
+
+    const btn = document.getElementById('login-btn');
+    btn.disabled = true;
+    btn.textContent = 'กำลังเข้าสู่ระบบ...';
+
+    try {
+      const r = await fetch('/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await r.json();
+      if (!r.ok) {
+        showError('login-error', data.error || 'เข้าสู่ระบบไม่สำเร็จ');
+        return;
+      }
+      window.location.replace('/');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'เข้าสู่ระบบ';
+    }
+  }
+
+  async function doRegister() {
+    hideError('register-error');
+    document.getElementById('register-success').style.display = 'none';
+    const email = document.getElementById('reg-email').value.trim();
+    const password = document.getElementById('reg-password').value;
+    const confirm = document.getElementById('reg-confirm').value;
+    if (!email || !password) return showError('register-error', 'กรุณากรอกอีเมลและรหัสผ่าน');
+    if (password !== confirm) return showError('register-error', 'รหัสผ่านไม่ตรงกัน');
+    if (password.length < 6) return showError('register-error', 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร');
+
+    const btn = document.getElementById('register-btn');
+    btn.disabled = true;
+    btn.textContent = 'กำลังสมัคร...';
+
+    try {
+      const r = await fetch('/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await r.json();
+      if (!r.ok) {
+        showError('register-error', data.error || 'สมัครไม่สำเร็จ');
+        return;
+      }
+      window.location.replace('/');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'สมัครใช้งาน';
+    }
+  }
+</script>
+</body>
+</html>

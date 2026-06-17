@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HA Apps Portal</title>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Sarabun', sans-serif;
+      background: #f0f4f8;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: radial-gradient(circle, #cbd5e1 1px, transparent 1px);
+      background-size: 28px 28px;
+      opacity: 0.4;
+      pointer-events: none;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 48px;
+      position: relative;
+    }
+
+    .header h1 {
+      font-size: 1.75rem;
+      font-weight: 800;
+      color: #0d1525;
+      letter-spacing: -0.5px;
+    }
+
+    .header p {
+      font-size: 0.95rem;
+      color: #64748b;
+      margin-top: 6px;
+    }
+
+    .grid {
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+      justify-content: center;
+      position: relative;
+    }
+
+    .card {
+      background: #ffffff;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 20px;
+      padding: 36px 32px;
+      width: 240px;
+      text-align: center;
+      cursor: pointer;
+      text-decoration: none;
+      color: inherit;
+      transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 32px rgba(0,0,0,0.12);
+    }
+
+    .card:active {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+    }
+
+    .card.motor:hover { border-color: #2563eb; }
+    .card.hospital:hover { border-color: #059669; }
+
+    .icon {
+      width: 72px;
+      height: 72px;
+      border-radius: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .card.motor .icon {
+      background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+    }
+
+    .card.hospital .icon {
+      background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+    }
+
+    .icon svg {
+      width: 36px;
+      height: 36px;
+    }
+
+    .card-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #0d1525;
+    }
+
+    .card-desc {
+      font-size: 0.82rem;
+      color: #64748b;
+      line-height: 1.5;
+    }
+
+    .badge {
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 20px;
+    }
+
+    .card.motor .badge {
+      background: #dbeafe;
+      color: #1d4ed8;
+    }
+
+    .card.hospital .badge {
+      background: #d1fae5;
+      color: #065f46;
+    }
+
+    .footer {
+      margin-top: 48px;
+      font-size: 0.78rem;
+      color: #94a3b8;
+      position: relative;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h1>HA Apps Portal</h1>
+    <p>เลือกระบบที่ต้องการใช้งาน</p>
+  </div>
+
+  <div class="grid">
+
+    <a class="card motor" href="/login.html">
+      <div class="icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 17H3a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1"/>
+          <path d="M19 17h2a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-1"/>
+          <path d="M14 17H8"/>
+          <path d="M5 7l1.5-4h11L19 7"/>
+          <rect x="2" y="7" width="20" height="10" rx="2"/>
+          <circle cx="7" cy="17" r="2"/>
+          <circle cx="17" cy="17" r="2"/>
+        </svg>
+      </div>
+      <div>
+        <div class="card-title">Motor Pool</div>
+        <div class="card-desc">ระบบบริหารจัดการ<br>ค่าใช้จ่ายการเดินทาง</div>
+      </div>
+      <span class="badge">ต้องการเข้าสู่ระบบ</span>
+    </a>
+
+    <a class="card hospital" href="https://209.15.119.96" target="_blank">
+      <div class="icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+          <polyline points="9 22 9 12 15 12 15 22"/>
+          <line x1="12" y1="6" x2="12" y2="10"/>
+          <line x1="10" y1="8" x2="14" y2="8"/>
+        </svg>
+      </div>
+      <div>
+        <div class="card-title">Hospital Billing</div>
+        <div class="card-desc">ระบบ Interface ERP<br>ข้อมูลโรงพยาบาล</div>
+      </div>
+      <span class="badge">เข้าใช้ได้เลย</span>
+    </a>
+
+  </div>
+
+  <div class="footer">Hospital Authority &copy; 2026</div>
+
+</body>
+</html>

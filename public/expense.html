@@ -142,13 +142,16 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-xs font-bold text-slate-500 mb-1">ออกเดินทางจาก <span class="text-rose-500">*</span></label>
-                            <select id="startFromType" class="w-full border p-2.5 rounded-lg text-sm outline-none focus:border-blue-500 mb-2">
+                            <select id="startFromType" onchange="onStartFromTypeChange()" class="w-full border p-2.5 rounded-lg text-sm outline-none focus:border-blue-500 mb-2">
                                 <option value="ที่พัก">ที่พัก</option>
                                 <option value="ที่ทำงาน">ที่ทำงาน</option>
                             </select>
+                            <input type="text" id="startFromLocation" value="ที่พัก" readonly
+                                class="w-full border p-2.5 rounded-lg text-sm outline-none bg-slate-100 text-slate-500 cursor-default mb-2"
+                                placeholder="ระบุสถานที่ต้นทาง">
                             <div class="flex gap-2">
                                 <input type="date" id="dateStart" class="w-full border p-2.5 rounded-lg text-sm outline-none focus:border-blue-500">
-                                <input type="time" id="timeStart" class="w-full border p-2.5 rounded-lg text-sm outline-none focus:border-blue-500">
+                                <div id="timeStart" class="flex items-center gap-1 w-full"></div>
                             </div>
                         </div>
                         <div>
@@ -156,7 +159,7 @@
                             <input type="text" id="targetProv" placeholder="ไปปฏิบัติงาน ณ จังหวัด..." class="w-full border p-2.5 rounded-lg text-sm outline-none focus:border-blue-500 mb-2">
                             <div class="flex gap-2">
                                 <input type="date" id="dateEnd" class="w-full border p-2.5 rounded-lg text-sm outline-none focus:border-blue-500">
-                                <input type="time" id="timeEnd" class="w-full border p-2.5 rounded-lg text-sm outline-none focus:border-blue-500">
+                                <div id="timeEnd" class="flex items-center gap-1 w-full"></div>
                             </div>
                         </div>
                     </div>
@@ -393,23 +396,25 @@
         if (!cat) return {};
         if (cat.attachmentRules && typeof cat.attachmentRules === 'object') {
             const out = {};
-            ATTACHMENT_IDS.forEach(id => {
+            const order = (cat.attachmentOrder && cat.attachmentOrder.length) ? cat.attachmentOrder : ATTACHMENT_IDS;
+            const allIds = [...new Set([...order, ...Object.keys(cat.attachmentRules)])];
+            allIds.forEach(id => {
                 const r = cat.attachmentRules[id] || {};
                 const show = !!r.show;
-                out[id] = { show, required: show && !!r.required };
+                out[id] = { show, required: show && !!r.required, label: r.label || '' };
             });
             return out;
         }
         const out = {};
         ATTACHMENT_IDS.forEach(id => {
             const legacy = Array.isArray(cat.requiredFields) && cat.requiredFields.includes(id);
-            out[id] = { show: legacy, required: legacy };
+            out[id] = { show: legacy, required: legacy, label: '' };
         });
         return out;
     }
 
     function anyAttachmentShown(rules) {
-        return ATTACHMENT_IDS.some(id => rules[id] && rules[id].show);
+        return Object.keys(rules).some(id => rules[id] && rules[id].show);
     }
     let map = null;
     let startMarker = null, endMarker = null, routeLine = null;
@@ -550,12 +555,37 @@
         document.getElementById('addrDist').value = p.dist || '';
         document.getElementById('addrProv').value = p.prov || '';
         document.getElementById('addrZip').value = p.zip || '';
+        const addrLine = document.getElementById('extraAddrLine');
+        if (addrLine) addrLine._userEdited = false;
+        autoFillExtraEntries();
         if(map && p.lat && p.lng) {
             const newStart = L.latLng(p.lat, p.lng);
             setWaypoint(0, newStart);
             map.flyTo(newStart, 14);
             document.getElementById('travelFrom').value = "ที่พัก (" + p.profileName + ")";
             document.getElementById('startFromType').value = "ที่พัก";
+        }
+    }
+
+    function autoFillExtraEntries() {
+        if (document.getElementById('extraEntriesBox')?.classList.contains('hidden')) return;
+        const addrLine = document.getElementById('extraAddrLine');
+        if (addrLine && !addrLine._userEdited) {
+            const v = (id) => document.getElementById(id)?.value?.trim() || '';
+            const parts = [
+                v('addrNo'),
+                v('addrSoi') ? 'ซอย ' + v('addrSoi') : '',
+                v('addrRoad') ? 'ถนน' + v('addrRoad') : '',
+                v('addrSub'), v('addrDist'), v('addrProv'), v('addrZip'),
+            ].filter(Boolean);
+            addrLine.value = parts.join(' ');
+        }
+        const actName = document.getElementById('activityName')?.value?.trim();
+        const list = document.getElementById('extraActivitiesList');
+        if (actName && list && !list.querySelector('.extra-activity')) {
+            addExtraActivity();
+            const inp = list.querySelector('.extra-act-text');
+            if (inp) inp.value = actName;
         }
     }
 
@@ -744,8 +774,8 @@
             <div class="flex items-end gap-2">
                 <div class="flex-1 flex gap-1.5">
                     <div class="taxi-out-wrap flex-1">
-                        <label class="taxi-out-label text-[10px] text-slate-400 font-bold block mb-0.5 hidden">ขาไป</label>
-                        <input type="number" min="0" step="any" class="taxi-amt-out w-full border border-slate-200 px-2 py-1.5 rounded text-xs outline-none focus:border-blue-400" placeholder="ยอดค่า Taxi (บาท)" oninput="onTaxiAmtChange(this)">
+                        <label class="taxi-out-label text-[10px] text-slate-400 font-bold block mb-0.5">ขาไป (บาท)</label>
+                        <input type="number" min="0" step="any" class="taxi-amt-out w-full border border-slate-200 px-2 py-1.5 rounded text-xs outline-none focus:border-blue-400" placeholder="ขาไป (บาท)" oninput="onTaxiAmtChange(this)">
                     </div>
                     <div class="taxi-ret-wrap flex-1 hidden">
                         <label class="text-[10px] text-slate-400 font-bold block mb-0.5">ขากลับ</label>
@@ -776,18 +806,17 @@
         if (dir === 'ไป-กลับ') {
             outWrap.classList.remove('hidden');
             retWrap.classList.remove('hidden');
-            outLbl.classList.remove('hidden');
+            outLbl.textContent = 'ขาไป (บาท)';
             outInp.placeholder = 'ขาไป (บาท)';
         } else if (dir === 'ขากลับ') {
             outWrap.classList.add('hidden');
             retWrap.classList.remove('hidden');
-            outLbl.classList.add('hidden');
             outInp.value = '';
         } else {
             outWrap.classList.remove('hidden');
             retWrap.classList.add('hidden');
-            outLbl.classList.add('hidden');
-            outInp.placeholder = 'ยอดค่า Taxi (บาท)';
+            outLbl.textContent = 'ขาไป (บาท)';
+            outInp.placeholder = 'ขาไป (บาท)';
             retInp.value = '';
         }
         entry.querySelector('.taxi-err').classList.add('hidden');
@@ -932,6 +961,7 @@
         document.getElementById('travelDetailsBox').classList.toggle('hidden', !hasTravel);
         document.getElementById('travelCostBox').classList.toggle('hidden', !hasTravel);
         document.getElementById('extraEntriesBox').classList.toggle('hidden', !hasTravel);
+        if (hasTravel) { setTimeout(autoFillExtraEntries, 100); }
         document.getElementById('generalReceiptSection').classList.toggle('hidden', !hasGeneral);
         document.getElementById('descBox').classList.toggle('hidden', !hasNormal || hasTravel);
         document.getElementById('dynamicInputs').classList.toggle('hidden', !hasNormal || hasTravel);
@@ -989,23 +1019,30 @@
         });
 
         eviDiv.innerHTML = '';
+        const _attDefaultLabels = {
+            RECEIPT: '📎 ภาพถ่ายใบเสร็จรับเงิน (แนบได้หลายไฟล์)',
+            TAX_INVOICE: '🧾 ภาพถ่ายใบกำกับภาษี (แนบได้หลายไฟล์)',
+            PHOTO: '📸 ภาพถ่ายกิจกรรมประกอบ (แนบได้หลายไฟล์)',
+        };
+        const _attOrder = (category && category.attachmentOrder && category.attachmentOrder.length)
+            ? category.attachmentOrder : Object.keys(rules);
         if (anyAttachmentShown(rules)) {
             eviBox.classList.remove('hidden');
             const reqTag = (r) => r.required ? '<span class="text-rose-500">*จำเป็น</span>' : '<span class="text-slate-500 font-normal text-xs">(ไม่บังคับ)</span>';
-            ATTACHMENT_IDS.forEach(field => {
+            _attOrder.forEach(field => {
                 const r = rules[field];
-                if (!r.show) return;
+                if (!r || !r.show) return;
                 if (field === 'LOCATION') {
                     eviDiv.innerHTML += `
                     <div class="bg-blue-50 p-5 rounded-xl border border-blue-200 mb-4 shadow-sm">
                         <label class="block text-sm font-black text-blue-900 mb-3">📍 ภาพแคปหน้าจอแผนที่ / เส้นทาง (Google Maps ฯลฯ) ${reqTag(r)}</label>
                         <div class="flex flex-col gap-3 bg-white p-3 rounded-lg border border-blue-100">
                             <label class="flex items-center gap-2 text-sm font-bold text-slate-700 cursor-pointer">
-                                <input type="radio" name="mapCaptureMode" value="auto" checked onchange="toggleMapUpload()" class="w-4 h-4 text-blue-600"> 
+                                <input type="radio" name="mapCaptureMode" value="auto" checked onchange="toggleMapUpload()" class="w-4 h-4 text-blue-600">
                                 📸 ให้ระบบแคปหน้าจอแผนที่ด้านบนให้อัตโนมัติ (สัดส่วนสวยงาม)
                             </label>
                             <label class="flex items-center gap-2 text-sm font-bold text-slate-600 cursor-pointer">
-                                <input type="radio" name="mapCaptureMode" value="manual" onchange="toggleMapUpload()" class="w-4 h-4 text-slate-400"> 
+                                <input type="radio" name="mapCaptureMode" value="manual" onchange="toggleMapUpload()" class="w-4 h-4 text-slate-400">
                                 📁 อัปโหลดรูปภาพแผนที่ด้วยตัวเอง (เลือกได้หลายไฟล์)
                             </label>
                         </div>
@@ -1013,10 +1050,7 @@
                     </div>`;
                     return;
                 }
-                let label = '';
-                if (field === 'RECEIPT') label = '📎 ภาพถ่ายใบเสร็จรับเงิน (แนบได้หลายไฟล์)';
-                if (field === 'TAX_INVOICE') label = '🧾 ภาพถ่ายใบกำกับภาษี (แนบได้หลายไฟล์)';
-                if (field === 'PHOTO') label = '📸 ภาพถ่ายกิจกรรมประกอบ (แนบได้หลายไฟล์)';
+                const label = r.label ? `📎 ${r.label} (แนบได้หลายไฟล์)` : (_attDefaultLabels[field] || `📎 ${field} (แนบได้หลายไฟล์)`);
                 const reqClass = r.required ? 'required-file' : '';
                 eviDiv.innerHTML += `
                     <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-4">
@@ -1156,8 +1190,9 @@
             };
             metadata._travel = {
                 startFromType: document.getElementById('startFromType')?.value || '',
-                startDate: document.getElementById('dateStart')?.value || '', startTime: document.getElementById('timeStart')?.value || '',
-                endDate: document.getElementById('dateEnd')?.value || '', endTime: document.getElementById('timeEnd')?.value || '',
+                startFromLocation: document.getElementById('startFromLocation')?.value || '',
+                startDate: document.getElementById('dateStart')?.value || '', startTime: getTime24('timeStart'),
+                endDate: document.getElementById('dateEnd')?.value || '', endTime: getTime24('timeEnd'),
                 from: travelFrom, to: travelTo, toProv: document.getElementById('targetProv')?.value || '',
                 distOut: document.getElementById('distOutbound')?.value || 0, distRet: document.getElementById('distReturn')?.value || 0
             };
@@ -1270,7 +1305,6 @@
             status: "OBLIGATED", inputMetadata: metadata, attachments: { images: uploadedImages }, amount: finalAmount
         };
 
-        let savedViaApi = false;
         try {
             let res;
             if (editingExpenseId) {
@@ -1286,30 +1320,22 @@
                     body: JSON.stringify(payload)
                 });
             }
-            if (res && res.ok) savedViaApi = true;
-        } catch (e) { /* ไม่มีเซิร์ฟเวอร์หรือเครือข่ายล้ม */ }
-
-        if (savedViaApi) {
-            alert(editingExpenseId ? "✅ อัปเดตข้อมูลสำเร็จ!" : "🎉 บันทึกข้อมูลสำเร็จ!");
-            window.location.href = 'history.html';
-            return;
+            if (res.ok) {
+                alert(editingExpenseId ? "✅ อัปเดตข้อมูลสำเร็จ!" : "🎉 บันทึกข้อมูลสำเร็จ!");
+                window.location.href = 'history.html';
+                return;
+            }
+            if (res.status === 401) {
+                window.location.replace('/login.html');
+                return;
+            }
+            const errData = await res.json().catch(() => ({}));
+            alert('บันทึกไม่สำเร็จ: ' + (errData.error || 'HTTP ' + res.status));
+        } catch (e) {
+            alert('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาตรวจสอบการเชื่อมต่อ');
         }
-
-        try {
-            const arr = JSON.parse(localStorage.getItem(LOCAL_EXPENSES_KEY) || '[]');
-            const row = Object.assign({}, payload, {
-                createdAt: new Date().toISOString(),
-                _savedLocally: true
-            });
-            arr.unshift(row);
-            localStorage.setItem(LOCAL_EXPENSES_KEY, JSON.stringify(arr));
-            alert("✅ บันทึกในเครื่องแล้ว (ไม่มี API / เซิร์ฟเวอร์ไม่ตอบ)\nรายการจะไปแสดงในหน้า「ประวัติการเบิก」จากข้อมูล LocalStorage");
-            window.location.href = 'history.html';
-        } catch (e2) {
-            alert("บันทึกไม่สำเร็จ (LocalStorage เต็มหรือถูกบล็อก)");
-            btn.innerHTML = originalText;
-            btn.disabled = false;
-        }
+        btn.innerHTML = originalText;
+        btn.disabled = false;
     }
     async function prefillForm(expense) {
         const meta = expense.inputMetadata || {};
@@ -1352,10 +1378,12 @@
             document.getElementById('addrZip').value   = addr.zip  || '';
 
             document.getElementById('startFromType').value = tr.startFromType || 'ที่พัก';
+            onStartFromTypeChange();
+            if (tr.startFromLocation) document.getElementById('startFromLocation').value = tr.startFromLocation;
             document.getElementById('dateStart').value     = tr.startDate || '';
-            document.getElementById('timeStart').value     = tr.startTime || '';
+            setTime24('timeStart', tr.startTime || '');
             document.getElementById('dateEnd').value       = tr.endDate   || '';
-            document.getElementById('timeEnd').value       = tr.endTime   || '';
+            setTime24('timeEnd', tr.endTime || '');
             document.getElementById('targetProv').value    = tr.toProv    || '';
             document.getElementById('travelFrom').value    = tr.from      || '';
             document.getElementById('travelTo').value      = tr.to        || '';
@@ -1459,7 +1487,58 @@
         return suggestions.filter(s => s !== q).slice(0, 3);
     }
 
+    function makeTime24Picker(wrapperId) {
+        const wrapper = document.getElementById(wrapperId);
+        if (!wrapper) return;
+        const hours = Array.from({length: 24}, (_, i) => String(i).padStart(2, '0'));
+        const mins  = Array.from({length: 60}, (_, i) => String(i).padStart(2, '0'));
+        const cls = 'border p-2.5 rounded-lg text-sm outline-none focus:border-blue-500 flex-1';
+        wrapper.innerHTML = `
+            <select class="time24-h ${cls}">${hours.map(h => `<option value="${h}">${h}</option>`).join('')}</select>
+            <span class="text-slate-500 font-bold text-sm select-none px-0.5">:</span>
+            <select class="time24-m ${cls}">${mins.map(m => `<option value="${m}">${m}</option>`).join('')}</select>
+        `;
+    }
+
+    function getTime24(wrapperId) {
+        const w = document.getElementById(wrapperId);
+        if (!w) return '';
+        return `${w.querySelector('.time24-h')?.value || '00'}:${w.querySelector('.time24-m')?.value || '00'}`;
+    }
+
+    function setTime24(wrapperId, hhmm) {
+        const w = document.getElementById(wrapperId);
+        if (!w) return;
+        const parts = (hhmm || '').split(':');
+        const h = String(parseInt(parts[0]) || 0).padStart(2, '0');
+        const m = String(parseInt(parts[1]) || 0).padStart(2, '0');
+        const hSel = w.querySelector('.time24-h');
+        const mSel = w.querySelector('.time24-m');
+        if (hSel) hSel.value = h;
+        if (mSel) mSel.value = m;
+    }
+
+    function onStartFromTypeChange() {
+        const type = document.getElementById('startFromType').value;
+        const loc  = document.getElementById('startFromLocation');
+        if (!loc) return;
+        if (type === 'ที่พัก') {
+            loc.value    = 'ที่พัก';
+            loc.readOnly = true;
+            loc.className = 'w-full border p-2.5 rounded-lg text-sm outline-none bg-slate-100 text-slate-500 cursor-default mb-2';
+        } else {
+            if (loc.value === 'ที่พัก') loc.value = '';
+            loc.readOnly = false;
+            loc.className = 'w-full border p-2.5 rounded-lg text-sm outline-none focus:border-blue-500 mb-2';
+            setTimeout(() => loc.focus(), 50);
+        }
+    }
+
     init();
+    makeTime24Picker('timeStart');
+    makeTime24Picker('timeEnd');
     </script>
+    <script src="/auth-guard.js"></script>
+    <script>initAuthGuard();</script>
 </body>
 </html>

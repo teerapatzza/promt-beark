@@ -208,7 +208,10 @@
                         <td class="p-4 font-semibold text-slate-800 text-sm">
                             <div class="flex items-center gap-2">
                                 <div class="w-7 h-7 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold flex-shrink-0">${reqName ? reqName.charAt(0) : '?'}</div>
-                                ${reqName || '—'}
+                                <div>
+                                    <div>${reqName || '—'}</div>
+                                    ${x.ownerEmail ? `<div class="text-[10px] text-slate-400 font-normal mt-0.5 font-mono">${x.ownerEmail}</div>` : ''}
+                                </div>
                             </div>
                         </td>
                         <td class="p-4">
@@ -519,6 +522,8 @@
 
             const actName = meta._activityName || '';
             const position = meta._position || '';
+            const extraAddr = meta._extraAddr || '';
+            const extraActivities = Array.isArray(meta._extraActivities) ? meta._extraActivities.filter(Boolean) : [];
             const templates = resolveTemplates(meta);
             const hasTravel   = templates.some(t => ['REPORT', 'TRANSPORT_RECEIPT'].includes(t));
             const hasGeneral  = templates.includes('GENERAL_RECEIPT');
@@ -543,6 +548,27 @@
                 const taxiTotal = taxiEntries.length > 0
                     ? taxiEntries.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0)
                     : (parseFloat(c.taxiOutAmt || 0) + parseFloat(c.taxiRetAmt || 0));
+
+                // แยกยอดขาไป/ขากลับสำหรับแสดงใน PDF แต่ละแถว
+                let taxiOutDisplayAmt = 0, taxiRetDisplayAmt = 0;
+                if (taxiEntries.length > 0) {
+                    taxiEntries.forEach(e => {
+                        if (e.direction === 'ขาไป') taxiOutDisplayAmt += parseFloat(e.amount) || 0;
+                        else if (e.direction === 'ขากลับ') taxiRetDisplayAmt += parseFloat(e.amount) || 0;
+                        else if (e.direction === 'ไป-กลับ') {
+                            const out = parseFloat(e.amountOut), ret = parseFloat(e.amountRet);
+                            if (!isNaN(out) && !isNaN(ret) && (out > 0 || ret > 0)) {
+                                taxiOutDisplayAmt += out || 0;
+                                taxiRetDisplayAmt += ret || 0;
+                            } else {
+                                taxiOutDisplayAmt += parseFloat(e.amount) || 0;
+                            }
+                        }
+                    });
+                } else {
+                    taxiOutDisplayAmt = parseFloat(c.taxiOutAmt || 0);
+                    taxiRetDisplayAmt = parseFloat(c.taxiRetAmt || 0);
+                }
 
                 const hasTaxiOut = taxiEntries.length > 0
                     ? taxiEntries.some(e => e.direction === 'ขาไป' || e.direction === 'ไป-กลับ')
@@ -801,7 +827,7 @@
                             <tbody>
                                 <!-- row 1: กิจกรรม -->
                                 <tr>
-                                    <td style="border-bottom: none; text-align: center; vertical-align: top;" rowspan="18">${dateStr}</td>
+                                    <td style="border-bottom: none; text-align: center; vertical-align: top;" rowspan="16">${dateStr}</td>
                                     <td style="border-bottom: 1px solid #000;">
                                         <b>กิจกรรม</b> &nbsp;&nbsp;&nbsp; ${actName}
                                     </td>
@@ -815,15 +841,16 @@
                                         <span style="font-family: Arial; font-size: 18px; vertical-align: middle;">${chkTaxiRet}</span> ขากลับ &nbsp;&nbsp;&nbsp;&nbsp;
                                         <span style="font-family: Arial; font-size: 18px; vertical-align: middle;">${chkTaxiRnd}</span> ไป-กลับ
                                     </td>
-                                    <td style="border-top: none; border-bottom: none; text-align: right; vertical-align: middle;" rowspan="4">
-                                        ${taxiTotal > 0 ? formatNumber(taxiTotal) : ''}
-                                    </td>
+                                    <td style="border-top: none; border-bottom: none;"></td>
                                 </tr>
                                 <!-- row 3: จาก/ถึง taxi 1 (ขาไป) -->
                                 <tr>
                                     <td style="border-top: none; border-bottom: none;">
                                         จาก <span style="padding-left: 10px;">${firstTaxiOut ? firstTaxiOut.from : ''}</span>
                                         <span style="float: right; padding-right: 80px;">ถึง ${firstTaxiOut ? firstTaxiOut.to : ''}</span>
+                                    </td>
+                                    <td style="border-top: none; border-bottom: none; text-align: right; vertical-align: middle; white-space: nowrap;">
+                                        ${taxiOutDisplayAmt > 0 ? formatNumber(taxiOutDisplayAmt) : ''}
                                     </td>
                                 </tr>
                                 <!-- row 4: จาก/ถึง taxi 2 (ขากลับ — ถ้า ไป-กลับ ให้สลับทิศ) -->
@@ -832,6 +859,9 @@
                                         จาก <span style="padding-left: 10px;">${firstTaxiRet ? (firstTaxiRet.direction === 'ไป-กลับ' ? firstTaxiRet.to : firstTaxiRet.from) : ''}</span>
                                         <span style="float: right; padding-right: 80px;">ถึง ${firstTaxiRet ? (firstTaxiRet.direction === 'ไป-กลับ' ? firstTaxiRet.from : firstTaxiRet.to) : ''}</span>
                                     </td>
+                                    <td style="border-top: none; border-bottom: none; text-align: right; vertical-align: middle; white-space: nowrap;">
+                                        ${taxiRetDisplayAmt > 0 ? formatNumber(taxiRetDisplayAmt) : ''}
+                                    </td>
                                 </tr>
                                 <!-- row 5: จาก/ถึง taxi 3 (ใหม่) -->
                                 <tr>
@@ -839,6 +869,7 @@
                                         จาก <span style="padding-left: 10px;"></span>
                                         <span style="float: right; padding-right: 80px;">ถึง</span>
                                     </td>
+                                    <td style="border-top: none; border-bottom: 1px solid #000;"></td>
                                 </tr>
                                 <!-- row 6: ค่าน้ำมันเชื้อเพลิง header -->
                                 <tr>
@@ -907,31 +938,23 @@
                                         ${otherTotal > 0 ? formatNumber(otherTotal) : ''}
                                     </td>
                                 </tr>
-                                <!-- row 14: ที่อยู่ (ใหม่) -->
+                                <!-- row 14: ที่อยู่ -->
                                 <tr>
                                     <td style="border-top: none; border-bottom: 1px solid #000; padding: 6px 8px;">
-                                        ที่อยู่
+                                        ที่อยู่${extraAddr ? ' &nbsp; ' + extraAddr : ''}
                                     </td>
                                     <td style="border-top: none; border-bottom: 1px solid #000;"></td>
                                 </tr>
-                                <!-- row 15: กิจกรรม (แถวที่ 2) -->
+                                <!-- row 15: กิจกรรม -->
                                 <tr>
                                     <td style="border-top: none; border-bottom: 1px solid #000;">
-                                        <b>กิจกรรม</b>
+                                        <b>กิจกรรม</b>${extraActivities[0] ? ' &nbsp; ' + extraActivities[0] : ''}
                                     </td>
                                     <td style="border-top: none; border-bottom: 1px solid #000;"></td>
                                 </tr>
-                                <!-- rows 16-18: แถวว่างสำหรับรายการเพิ่มเติม -->
+                                <!-- row 16: แถวว่าง / กิจกรรมเพิ่มเติม -->
                                 <tr>
-                                    <td style="border-bottom: 1px solid #000; height: 22px;"></td>
-                                    <td style="border-bottom: 1px solid #000;"></td>
-                                </tr>
-                                <tr>
-                                    <td style="border-bottom: 1px solid #000; height: 22px;"></td>
-                                    <td style="border-bottom: 1px solid #000;"></td>
-                                </tr>
-                                <tr>
-                                    <td style="border-bottom: 1px solid #000; height: 22px;"></td>
+                                    <td style="border-bottom: 1px solid #000; height: 22px;">${extraActivities[1] || ''}</td>
                                     <td style="border-bottom: 1px solid #000;"></td>
                                 </tr>
                                 <!-- รวมทั้งสิ้น -->
@@ -992,11 +1015,22 @@
                     </tr>
                 `).join('');
 
-                // Pad to at least 5 rows for empty lines
-                const padRows = Math.max(0, 5 - grItems.length);
+                // Pad to 18 rows (กิจกรรม+1 spacer ใช้แถวที่เหลือ)
+                const padRows = Math.max(0, 18 - grItems.length);
                 for (let i = 0; i < padRows; i++) {
-                    grRowsHtml += `<tr><td style="height: 26px; border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td></tr>`;
+                    grRowsHtml += `<tr><td style="height: 24px; border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td><td style="border: 1px solid #000;"></td></tr>`;
                 }
+                // แถวกิจกรรม (rows 19-20)
+                grRowsHtml += `<tr>
+                    <td style="height: 22px; border: 1px solid #000;"></td>
+                    <td style="padding: 4px 8px; border: 1px solid #000;"><b>กิจกรรม</b>${extraActivities[0] ? ' &nbsp; ' + extraActivities[0] : ''}</td>
+                    <td style="border: 1px solid #000;"></td>
+                </tr>
+                <tr>
+                    <td style="height: 22px; border: 1px solid #000;"></td>
+                    <td style="border: 1px solid #000;">${extraActivities[1] || ''}</td>
+                    <td style="border: 1px solid #000;"></td>
+                </tr>`;
 
                 templateHtml += `
                 <div class="pdf-page">
@@ -1004,7 +1038,6 @@
                         <img src="/logo.png" style="height: 65px;" onerror="this.style.display='none'">
                         <div style="text-align: right; font-size: 11px; line-height: 1.5; font-weight: bold;">
                             FM-SAM-003-06<br>
-                            ใบรับรองแทนใบเสร็จรับเงิน (ทั่วไป)<br>
                             วันที่ประกาศใช้ 11/05/2569<br>
                             รอบทบทวน 11/05/2571<br>
                             ชั้นความลับ : เอกสารภายใน
@@ -1018,7 +1051,7 @@
                             <tr style="background: white;">
                                 <th style="width: 18%; text-align: center;">วัน เดือน ปี</th>
                                 <th style="text-align: center;">รายละเอียดรายจ่าย</th>
-                                <th style="width: 22%; text-align: center;">จำนวนเงิน (บาท)</th>
+                                <th style="width: 22%; text-align: center;">จำนวนเงิน</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1027,27 +1060,33 @@
                                 <td colspan="2" style="text-align: right; border: 1px solid #000; padding: 5px 8px;">รวมทั้งสิ้น</td>
                                 <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; font-family: monospace;">${formatNumber(grTotal)}</td>
                             </tr>
-                            <tr>
-                                <td colspan="3" style="text-align: center; border: 1px solid #000; padding: 5px 8px;">
-                                    จำนวนเงินตัวอักษร ( ${grAmtText} )
-                                </td>
+                            <tr style="font-weight: bold;">
+                                <td colspan="2" style="text-align: right; border: 1px solid #000; padding: 5px 8px;">จำนวนเงินรวมตัวอักษร</td>
+                                <td style="text-align: left; border: 1px solid #000; padding: 5px 8px;">${grAmtText}</td>
                             </tr>
                         </tbody>
                     </table>
 
-                    <div class="avoid-break" style="margin-top: 15px;">
-                        <div style="display: flex; align-items: baseline; margin-bottom: 8px;">
-                            ข้าพเจ้า <span class="solid-line" style="width: 250px; margin: 0 10px;">${data.requestedBy}</span>
-                            ตำแหน่ง <span class="solid-line" style="width: 180px; margin: 0 10px;">${position}</span>
+                    <div class="avoid-break" style="margin-top: 20px;">
+                        <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px;">
+                            <span>ข้าพเจ้า</span>
+                            <span class="solid-line" style="flex: 1; min-width: 200px;">${data.requestedBy}</span>
+                            <span>ตำแหน่ง</span>
+                            <span class="solid-line" style="flex: 1; min-width: 150px;">${position}</span>
                         </div>
-                        <div style="margin-top: 5px; line-height: 1.6; margin-bottom: 25px;">
-                            ขอรับรองว่า รายจ่ายข้างต้นนี้ข้าพเจ้าได้จ่ายไปในงานของสถาบันรับรองคุณภาพสถานพยาบาล และไม่อาจเรียก<br>
+                        <div style="line-height: 1.8; margin-bottom: 30px;">
+                            ขอรับรองว่า รายจ่ายข้างต้นนี้ข้าพเจ้าได้จ่ายไปในงานของสถาบันรับรองคุณภาพสถานพยาบาล และไม่อาจเรียก
                             ใบเสร็จรับเงินจากผู้รับเงิน
                         </div>
-                        <div style="text-align: center; margin-top: 10px;">
-                            ลงชื่อ <span class="solid-line" style="width: 200px;"></span><br><br>
-                            ( <span class="solid-line" style="width: 160px; border: none; font-weight: bold;">${data.requestedBy}</span> )<br><br>
-                            วันที่ <span class="solid-line" style="width: 160px; border: none;">${dateStr}</span>
+                        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 16px; padding-right: 40px;">
+                            <div style="display: flex; align-items: baseline; gap: 8px;">
+                                <span>ลงชื่อ</span>
+                                <span class="solid-line" style="width: 220px;"></span>
+                            </div>
+                            <div style="display: flex; align-items: baseline; gap: 8px;">
+                                <span>วันที่</span>
+                                <span class="solid-line" style="width: 220px;">${dateStr}</span>
+                            </div>
                         </div>
                     </div>
                 </div>`;
@@ -1194,5 +1233,7 @@
 
         load();
     </script>
+    <script src="/auth-guard.js"></script>
+    <script>initAuthGuard();</script>
 </body>
 </html>

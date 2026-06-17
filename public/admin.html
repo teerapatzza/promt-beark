@@ -38,6 +38,14 @@
                 </svg>
                 หมวดหมู่งบประมาณ
             </button>
+            <button onclick="showPanel('users')" id="nav-users"
+                class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold text-left">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+                จัดการ Users
+            </button>
         </nav>
 
         <div class="p-4 border-t border-slate-700/60">
@@ -157,10 +165,10 @@
                             <table class="w-full text-xs">
                                 <thead class="bg-slate-50 border-b border-slate-200">
                                     <tr class="text-[11px] uppercase text-slate-400 font-bold">
-                                        <th class="px-3 py-2 text-left">ประเภท</th>
+                                        <th class="px-3 py-2 text-left">ประเภท / ชื่อ</th>
                                         <th class="px-2 py-2 text-center w-14">แสดง</th>
                                         <th class="px-2 py-2 text-center w-14">บังคับ</th>
-                                        <th class="px-2 py-2 text-center w-14">เรียง</th>
+                                        <th class="px-2 py-2 text-center w-20">จัดการ</th>
                                     </tr>
                                 </thead>
                                 <tbody id="attachmentTableBody" class="divide-y divide-slate-100">
@@ -168,6 +176,11 @@
                                 </tbody>
                             </table>
                         </div>
+                        <button type="button" onclick="addCustomAttRow()"
+                            class="mt-2 w-full flex items-center justify-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-800 border border-dashed border-blue-200 hover:border-blue-400 py-2 rounded-xl transition-colors">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                            เพิ่มประเภทเอกสารแนบ
+                        </button>
                     </div>
 
                     <button type="button" id="btnSaveCategory" onclick="saveCategory()"
@@ -204,6 +217,46 @@
                         </div>
                     </div>
 
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel: Users -->
+        <div id="panel-users" style="display:none">
+            <div class="px-6 py-4 border-b border-slate-200 bg-white sticky top-0 z-10">
+                <h1 class="text-lg font-bold text-slate-800">จัดการ Users</h1>
+                <p class="text-slate-500 text-xs mt-0.5">เปลี่ยน Role, Reset รหัสผ่าน, ลบ User</p>
+            </div>
+            <div class="p-6">
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div id="users-loading" class="p-8 text-center text-slate-400 text-sm">กำลังโหลด...</div>
+                    <table class="w-full text-sm hidden" id="users-table">
+                        <thead class="bg-slate-50 border-b border-slate-200">
+                            <tr>
+                                <th class="px-4 py-3 text-left font-semibold text-slate-600">อีเมล</th>
+                                <th class="px-4 py-3 text-left font-semibold text-slate-600">Role</th>
+                                <th class="px-4 py-3 text-left font-semibold text-slate-600">สมัครเมื่อ</th>
+                                <th class="px-4 py-3 text-center font-semibold text-slate-600">จัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Reset password modal -->
+            <div id="reset-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:center;justify-content:center;">
+                <div style="background:#fff;border-radius:16px;padding:28px 32px;width:380px;max-width:90vw;box-shadow:0 8px 40px rgba(0,0,0,.25);">
+                    <h3 style="font-weight:700;font-size:1rem;margin-bottom:16px;">Reset รหัสผ่าน</h3>
+                    <p id="reset-modal-email" style="color:#64748b;font-size:.85rem;margin-bottom:14px;"></p>
+                    <input type="password" id="reset-new-password" placeholder="รหัสผ่านใหม่ (อย่างน้อย 6 ตัวอักษร)"
+                        style="width:100%;padding:10px 14px;border:1.5px solid #ddd;border-radius:8px;font-size:.9rem;margin-bottom:16px;">
+                    <div style="display:flex;gap:10px;justify-content:flex-end;">
+                        <button onclick="closeResetModal()"
+                            style="padding:8px 18px;border:1.5px solid #ddd;border-radius:8px;cursor:pointer;font-size:.9rem;">ยกเลิก</button>
+                        <button onclick="confirmResetPassword()"
+                            style="padding:8px 18px;background:#1a237e;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:.9rem;font-weight:700;">Reset</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -274,6 +327,8 @@
 
         order.forEach((id, idx) => {
             const r = rulesMap[id] || { show: false, required: false };
+            const isCustom = !ATT_LABELS[id];
+            const currentLabel = r.label !== undefined ? r.label : (ATT_LABELS[id] || id);
             const tr = document.createElement('tr');
             tr.className = 'attachment-row hover:bg-slate-50';
             tr.draggable = true;
@@ -282,10 +337,11 @@
             tr.innerHTML = `
                 <td class="px-3 py-2 text-slate-700 select-none">
                     <div class="flex items-center gap-2 drag-handle">
-                        <svg class="w-3.5 h-3.5 text-slate-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg class="w-3.5 h-3.5 text-slate-300 flex-shrink-0 cursor-grab" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 12h16M4 16h16"/>
                         </svg>
-                        <span class="text-xs">${ATT_LABELS[id] || id}</span>
+                        <input type="text" class="att-label-input text-xs border border-slate-200 rounded px-2 py-1 outline-none focus:border-blue-400 w-full"
+                            value="${currentLabel.replace(/"/g,'&quot;')}" placeholder="ชื่อประเภทเอกสาร${isCustom ? ' (จำเป็น)' : ''}">
                     </div>
                 </td>
                 <td class="px-2 py-2 text-center">
@@ -299,21 +355,26 @@
                         aria-label="บังคับแนบ">
                 </td>
                 <td class="px-2 py-2 text-center">
-                    <div class="inline-flex flex-col gap-0.5">
-                        <button type="button" onclick="moveAttRow(${idx}, -1)"
-                            class="text-slate-300 hover:text-slate-700 transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
-                            ${idx === 0 ? 'disabled' : ''}>
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 15l7-7 7 7"/>
-                            </svg>
-                        </button>
-                        <button type="button" onclick="moveAttRow(${idx}, 1)"
-                            class="text-slate-300 hover:text-slate-700 transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
-                            ${idx === order.length - 1 ? 'disabled' : ''}>
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
-                            </svg>
-                        </button>
+                    <div class="inline-flex items-center gap-0.5">
+                        <div class="inline-flex flex-col gap-0.5">
+                            <button type="button" onclick="moveAttRow(${idx}, -1)"
+                                class="text-slate-300 hover:text-slate-700 transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
+                                ${idx === 0 ? 'disabled' : ''}>
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 15l7-7 7 7"/>
+                                </svg>
+                            </button>
+                            <button type="button" onclick="moveAttRow(${idx}, 1)"
+                                class="text-slate-300 hover:text-slate-700 transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
+                                ${idx === order.length - 1 ? 'disabled' : ''}>
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+                                </svg>
+                            </button>
+                        </div>
+                        ${isCustom ? `<button type="button" onclick="removeCustomAttRow('${id}')" class="ml-1 text-rose-300 hover:text-rose-600 transition-colors" title="ลบ">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>` : ''}
                     </div>
                 </td>
             `;
@@ -375,9 +436,31 @@
             const id   = row.dataset.att;
             const show = row.querySelector('.att-show').checked;
             const req  = show && row.querySelector('.att-req').checked;
+            const labelInput = row.querySelector('.att-label-input');
+            const label = labelInput ? labelInput.value.trim() : '';
+            const defaultLabel = ATT_LABELS[id] || '';
             out[id] = { show, required: req };
+            if (label !== defaultLabel) out[id].label = label;
         });
         return out;
+    }
+
+    function addCustomAttRow() {
+        const rules = snapshotAttachmentRules();
+        const customId = 'CUSTOM_' + Date.now();
+        const newOrder = [...currentAttachmentOrder, customId];
+        rules[customId] = { show: true, required: false, label: '' };
+        renderAttachmentRows(newOrder, rules);
+        const rows = document.querySelectorAll('.attachment-row');
+        const last = rows[rows.length - 1];
+        if (last) setTimeout(() => last.querySelector('.att-label-input')?.focus(), 50);
+    }
+
+    function removeCustomAttRow(id) {
+        const rules = snapshotAttachmentRules();
+        const newOrder = currentAttachmentOrder.filter(i => i !== id);
+        delete rules[id];
+        renderAttachmentRows(newOrder, rules);
     }
 
     function collectAttachmentRulesFromForm() {
@@ -402,17 +485,19 @@
         if (!cat) return {};
         if (cat.attachmentRules && typeof cat.attachmentRules === 'object') {
             const out = {};
-            ATTACHMENT_IDS.forEach(id => {
-                const r    = cat.attachmentRules[id] || {};
+            const order = (cat.attachmentOrder && cat.attachmentOrder.length) ? cat.attachmentOrder : ATTACHMENT_IDS;
+            const allIds = [...new Set([...order, ...Object.keys(cat.attachmentRules)])];
+            allIds.forEach(id => {
+                const r = cat.attachmentRules[id] || {};
                 const show = !!r.show;
-                out[id] = { show, required: show && !!r.required };
+                out[id] = { show, required: show && !!r.required, label: r.label || '' };
             });
             return out;
         }
         const out = {};
         ATTACHMENT_IDS.forEach(id => {
             const legacy = Array.isArray(cat.requiredFields) && cat.requiredFields.includes(id);
-            out[id] = { show: legacy, required: legacy };
+            out[id] = { show: legacy, required: legacy, label: '' };
         });
         return out;
     }
@@ -474,7 +559,7 @@
             if (!r || !r.show) return;
             const cls    = r.required ? 'bg-rose-100 text-rose-800' : 'bg-slate-100 text-slate-600';
             const suffix = r.required ? ' *' : '';
-            parts.push(`<span class="${cls} px-2 py-0.5 rounded text-[10px] font-bold">${ATT_LABELS[id] || id}${suffix}</span>`);
+            parts.push(`<span class="${cls} px-2 py-0.5 rounded text-[10px] font-bold">${r.label || ATT_LABELS[id] || id}${suffix}</span>`);
         });
         return parts.length ? parts.join(' ') : '<span class="text-slate-300 text-xs">ไม่มีช่องแนบ</span>';
     }
@@ -676,11 +761,140 @@
         alert('โหลดข้อมูลตัวอย่างเรียบร้อยแล้ว');
     }
 
-    function showPanel(name) { /* single-panel layout — reserved for future multi-panel expansion */ }
+    const PANELS = ['categories', 'users'];
+    function showPanel(name) {
+        PANELS.forEach(p => {
+            const panel = document.getElementById('panel-' + p);
+            const nav   = document.getElementById('nav-' + p);
+            if (panel) panel.style.display = p === name ? '' : 'none';
+            if (nav) nav.classList.toggle('active', p === name);
+        });
+        if (name === 'users') loadUsers();
+    }
+
+    // ── User Management ────────────────────────────────────
+    let _resetUserId = null;
+
+    async function loadUsers() {
+        document.getElementById('users-loading').style.display = '';
+        document.getElementById('users-table').classList.add('hidden');
+        try {
+            const res = await fetch('/users');
+            if (!res.ok) throw new Error('server error');
+            const users = await res.json();
+            renderUsersTable(users);
+        } catch (e) {
+            document.getElementById('users-loading').textContent = 'ไม่สามารถโหลดข้อมูลได้';
+        }
+    }
+
+    const ROLE_LABELS = { admin: 'Admin', approver: 'Approver', user: 'User' };
+    const ROLE_COLORS = { admin: '#d32f2f', approver: '#1565c0', user: '#2e7d32' };
+
+    function renderUsersTable(users) {
+        document.getElementById('users-loading').style.display = 'none';
+        const table = document.getElementById('users-table');
+        table.classList.remove('hidden');
+        const tbody = document.getElementById('users-tbody');
+        tbody.innerHTML = '';
+        users.forEach(u => {
+            const roleTag = `<span style="background:${ROLE_COLORS[u.role]};color:#fff;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:700;">${ROLE_LABELS[u.role] || u.role}</span>`;
+            const dt = new Date(u.created_at).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' });
+            const currentUserId = window.__currentUser?.id;
+            const isSelf = u.id === currentUserId;
+            tbody.innerHTML += `
+                <tr class="border-t border-slate-100 hover:bg-slate-50">
+                    <td class="px-4 py-3">
+                        <span class="font-medium text-slate-800">${u.email}</span>
+                        ${isSelf ? '<span class="ml-2 text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-bold">คุณ</span>' : ''}
+                    </td>
+                    <td class="px-4 py-3">
+                        <select onchange="changeRole(${u.id}, this.value)" ${isSelf ? 'disabled' : ''}
+                            style="padding:4px 8px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:.85rem;">
+                            <option value="user" ${u.role==='user'?'selected':''}>User</option>
+                            <option value="approver" ${u.role==='approver'?'selected':''}>Approver</option>
+                            <option value="admin" ${u.role==='admin'?'selected':''}>Admin</option>
+                        </select>
+                    </td>
+                    <td class="px-4 py-3 text-slate-500 text-xs">${dt}</td>
+                    <td class="px-4 py-3 text-center">
+                        <div style="display:inline-flex;gap:6px;">
+                            <button onclick="openResetModal(${u.id}, '${u.email.replace(/'/g,"\\'")}')"
+                                style="padding:5px 12px;background:#fff;border:1.5px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:.8rem;">Reset PW</button>
+                            ${!isSelf ? `<button onclick="deleteUser(${u.id})"
+                                style="padding:5px 12px;background:#fff;border:1.5px solid #fecaca;color:#dc2626;border-radius:6px;cursor:pointer;font-size:.8rem;">ลบ</button>` : ''}
+                        </div>
+                    </td>
+                </tr>
+            `;
+        });
+    }
+
+    async function changeRole(userId, role) {
+        try {
+            const res = await fetch(`/users/${userId}/role`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ role })
+            });
+            if (!res.ok) throw new Error();
+        } catch (e) {
+            alert('เปลี่ยน role ไม่สำเร็จ');
+            loadUsers();
+        }
+    }
+
+    function openResetModal(userId, email) {
+        _resetUserId = userId;
+        document.getElementById('reset-modal-email').textContent = email;
+        document.getElementById('reset-new-password').value = '';
+        document.getElementById('reset-modal').style.display = 'flex';
+    }
+    function closeResetModal() {
+        _resetUserId = null;
+        document.getElementById('reset-modal').style.display = 'none';
+    }
+
+    async function confirmResetPassword() {
+        const newPassword = document.getElementById('reset-new-password').value;
+        if (!newPassword || newPassword.length < 6) {
+            alert('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร');
+            return;
+        }
+        try {
+            const res = await fetch(`/users/${_resetUserId}/reset-password`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ newPassword })
+            });
+            if (!res.ok) throw new Error();
+            alert('Reset รหัสผ่านสำเร็จ');
+            closeResetModal();
+        } catch (e) {
+            alert('เกิดข้อผิดพลาด กรุณาลองใหม่');
+        }
+    }
+
+    async function deleteUser(userId) {
+        if (!confirm('ลบ user นี้? ข้อมูลค่าใช้จ่ายที่เกี่ยวข้องจะถูกลบด้วย')) return;
+        try {
+            const res = await fetch(`/users/${userId}`, { method: 'DELETE' });
+            if (!res.ok) {
+                const d = await res.json();
+                alert(d.error || 'ลบไม่สำเร็จ');
+                return;
+            }
+            loadUsers();
+        } catch (e) {
+            alert('เกิดข้อผิดพลาด');
+        }
+    }
 
     // ── Init ───────────────────────────────────────────────
     renderAttachmentRows([...ATTACHMENT_IDS], {});
     renderCategories();
 </script>
+<script src="/auth-guard.js"></script>
+<script>initAuthGuard({ adminOnly: true });</script>
 </body>
 </html>
