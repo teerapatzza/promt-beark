@@ -195,7 +195,10 @@
                                 <option value="ขากลับ">ขากลับ</option>
                                 <option value="ไป-กลับ" selected>ไป-กลับ</option>
                             </select>
-                            <input type="number" id="fuelRate" placeholder="เรทน้ำมัน เช่น 4 (บาท/กม.)" class="w-full border border-slate-200 p-2 mt-2 rounded text-sm outline-none focus:border-blue-500" oninput="calculateTravelTotal()" value="4">
+                            <div class="mt-2">
+                                <label for="fuelRate" class="block text-[10px] text-slate-400 mb-1">ค่าน้ำมัน (บาท/กม.)</label>
+                                <input type="number" id="fuelRate" placeholder="เช่น 4" class="w-full border border-slate-200 p-2 rounded text-sm outline-none focus:border-blue-500" oninput="calculateTravelTotal()" value="4">
+                            </div>
                         </div>
                     </div>
 
@@ -992,7 +995,7 @@
         const container = document.getElementById('dynamicInputs');
         const eviBox = document.getElementById('evidenceBox');
         const eviDiv = document.getElementById('evidenceInputs');
-        
+
         if (!category) {
             container.innerHTML = ''; eviBox.classList.add('hidden');
             document.getElementById('totalAmount').innerHTML = '0.00 <span class="text-2xl">฿</span>';
@@ -1004,6 +1007,20 @@
         const catTaxi = category.taxiMaxPerTrip;
         taxiMaxPerTrip = (catTaxi != null && catTaxi > 0) ? catTaxi : Infinity;
         applyCategoryPdfTemplate(category);
+
+        // Apply fuel rate from category (if defined by admin)
+        const fuelRateInput = document.getElementById('fuelRate');
+        if (category.fuelRate != null && category.fuelRate > 0) {
+            fuelRateInput.value = category.fuelRate;
+            fuelRateInput.readOnly = true;
+            fuelRateInput.classList.add('bg-slate-100', 'cursor-not-allowed', 'text-slate-700');
+            fuelRateInput.title = 'ค่าน้ำมันกำหนดโดย Admin (' + category.fuelRate + ' บาท/กม.)';
+        } else {
+            fuelRateInput.readOnly = false;
+            fuelRateInput.classList.remove('bg-slate-100', 'cursor-not-allowed', 'text-slate-700');
+            fuelRateInput.title = '';
+            if (!fuelRateInput.value) fuelRateInput.value = 4;
+        }
 
         container.innerHTML = `<div class="bg-blue-50 text-blue-700 p-3 rounded-lg text-sm mb-4 font-mono border border-blue-100">สมการที่ใช้: ${category.formulaString}</div>`;
         
