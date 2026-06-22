@@ -3,15 +3,15 @@ window.__currentUser = null;
 async function initAuthGuard({ adminOnly = false } = {}) {
   try {
     const r = await fetch('/auth/me');
-    if (!r.ok) { window.location.replace('/login.html'); return; }
+    if (!r.ok) { window.location.replace('/prompt/login.html'); return; }
     const user = await r.json();
     window.__currentUser = user;
-    if (adminOnly && user.role !== 'admin') { window.location.replace('/'); return; }
+    if (adminOnly && user.role !== 'admin') { window.location.replace('/prompt'); return; }
     _renderUserBar(user);
     _renderChangePasswordModal();
     return user;
   } catch (_) {
-    window.location.replace('/login.html');
+    window.location.replace('/prompt/login.html');
   }
 }
 
@@ -170,5 +170,5 @@ async function submitChangePassword() {
 
 async function doLogout() {
   await fetch('/auth/logout', { method: 'POST' });
-  window.location.replace('/login.html');
+  window.location.replace('/prompt/login.html');
 }

@@ -182,7 +182,7 @@
 <script>
   // If already logged in, redirect
   fetch('/auth/me').then(r => {
-    if (r.ok) window.location.replace('/');
+    if (r.ok) window.location.replace('/prompt');
   });
 
   function switchTab(tab) {
@@ -222,7 +222,7 @@
         showError('login-error', data.error || 'เข้าสู่ระบบไม่สำเร็จ');
         return;
       }
-      window.location.replace('/');
+      window.location.replace('/prompt');
     } finally {
       btn.disabled = false;
       btn.textContent = 'เข้าสู่ระบบ';
@@ -254,7 +254,7 @@
         showError('register-error', data.error || 'สมัครไม่สำเร็จ');
         return;
       }
-      window.location.replace('/');
+      window.location.replace('/prompt');
     } finally {
       btn.disabled = false;
       btn.textContent = 'สมัครใช้งาน';
