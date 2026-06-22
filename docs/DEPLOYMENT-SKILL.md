@@ -1,5 +1,7 @@
 # Production Server Deployment Skill
 
+**📌 อ่านไฟล์นี้ก่อนทำงานทุกครั้ง - บังคับ!**
+
 ## 🚨 CRITICAL: Server Ownership & Restrictions
 
 ### **Server นี้เป็น SHARED SERVER - มีหลายคนใช้ร่วมกัน**
@@ -34,6 +36,11 @@ Password: T33r@p@t2026
 ssh -p 8839 teerapat@209.15.119.96
 ```
 
+**SSH Key (Passwordless):**
+```bash
+ssh -i ~/.ssh/promt-beark-deploy -p 8839 teerapat@209.15.119.96
+```
+
 ---
 
 ## 🏗️ Current Architecture
@@ -56,14 +63,30 @@ ha-dashboard
 checkin_db_container
 ```
 
-### URL Structure (ปัจจุบัน)
+### URL Structure (**ปัจจุบัน - Updated 2026-06-22**)
 
 | URL | แอป | Port | หมายเหตุ |
 |-----|-----|------|----------|
-| `https://209.15.119.96/` | Hospital Billing | 5000 | Default (root) |
-| `https://209.15.119.96/prompt` | Prompt-Beark | 8080 | Prefix path |
-| `https://209.15.119.96/prompt/login.html` | Prompt-Beark | 8080 | Login page |
-| `https://hospitalbilling.ha.or.th` | Hospital Billing | 5000 | Domain name |
+| `https://209.15.119.96/` | Hospital Billing | 5000 | Default (root) - CSS/JS ทำงาน ✅ |
+| `https://209.15.119.96/prompt` | Prompt-Beark | 8080 | Homepage (หลัง login) ✅ |
+| `https://209.15.119.96/prompt/login.html` | Prompt-Beark | 8080 | **Login page (เริ่มต้น)** ✅ |
+| `https://209.15.119.96/login.html` | → `/prompt/login.html` | - | Auto-redirect ✅ |
+| `https://209.15.119.96/expense.html` | → `/prompt/expense.html` | - | Auto-redirect ✅ |
+| `https://209.15.119.96/admin.html` | → `/prompt/admin.html` | - | Auto-redirect ✅ |
+| `https://209.15.119.96/auth/*` | Prompt-Beark API | 8080 | API endpoints ✅ |
+| `https://209.15.119.96/expenses/*` | Prompt-Beark API | 8080 | API endpoints ✅ |
+| `https://hospitalbilling.ha.or.th` | Hospital Billing | 5000 | Domain name ✅ |
+
+**⚠️ สำคัญมาก:**
+1. Hospital Billing **ต้องอยู่ที่ root (/)** เพราะใช้ absolute paths (`/static/style.css`)
+2. Prompt-Beark ใช้ **prefix `/prompt`** เพราะทำงานได้กับ prefix
+3. **Auto-redirects** จะ redirect pages ที่ไม่มี /prompt ให้อัตโนมัติ (HTTP 301)
+4. **API routes** (`/auth/*`, `/expenses/*`) ต้องทำงานที่ root เพราะ frontend เรียก absolute paths
+
+**URL เริ่มต้น (Bookmark นี้):**
+```
+https://209.15.119.96/prompt/login.html
+```
 
 ---
 
@@ -136,10 +159,12 @@ docker ps --filter "name=hospital"
 /etc/nginx/sites-available/motor_pool
 ```
 
-### Current Nginx Config Template
+### Current Nginx Config Template (**Updated 2026-06-22**)
 
 ```nginx
 # /etc/nginx/sites-available/hospitalbilling-ssl
+# IMPORTANT: Config includes redirects, API routes, and proper path handling
+# ORDER MATTERS - Do not rearrange!
 
 server {
     listen 443 ssl default_server;
@@ -151,7 +176,25 @@ server {
     ssl_protocols       TLSv1.2 TLSv1.3;
     ssl_ciphers         HIGH:!aNULL:!MD5;
 
-    # Prompt-Beark - with /prompt prefix
+    # 1. Auto-redirect Prompt-Beark pages without /prompt prefix
+    # Fixes: /expense.html → /prompt/expense.html (HTTP 301)
+    location ~ ^/(login\.html|expense\.html|admin\.html|history\.html|profile\.html|portal\.html|auth-guard\.js)$ {
+        return 301 https://$host/prompt/$1;
+    }
+
+    # 2. Prompt-Beark API endpoints (MUST come before /prompt location)
+    # Allows /auth/login to work from /prompt/login.html
+    location ~ ^/(auth|users|budget-categories|expenses|settings|profiles|map-search|map-route|health)(/.*)?$ {
+        proxy_pass         http://localhost:8080;
+        proxy_http_version 1.1;
+        proxy_set_header   Host $host;
+        proxy_set_header   X-Real-IP $remote_addr;
+        proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto https;
+        client_max_body_size 50m;
+    }
+
+    # 3. Prompt-Beark pages - with /prompt prefix
     location /prompt {
         rewrite ^/prompt/?$ / break;
         rewrite ^/prompt/(.*)$ /$1 break;
@@ -165,7 +208,30 @@ server {
         client_max_body_size 50m;
     }
 
-    # Hospital Billing - default (root)
+    # 4. Hospital Billing - default (root and all other paths)
+    # MUST be last - catches everything else
+    location / {
+        proxy_pass         http://localhost:5000;
+        proxy_http_version 1.1;
+        proxy_set_header   Host $host;
+        proxy_set_header   X-Real-IP $remote_addr;
+        proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto https;
+        client_max_body_size 50m;
+    }
+}
+
+# Hospital Billing - Specific domain
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name hospitalbilling.ha.or.th billing.ha.or.th;
+
+    ssl_certificate     /etc/nginx/ssl/hospitalbilling.crt;
+    ssl_certificate_key /etc/nginx/ssl/hospitalbilling.key;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
+
     location / {
         proxy_pass         http://localhost:5000;
         proxy_http_version 1.1;
@@ -178,25 +244,35 @@ server {
 }
 ```
 
+**⚠️ Config Structure (ORDER MATTERS):**
+1. **Auto-redirects** (line 15-17) - Redirect pages without /prompt prefix
+2. **API routes** (line 20-28) - Allow /auth/*, /expenses/*, etc. to work
+3. **/prompt location** (line 31-42) - Serve Prompt-Beark pages
+4. **Default /** (line 45-54) - Serve Hospital Billing (must be last)
+
+**ถ้าเรียงผิด = แอปทำงานผิด!**
+
 ### How to Update Nginx Config
 
 ```bash
-# 1. Backup current config
+# 1. Backup current config (always!)
 sudo cp /etc/nginx/sites-available/hospitalbilling-ssl \
        /etc/nginx/sites-available/hospitalbilling-ssl.backup.$(date +%Y%m%d-%H%M%S)
 
 # 2. Edit config
 sudo nano /etc/nginx/sites-available/hospitalbilling-ssl
 
-# 3. Test config
+# 3. Test config (must pass!)
 sudo nginx -t
 
-# 4. Reload (if test passes)
+# 4. Reload (only if test passes)
 sudo systemctl reload nginx
 
-# 5. Verify
-curl -skI https://localhost/
-curl -skI https://localhost/prompt
+# 5. Verify both apps work
+curl -skI https://localhost/                    # Hospital Billing
+curl -skI https://localhost/prompt              # Prompt-Beark
+curl -skI https://localhost/auth/me             # API
+curl -skI https://localhost/expense.html        # Redirect (301)
 ```
 
 ---
@@ -224,14 +300,17 @@ curl -skI https://localhost/prompt
 
 4. **Check logs if something breaks**
    ```bash
-   docker logs promt-beark-frontend-1
-   docker logs hospitalbilling-app
+   docker logs promt-beark-frontend-1 --tail 50
+   docker logs hospitalbilling-app --tail 50
    sudo tail -f /var/log/nginx/error.log
    ```
 
 5. **Only modify our apps**
    - Prompt-Beark (port 8080)
    - Hospital Billing (port 5000)
+
+6. **Read this file before every deployment**
+   - อ่านทุกครั้ง ไม่งั้นจะลืม!
 
 ### DON'T ❌
 
@@ -268,31 +347,74 @@ curl -skI https://localhost/prompt
    docker network prune
    ```
 
+6. **Never put Hospital Billing under prefix path**
+   - เช่น `/HospitalBilling` จะทำให้ CSS/JS โหลดไม่ได้
+   - Hospital Billing **ต้องอยู่ที่ root (/)** เท่านั้น
+
+7. **Never remove API routes or auto-redirects**
+   - จะทำให้ login และ navigation ใช้ไม่ได้
+
 ---
 
 ## 🐛 Troubleshooting
 
-### Problem: CSS/JS not loading
+### Problem 1: Login button ไม่ทำงาน (กดแล้วไม่มีอะไรเกิดขึ้น)
 
-**Cause:** Using path prefix (e.g., `/HospitalBilling`) breaks absolute paths
+**Cause:** API endpoints (/auth/login) ไม่ทำงาน
 
-**Solution:**
-```nginx
-# Put app at root (/) instead of prefix
-location / {
-    proxy_pass http://localhost:5000;
-}
+**Check:**
+```bash
+curl -sk https://localhost/auth/me
+# ถ้า 404 = ไม่มี API route
 ```
 
-### Problem: Apps interfering with each other
+**Solution:** เพิ่ม API routes ใน nginx config (ดู line 20-28)
 
-**Current Setup:**
-- Hospital Billing: `/` (root - needs CSS/JS to work)
-- Prompt-Beark: `/prompt` (can work with prefix)
+---
 
-**Why:** Hospital Billing uses absolute paths (`/static/style.css`) so it MUST be at root
+### Problem 2: Login สำเร็จแล้วไปหน้า Hospital Billing แทน
 
-### Problem: Other apps not working
+**Cause:** Frontend redirect ไปที่ `/` แทน `/prompt`
+
+**Check:**
+```bash
+grep "window.location" public/login.html
+grep "window.location" public/auth-guard.js
+```
+
+**Solution:** แก้ไข redirects ให้เป็น `/prompt`
+```javascript
+window.location.replace('/prompt');        // ✅ ถูก
+window.location.replace('/');              // ❌ ผิด
+```
+
+---
+
+### Problem 3: เข้า /expense.html แล้วขึ้น "Not Found"
+
+**Cause:** Missing /prompt prefix
+
+**Check:**
+```bash
+curl -skI https://localhost/expense.html
+# ถ้า 404 = ไม่มี redirect
+```
+
+**Solution:** เพิ่ม auto-redirect ใน nginx config (ดู line 15-17)
+
+---
+
+### Problem 4: Hospital Billing CSS/JS ไม่โหลด (หน้าตาเละ)
+
+**Cause:** Hospital Billing อยู่ใต้ prefix path (เช่น `/HospitalBilling`)
+
+**Why:** Hospital Billing ใช้ absolute paths (`/static/style.css`) ซึ่งไม่มี prefix
+
+**Solution:** ย้าย Hospital Billing ไปที่ root `/` และให้ Prompt-Beark ใช้ prefix แทน
+
+---
+
+### Problem 5: Other apps not working
 
 **Check:**
 1. Did we modify their configs?
@@ -317,6 +439,7 @@ location / {
 ## 📝 Deployment Checklist
 
 **Before Deployment:**
+- [ ] อ่าน DEPLOYMENT-SKILL.md นี้แล้ว
 - [ ] Code committed and pushed to GitHub
 - [ ] No uncommitted changes locally
 - [ ] Tested locally with `docker compose up`
@@ -326,19 +449,20 @@ location / {
 - [ ] Navigate to project directory
 - [ ] Backup current container state
 - [ ] Pull latest code
-- [ ] Rebuild only our containers
+- [ ] Rebuild only our containers (ห้ามใช้ `down`)
 - [ ] Wait for containers to start
 
 **After Deployment:**
 - [ ] Verify our apps work
-  - [ ] https://209.15.119.96/ (Hospital Billing)
-  - [ ] https://209.15.119.96/prompt (Prompt-Beark)
+  - [ ] https://209.15.119.96/ (Hospital Billing - หน้าตาสวย CSS/JS ทำงาน)
+  - [ ] https://209.15.119.96/prompt/login.html (Prompt-Beark Login)
+  - [ ] Login และทดสอบ navigation
 - [ ] Check other apps still work
   - [ ] https://apps.ha.or.th
   - [ ] https://ticket.ha.or.th
   - [ ] https://dashboard.ha.or.th
 - [ ] Check Docker containers status
-  - [ ] No other containers restarted
+  - [ ] No other containers restarted (Up X weeks)
   - [ ] Our containers running normally
 
 ---
@@ -401,12 +525,34 @@ curl -skI https://209.15.119.96/static/style.css
 # Prompt-Beark
 curl -skI https://209.15.119.96/prompt
 curl -skI https://209.15.119.96/prompt/login.html
-curl -sk https://209.15.119.96/prompt/auth/me
+curl -sk https://209.15.119.96/auth/me
+
+# Redirects
+curl -skI https://209.15.119.96/expense.html  # Should 301 → /prompt/expense.html
+curl -skI https://209.15.119.96/login.html    # Should 301 → /prompt/login.html
 ```
 
 ---
 
-**Last Updated:** 2026-06-21
-**Server:** 209.15.119.96
-**Apps:** Prompt-Beark, Hospital Billing
-**Status:** Production
+## 🎯 Summary (TL;DR)
+
+1. **Read this file before every deployment** ⚠️
+2. **Only modify Prompt-Beark & Hospital Billing** ✅
+3. **Never touch other apps** ❌
+4. **Hospital Billing = root (/)** - ย้ายไม่ได้
+5. **Prompt-Beark = /prompt** - ใช้ prefix
+6. **Always backup before changing nginx config**
+7. **Test with `nginx -t` before reload**
+8. **Verify other apps after deployment**
+
+**Start URL:**
+```
+https://209.15.119.96/prompt/login.html
+```
+
+---
+
+**Last Updated:** 2026-06-22  
+**Server:** 209.15.119.96  
+**Apps:** Prompt-Beark, Hospital Billing  
+**Status:** Production ✅
