@@ -134,6 +134,82 @@ docker ps --filter "name=promt-beark"
 docker ps --filter "name=hospital"
 ```
 
+### Step 3: Deploy Hospital Billing (Manual Upload)
+
+**⚠️ Hospital Billing ไม่ใช่ Git repo — ต้อง upload files manually**
+
+**Path on Server:**
+```
+/opt/apps/HospitalBilling
+```
+
+**Deployment Steps:**
+
+```bash
+# 1. Backup current files (บน server)
+ssh -i ~/.ssh/promt-beark-deploy -p 8839 teerapat@209.15.119.96 'bash -s' << 'ENDSSH'
+cd /opt/apps/HospitalBilling
+backup_dir="backup-$(date +%Y%m%d-%H%M%S)"
+mkdir -p "$backup_dir"
+cp app.py core/matcher.py core/parser.py templates/index.html "$backup_dir/"
+echo "✅ Backup: $backup_dir"
+ENDSSH
+
+# 2. Upload modified files (จาก local)
+cd D:/Manny/HospitalBilling
+scp -i ~/.ssh/promt-beark-deploy -P 8839 \
+  app.py \
+  core/matcher.py \
+  core/parser.py \
+  templates/index.html \
+  teerapat@209.15.119.96:/tmp/hospital_deploy/
+
+# 3. Replace files and rebuild (บน server)
+ssh -i ~/.ssh/promt-beark-deploy -p 8839 teerapat@209.15.119.96 'bash -s' << 'ENDSSH'
+cd /opt/apps/HospitalBilling
+
+# Move files
+mv /tmp/hospital_deploy/app.py .
+mv /tmp/hospital_deploy/matcher.py core/
+mv /tmp/hospital_deploy/parser.py core/
+mv /tmp/hospital_deploy/index.html templates/
+
+# Rebuild เฉพาะ Hospital Billing
+docker compose up -d --build
+
+# Wait and verify
+sleep 15
+docker ps --filter "name=hospital"
+curl -skI http://localhost:5000/ | head -3
+ENDSSH
+```
+
+**Common Files to Deploy:**
+- `app.py` — Main Flask application
+- `core/matcher.py` — Matching logic
+- `core/parser.py` — Excel parsing
+- `core/erp_builder.py` — ERP file generation
+- `templates/*.html` — UI templates
+- `static/style.css` — Styles
+
+**⚠️ Critical Rules:**
+1. ✅ **Always backup before deploy**
+2. ✅ **Only rebuild Hospital Billing container** (ไม่กระทบแอปอื่น)
+3. ✅ **Verify other apps after deploy**
+4. ❌ **Never delete data/ or uploads/ folders** (persistent data)
+
+**Verification Checklist:**
+```bash
+# 1. Hospital Billing ทำงาน
+curl -sk https://209.15.119.96/ | grep -o "v[0-9]\.[0-9]"
+
+# 2. Prompt-Beark ไม่กระทบ
+curl -skI https://209.15.119.96/prompt/login.html | head -1
+
+# 3. Other apps ไม่กระทบ
+docker ps --filter "name=apps" --format '{{.Names}}\t{{.Status}}'
+```
+
 ---
 
 ## 🔒 Nginx Configuration
@@ -536,14 +612,55 @@ curl -skI https://209.15.119.96/login.html    # Should 301 → /prompt/login.htm
 
 ## 🎯 Summary (TL;DR)
 
+### 📌 **CRITICAL RULES**
 1. **Read this file before every deployment** ⚠️
-2. **Only modify Prompt-Beark & Hospital Billing** ✅
-3. **Never touch other apps** ❌
-4. **Hospital Billing = root (/)** - ย้ายไม่ได้
-5. **Prompt-Beark = /prompt** - ใช้ prefix
-6. **Always backup before changing nginx config**
-7. **Test with `nginx -t` before reload**
-8. **Verify other apps after deployment**
+2. **We have permission for ONLY 2 apps:**
+   - ✅ **Prompt-Beark** (`promt-beark-*` containers)
+   - ✅ **Hospital Billing** (`hospitalbilling-app` container)
+3. **All other apps = HANDS OFF** ❌
+   - apps-*, ticket-*, signature-*, dashboard-*, checkin-*, motor-pool-*
+   - **Touching them = breaking other people's work!**
+
+### 🚀 **Quick Deploy Commands**
+
+**Prompt-Beark (Git-based):**
+```bash
+ssh -i ~/.ssh/promt-beark-deploy -p 8839 teerapat@209.15.119.96 'bash -s' << 'ENDSSH'
+cd /home/teerapat/promt-beark
+git pull origin main
+docker compose up -d --build
+ENDSSH
+```
+
+**Hospital Billing (Manual upload):**
+```bash
+# 1. Upload files
+scp -i ~/.ssh/promt-beark-deploy -P 8839 app.py teerapat@209.15.119.96:/tmp/hospital_deploy/
+
+# 2. Deploy
+ssh -i ~/.ssh/promt-beark-deploy -p 8839 teerapat@209.15.119.96 'bash -s' << 'ENDSSH'
+cd /opt/apps/HospitalBilling
+mv /tmp/hospital_deploy/app.py .
+docker compose up -d --build
+ENDSSH
+```
+
+### ✅ **Post-Deployment Verification**
+```bash
+# Our apps ต้องทำงาน
+curl -skI https://209.15.119.96/                    # Hospital Billing
+curl -skI https://209.15.119.96/prompt/login.html   # Prompt-Beark
+
+# Other apps ต้องไม่กระทบ (ยังทำงานปกติ)
+docker ps --filter "name=apps"      # Apps Portal
+docker ps --filter "name=ticket"    # Ticket System
+```
+
+### 📍 **Key Facts**
+- **Hospital Billing = root (/)** - ต้องอยู่ที่นี่เท่านั้น (ย้ายไม่ได้)
+- **Prompt-Beark = /prompt** - ใช้ prefix path
+- **Prompt-Beark path:** `/home/teerapat/promt-beark` (Git)
+- **Hospital Billing path:** `/opt/apps/HospitalBilling` (No Git)
 
 **Start URL:**
 ```
@@ -552,7 +669,7 @@ https://209.15.119.96/prompt/login.html
 
 ---
 
-**Last Updated:** 2026-06-22  
+**Last Updated:** 2026-06-23  
 **Server:** 209.15.119.96  
-**Apps:** Prompt-Beark, Hospital Billing  
+**Apps:** Prompt-Beark (Git), Hospital Billing (Manual)  
 **Status:** Production ✅
