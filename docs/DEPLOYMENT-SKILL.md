@@ -210,6 +210,104 @@ curl -skI https://209.15.119.96/prompt/login.html | head -1
 docker ps --filter "name=apps" --format '{{.Names}}\t{{.Status}}'
 ```
 
+### Troubleshooting Hospital Billing
+
+**Problem 1: Export Excel แล้วข้อมูลหาย (ref1, จำนวนหน่วย ว่าง)**
+
+**Cause:** ไฟล์บน server ไม่ตรงกับ local (version เก่า)
+
+**Diagnosis:**
+```bash
+# เปรียบเทียบ hash
+md5sum D:/Manny/HospitalBilling/core/erp_builder.py
+ssh -i ~/.ssh/promt-beark-deploy -p 8839 teerapat@209.15.119.96 'md5sum /opt/apps/HospitalBilling/core/erp_builder.py'
+
+# ถ้า hash ต่างกัน = version ไม่ตรง
+```
+
+**Solution:**
+```bash
+# Upload ไฟล์ใหม่
+cd D:/Manny/HospitalBilling
+scp -i ~/.ssh/promt-beark-deploy -P 8839 \
+  core/erp_builder.py \
+  teerapat@209.15.119.96:/tmp/hospital_deploy/
+
+# Deploy
+ssh -i ~/.ssh/promt-beark-deploy -p 8839 teerapat@209.15.119.96 'bash -s' << 'ENDSSH'
+cd /opt/apps/HospitalBilling
+mv /tmp/hospital_deploy/erp_builder.py core/
+docker compose up -d --build
+ENDSSH
+```
+
+**Problem 2: ชื่อกิจกรรมไม่ถูกต้อง (แสดงชื่อเดียวกันทุก provide code)**
+
+**Cause:** ไฟล์ `ชื่อกิจกรรม.xlsx` หายจาก server
+
+**Diagnosis:**
+```bash
+ssh -i ~/.ssh/promt-beark-deploy -p 8839 teerapat@209.15.119.96 'bash -s' << 'ENDSSH'
+find /opt/apps/HospitalBilling -name "ชื่อกิจกรรม.xlsx"
+ENDSSH
+
+# ถ้าไม่พบ = ไฟล์หาย
+```
+
+**Solution:**
+```bash
+# Upload ไฟล์
+cd D:/Manny/HospitalBilling
+scp -i ~/.ssh/promt-beark-deploy -P 8839 \
+  "_ข้อมูลออกใบเสร็จรับเงิน_28052569/ชื่อกิจกรรม.xlsx" \
+  teerapat@209.15.119.96:/tmp/hospital_deploy/
+
+# Deploy
+ssh -i ~/.ssh/promt-beark-deploy -p 8839 teerapat@209.15.119.96 'bash -s' << 'ENDSSH'
+cd /opt/apps/HospitalBilling
+folder=$(ls -d *28052569 | head -1)
+mv /tmp/hospital_deploy/ชื่อกิจกรรม.xlsx "$folder/"
+docker compose up -d --build
+ENDSSH
+```
+
+**Problem 3: ฟังก์ชันจำ Access ล่าสุดไม่ทำงาน**
+
+**Cause:** `static/script.js` ไม่ได้ update
+
+**Solution:**
+```bash
+# Upload static files
+cd D:/Manny/HospitalBilling
+scp -i ~/.ssh/promt-beark-deploy -P 8839 \
+  static/script.js static/style.css \
+  teerapat@209.15.119.96:/tmp/hospital_deploy/
+
+# Deploy
+ssh -i ~/.ssh/promt-beark-deploy -p 8839 teerapat@209.15.119.96 'bash -s' << 'ENDSSH'
+cd /opt/apps/HospitalBilling
+mv /tmp/hospital_deploy/script.js static/
+mv /tmp/hospital_deploy/style.css static/
+docker compose up -d --build
+ENDSSH
+```
+
+**Debugging Tips:**
+```bash
+# 1. Check container logs
+docker logs hospitalbilling-app --tail 100
+
+# 2. Check if file exists in container
+docker exec hospitalbilling-app ls -la /app/core/
+
+# 3. Compare file hashes (local vs server)
+md5sum D:/Manny/HospitalBilling/core/matcher.py
+ssh ... 'md5sum /opt/apps/HospitalBilling/core/matcher.py'
+
+# 4. Test endpoint directly
+curl -sk https://209.15.119.96/api/master/hospitals?page=1\&per_page=1
+```
+
 ---
 
 ## 🔒 Nginx Configuration
