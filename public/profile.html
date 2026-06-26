@@ -8,6 +8,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Choices.js for searchable dropdown -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
     <style>
         body { font-family: 'Sarabun', sans-serif; }
     </style>
@@ -58,8 +61,11 @@
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-slate-500 mb-1.5">ตำแหน่ง</label>
-                        <input type="text" id="pPosition" placeholder="เช่น นักวิเคราะห์นโยบายและแผน..."
-                            class="w-full border border-slate-200 p-3 rounded-xl text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition">
+                        <select id="pPosition"
+                            class="w-full border border-slate-200 p-3 rounded-xl text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition bg-white">
+                            <option value="">— เลือกตำแหน่ง —</option>
+                        </select>
+                        <p class="text-xs text-slate-400 mt-1">💡 Admin สามารถเพิ่มตำแหน่งได้ที่ตั้งค่าระบบ</p>
                     </div>
                     <div class="col-span-full md:col-span-1">
                         <label class="block text-xs font-bold text-slate-500 mb-1.5">สังกัด / กลุ่มงาน</label>
@@ -109,6 +115,17 @@
                         </button>
                     </div>
                     <div id="profileMap" class="w-full h-64 rounded-xl border border-slate-200 shadow-inner"></div>
+                </div>
+
+                <!-- Global Profile Option (Admin Only) -->
+                <div id="globalProfileOption" class="hidden bg-blue-50 p-4 rounded-xl border border-blue-200 mb-4">
+                    <label class="flex items-start gap-3 cursor-pointer">
+                        <input type="checkbox" id="pIsGlobal" class="w-5 h-5 rounded border-blue-300 text-blue-600 focus:ring-2 focus:ring-blue-400 mt-0.5">
+                        <div class="flex-1">
+                            <div class="text-sm font-bold text-blue-900">🌐 โปรไฟล์สาธารณะ (Global Profile)</div>
+                            <p class="text-xs text-blue-700 mt-1">ทำให้ผู้ใช้ทุกคนสามารถเห็นและเลือกใช้โปรไฟล์นี้ได้ (เฉพาะ Admin เท่านั้น)</p>
+                        </div>
+                    </label>
                 </div>
 
                 <div class="flex gap-3">
@@ -450,8 +467,42 @@
             }
         }
 
+        let positionChoices; // Global Choices instance
+
+        async function loadPositions() {
+            try {
+                const res = await fetch('/settings');
+                if (res.ok) {
+                    const settings = await res.json();
+                    const positions = settings.positionList || [];
+                    const select = document.getElementById('pPosition');
+                    select.innerHTML = '<option value="">— เลือกตำแหน่ง —</option>';
+                    positions.forEach(pos => {
+                        const option = document.createElement('option');
+                        option.value = pos;
+                        option.textContent = pos;
+                        select.appendChild(option);
+                    });
+
+                    // Initialize Choices.js for searchable dropdown
+                    if (positionChoices) positionChoices.destroy();
+                    positionChoices = new Choices('#pPosition', {
+                        searchEnabled: true,
+                        searchPlaceholderValue: 'ค้นหาตำแหน่ง...',
+                        noResultsText: 'ไม่พบตำแหน่ง',
+                        itemSelectText: 'กดเพื่อเลือก',
+                        removeItemButton: false,
+                        shouldSort: false
+                    });
+                }
+            } catch (err) {
+                console.warn('Could not load positions:', err);
+            }
+        }
+
         initProfileMap();
         setupSearch();
+        loadPositions();
         renderProfiles();
     </script>
     <script src="/auth-guard.js"></script>
