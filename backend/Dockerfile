@@ -8,6 +8,7 @@ COPY package*.json ./
 RUN npm install --omit=dev
 
 COPY server.js .
+COPY validation.js .
 RUN mkdir -p /app/data
 
 EXPOSE 3000
