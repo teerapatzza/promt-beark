@@ -1228,22 +1228,60 @@
         `).join('');
     }
 
-    function addPosition() {
+    async function addPosition() {
         if (!window.positionList) window.positionList = [];
         window.positionList.push('ตำแหน่งใหม่');
         renderPositions();
+
+        // Auto-save immediately
+        await autoSavePositions();
     }
 
-    function removePosition(index) {
+    async function removePosition(index) {
         if (confirm('ต้องการลบตำแหน่งนี้?')) {
             window.positionList.splice(index, 1);
             renderPositions();
+
+            // Auto-save immediately
+            await autoSavePositions();
         }
     }
 
-    window.updatePosition = function(index, value) {
+    window.updatePosition = async function(index, value) {
         window.positionList[index] = value.trim();
+
+        // Auto-save immediately (debounced to avoid too many saves)
+        clearTimeout(window._positionSaveTimeout);
+        window._positionSaveTimeout = setTimeout(async () => {
+            await autoSavePositions();
+        }, 1000); // Save 1 second after typing stops
     };
+
+    // Auto-save positions to backend
+    async function autoSavePositions() {
+        try {
+            const settings = {
+                fuelRate: parseFloat(document.getElementById('setting-fuelRate').value) || 4,
+                taxiMaxPerTrip: parseInt(document.getElementById('setting-taxiMaxPerTrip').value) || 300,
+                hotelRateSingle: parseInt(document.getElementById('setting-hotelRateSingle').value) || 1500,
+                hotelRateDouble: parseInt(document.getElementById('setting-hotelRateDouble').value) || 1000,
+                positionList: window.positionList || []
+            };
+
+            const res = await fetch('/settings', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(settings)
+            });
+
+            if (!res.ok) throw new Error('Failed to save');
+
+            // Show brief success indicator (optional)
+            console.log('✅ Positions auto-saved');
+        } catch (err) {
+            console.error('❌ Auto-save failed:', err);
+        }
+    }
 
     // ── Init ───────────────────────────────────────────────
     renderAttachmentRows([...ATTACHMENT_IDS], {});
