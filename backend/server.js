@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 const cookieParser = require('cookie-parser');
 const path = require('path');
+const { validateExpense } = require('./validation');
 
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'data', 'prompt-berk.db');
 const PORT = process.env.PORT || 3000;
@@ -61,13 +62,32 @@ db.exec(`
 // Add columns to existing tables if they don't exist yet (idempotent)
 try { db.exec(`ALTER TABLE expenses ADD COLUMN user_id INTEGER REFERENCES users(id)`); } catch (_) {}
 try { db.exec(`ALTER TABLE profiles ADD COLUMN owner_user_id INTEGER REFERENCES users(id)`); } catch (_) {}
+try { db.exec(`ALTER TABLE profiles ADD COLUMN is_global INTEGER DEFAULT 0`); } catch (_) {}
 
 // Delete old expenses with no user_id (orphan records from pre-auth era)
 db.prepare(`DELETE FROM expenses WHERE user_id IS NULL`).run();
 
 // ── Settings helpers ──────────────────────────────────────
 
-const DEFAULT_SETTINGS = { taxiMaxPerTrip: 600 };
+const DEFAULT_SETTINGS = {
+  taxiMaxPerTrip: 300,  // บาท/เที่ยว
+  fuelRate: 4,          // บาท/กม.
+  hotelRateSingle: 1500, // บาท/คืน (พักเดี่ยว)
+  hotelRateDouble: 1000, // บาท/คืน (พักคู่)
+  positionList: [       // รายการตำแหน่งงาน (สำหรับ dropdown)
+    'นพ.',
+    'พญ.',
+    'ทพ.',
+    'ทพญ.',
+    'ภก.',
+    'ภญ.',
+    'พยาบาล',
+    'นักวิชาการ',
+    'เจ้าหน้าที่',
+    'ผู้อำนวยการ',
+    'รองผู้อำนวยการ'
+  ]
+};
 
 function getSetting(key) {
   const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
@@ -284,7 +304,29 @@ app.get('/expenses', requireAuth, (req, res) => {
 
 app.post('/expenses', requireAuth, (req, res) => {
   if (req.user.role === 'approver') return res.status(403).json({ error: 'Approvers cannot create expenses' });
+
   const expense = req.body;
+
+  // Get category for validation
+  const categoryId = expense.inputMetadata?._budgetCategoryId;
+  let category = null;
+  if (categoryId) {
+    const catRow = db.prepare('SELECT id, data FROM budget_categories WHERE id = ?').get(categoryId);
+    if (catRow) {
+      category = JSON.parse(catRow.data);
+      category.id = catRow.id;
+    }
+  }
+
+  // Validate expense
+  const errors = validateExpense(expense, category);
+  if (errors.length > 0) {
+    return res.status(422).json({
+      error: 'Validation failed',
+      errors: errors
+    });
+  }
+
   expense.createdAt = new Date().toISOString();
   const result = db.prepare('INSERT INTO expenses (data, user_id) VALUES (?, ?)').run(JSON.stringify(expense), req.user.id);
   expense.id = result.lastInsertRowid;
@@ -301,6 +343,27 @@ app.put('/expenses/:id', requireAuth, (req, res) => {
     return res.status(403).json({ error: 'Forbidden' });
 
   const expense = req.body;
+
+  // Get category for validation
+  const categoryId = expense.inputMetadata?._budgetCategoryId;
+  let category = null;
+  if (categoryId) {
+    const catRow = db.prepare('SELECT id, data FROM budget_categories WHERE id = ?').get(categoryId);
+    if (catRow) {
+      category = JSON.parse(catRow.data);
+      category.id = catRow.id;
+    }
+  }
+
+  // Validate expense
+  const errors = validateExpense(expense, category);
+  if (errors.length > 0) {
+    return res.status(422).json({
+      error: 'Validation failed',
+      errors: errors
+    });
+  }
+
   const original = JSON.parse(exists.data);
   if (original.createdAt) expense.createdAt = original.createdAt;
   db.prepare('UPDATE expenses SET data = ? WHERE id = ?').run(JSON.stringify(expense), id);
@@ -343,15 +406,16 @@ app.put('/settings', requireAdmin, (req, res) => {
 app.get('/profiles', requireAuth, (req, res) => {
   let rows;
   if (req.user.role === 'user') {
-    // own profiles + global profiles (owner_user_id IS NULL)
-    rows = db.prepare('SELECT id, data, owner_user_id FROM profiles WHERE owner_user_id = ? OR owner_user_id IS NULL ORDER BY id ASC').all(req.user.id);
+    // own profiles + global profiles (is_global = 1)
+    rows = db.prepare('SELECT id, data, owner_user_id, is_global FROM profiles WHERE owner_user_id = ? OR is_global = 1 ORDER BY id ASC').all(req.user.id);
   } else {
-    rows = db.prepare('SELECT p.id, p.data, p.owner_user_id, u.email as owner_email FROM profiles p LEFT JOIN users u ON u.id = p.owner_user_id ORDER BY p.id ASC').all();
+    rows = db.prepare('SELECT p.id, p.data, p.owner_user_id, p.is_global, u.email as owner_email FROM profiles p LEFT JOIN users u ON u.id = p.owner_user_id ORDER BY p.id ASC').all();
   }
   res.json(rows.map(r => {
     const o = JSON.parse(r.data);
     o.id = r.id;
     o.ownerUserId = r.owner_user_id ?? null;
+    o.isGlobal = r.is_global === 1;
     if (r.owner_email) o.ownerEmail = r.owner_email;
     return o;
   }));
@@ -362,22 +426,30 @@ app.post('/profiles', requireAuth, (req, res) => {
   const p = req.body;
   if (!p.profileName || !p.fullName) return res.status(400).json({ error: 'profileName and fullName are required' });
 
-  // admin can create global profiles (ownerUserId: null), others own only
-  const ownerUserId = req.user.role === 'admin' && p.ownerUserId === null ? null : req.user.id;
-  const result = db.prepare('INSERT INTO profiles (data, owner_user_id) VALUES (?, ?)').run(JSON.stringify(p), ownerUserId);
+  // admin can create global profiles (isGlobal: true), others own only
+  const ownerUserId = req.user.id;
+  const isGlobal = req.user.role === 'admin' && p.isGlobal === true ? 1 : 0;
+
+  const result = db.prepare('INSERT INTO profiles (data, owner_user_id, is_global) VALUES (?, ?, ?)').run(
+    JSON.stringify(p),
+    isGlobal === 1 ? null : ownerUserId,
+    isGlobal
+  );
+
   p.id = result.lastInsertRowid;
-  p.ownerUserId = ownerUserId;
+  p.ownerUserId = isGlobal === 1 ? null : ownerUserId;
+  p.isGlobal = isGlobal === 1;
   res.status(201).json(p);
 });
 
 app.put('/profiles/:id', requireAuth, (req, res) => {
   if (req.user.role === 'approver') return res.status(403).json({ error: 'Approvers cannot edit profiles' });
   const id = parseInt(req.params.id);
-  const exists = db.prepare('SELECT id, owner_user_id FROM profiles WHERE id = ?').get(id);
+  const exists = db.prepare('SELECT id, owner_user_id, is_global FROM profiles WHERE id = ?').get(id);
   if (!exists) return res.status(404).json({ error: 'Profile not found' });
 
-  // Global profiles (owner_user_id NULL) can only be edited by admin
-  if (exists.owner_user_id === null && req.user.role !== 'admin')
+  // Global profiles (is_global = 1) can only be edited by admin
+  if (exists.is_global === 1 && req.user.role !== 'admin')
     return res.status(403).json({ error: 'Only admin can edit global profiles' });
   if (exists.owner_user_id !== null && req.user.role !== 'admin' && exists.owner_user_id !== req.user.id)
     return res.status(403).json({ error: 'Forbidden' });
@@ -386,17 +458,20 @@ app.put('/profiles/:id', requireAuth, (req, res) => {
   db.prepare("UPDATE profiles SET data = ?, updated_at = datetime('now') WHERE id = ?").run(JSON.stringify(p), id);
   p.id = id;
   p.ownerUserId = exists.owner_user_id;
+  p.isGlobal = exists.is_global === 1;
   res.json(p);
 });
 
 app.delete('/profiles/:id', requireAuth, (req, res) => {
   if (req.user.role === 'approver') return res.status(403).json({ error: 'Approvers cannot delete profiles' });
   const id = parseInt(req.params.id);
-  const exists = db.prepare('SELECT id, owner_user_id FROM profiles WHERE id = ?').get(id);
+  const exists = db.prepare('SELECT id, owner_user_id, is_global FROM profiles WHERE id = ?').get(id);
   if (!exists) return res.status(404).json({ error: 'Profile not found' });
 
-  if (exists.owner_user_id === null && req.user.role !== 'admin')
+  // Global profiles can only be deleted by admin
+  if (exists.is_global === 1 && req.user.role !== 'admin')
     return res.status(403).json({ error: 'Only admin can delete global profiles' });
+  // User profiles can only be deleted by owner or admin
   if (exists.owner_user_id !== null && req.user.role !== 'admin' && exists.owner_user_id !== req.user.id)
     return res.status(403).json({ error: 'Forbidden' });
 
