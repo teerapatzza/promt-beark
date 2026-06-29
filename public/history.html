@@ -738,22 +738,35 @@
                                         doubleTotal = hotelTotal > 0 ? formatNumber(hotelTotal) : '';
                                     }
                                 } else if (c.hotelEntries && c.hotelEntries.entries && c.hotelEntries.entries.length > 0) {
-                                    // New format: find first entry of each type
-                                    const singleEntry = c.hotelEntries.entries.find(e => e.type === 'พักเดี่ยว');
-                                    const doubleEntry = c.hotelEntries.entries.find(e => e.type === 'พักคู่');
+                                    // New format: sum all entries of each type
+                                    const singleEntries = c.hotelEntries.entries.filter(e => e.type === 'พักเดี่ยว');
+                                    const doubleEntries = c.hotelEntries.entries.filter(e => e.type === 'พักคู่');
 
-                                    if (singleEntry) {
-                                        singleRate = singleEntry.rate || '';
-                                        singleNights = singleEntry.nights || '';
-                                        const total = (parseFloat(singleEntry.rate||0) * parseFloat(singleEntry.nights||0));
-                                        singleTotal = total > 0 ? formatNumber(total) : '';
+                                    if (singleEntries.length > 0) {
+                                        // Sum all single room entries
+                                        const totalNights = singleEntries.reduce((sum, e) => sum + (parseFloat(e.nights)||0), 0);
+                                        const totalAmount = singleEntries.reduce((sum, e) => {
+                                            return sum + (parseFloat(e.rate||0) * parseFloat(e.nights||0));
+                                        }, 0);
+
+                                        // Show summary (average rate if multiple entries)
+                                        const avgRate = totalNights > 0 ? Math.round(totalAmount / totalNights) : 0;
+                                        singleRate = avgRate > 0 ? avgRate : '';
+                                        singleNights = totalNights > 0 ? totalNights : '';
+                                        singleTotal = totalAmount > 0 ? formatNumber(totalAmount) : '';
                                     }
 
-                                    if (doubleEntry) {
-                                        doubleRate = doubleEntry.rate || '';
-                                        doubleNights = doubleEntry.nights || '';
-                                        const total = (parseFloat(doubleEntry.rate||0) * parseFloat(doubleEntry.nights||0));
-                                        doubleTotal = total > 0 ? formatNumber(total) : '';
+                                    if (doubleEntries.length > 0) {
+                                        // Sum all double room entries
+                                        const totalNights = doubleEntries.reduce((sum, e) => sum + (parseFloat(e.nights)||0), 0);
+                                        const totalAmount = doubleEntries.reduce((sum, e) => {
+                                            return sum + (parseFloat(e.rate||0) * parseFloat(e.nights||0));
+                                        }, 0);
+
+                                        const avgRate = totalNights > 0 ? Math.round(totalAmount / totalNights) : 0;
+                                        doubleRate = avgRate > 0 ? avgRate : '';
+                                        doubleNights = totalNights > 0 ? totalNights : '';
+                                        doubleTotal = totalAmount > 0 ? formatNumber(totalAmount) : '';
                                     }
                                 }
 
