@@ -620,8 +620,21 @@
                 if (templates.includes('REPORT')) {
                     const startTypeWork = tr.startFromType === 'ที่ทำงาน' ? '☑' : '☐';
                     const startTypeHome = tr.startFromType === 'ที่พัก' ? '☑' : '☐';
-                    const hotelSingle = c.hotel.type === 'พักเดี่ยว' ? '☑' : '☐';
-                    const hotelDouble = c.hotel.type === 'พักคู่' ? '☑' : '☐';
+
+                    // Check hotel type (support both old and new format)
+                    let hotelSingle = '☐';
+                    let hotelDouble = '☐';
+                    if (c.hotel && c.hotel.type) {
+                        // Old format
+                        hotelSingle = c.hotel.type === 'พักเดี่ยว' ? '☑' : '☐';
+                        hotelDouble = c.hotel.type === 'พักคู่' ? '☑' : '☐';
+                    } else if (c.accommodationEntries && c.accommodationEntries.length > 0) {
+                        // New format: check if any entry is พักเดี่ยว or พักคู่
+                        const hasSingle = c.accommodationEntries.some(e => e.type === 'พักเดี่ยว');
+                        const hasDouble = c.accommodationEntries.some(e => e.type === 'พักคู่');
+                        hotelSingle = hasSingle ? '☑' : '☐';
+                        hotelDouble = hasDouble ? '☑' : '☐';
+                    }
 
                     templateHtml += `
                     <div class="pdf-page">
