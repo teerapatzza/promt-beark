@@ -711,7 +711,13 @@
                                 <td style="border: none; padding: 0;"></td>
                                 <td colspan="4" style="border: none; padding: 0;">
                                     1.2 &nbsp;&nbsp; ชื่อโรงแรม <span class="solid-line" style="width: 250px;">${
-                                        (c.hotelEntries && c.hotelEntries.name) || (c.hotel && c.hotel.name) || ''
+                                        (() => {
+                                            console.log('🔍 DEBUG: c.hotelEntries =', c.hotelEntries);
+                                            console.log('🔍 DEBUG: c.hotel =', c.hotel);
+                                            const name = (c.hotelEntries && c.hotelEntries.name) || (c.hotel && c.hotel.name) || '';
+                                            console.log('🔍 DEBUG: Hotel name =', name);
+                                            return name;
+                                        })()
                                     }</span>
                                 </td>
                             </tr>
