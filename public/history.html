@@ -588,7 +588,18 @@
                 const tollTotal = parseFloat(c.tollAmount || 0);
                 const otherTotal = parseFloat(c.otherAmount || 0);
                 const airTotal = parseFloat(c.airAmount || 0);
-                const hotelTotal = (parseFloat(c.hotel.rate||0) * parseFloat(c.hotel.nights||0)) || 0;
+
+                // Calculate hotel total (support both old and new format)
+                let hotelTotal = 0;
+                if (c.hotel && c.hotel.rate) {
+                    // Old format: { hotel: { rate, nights } }
+                    hotelTotal = (parseFloat(c.hotel.rate||0) * parseFloat(c.hotel.nights||0)) || 0;
+                } else if (c.accommodationEntries && c.accommodationEntries.length > 0) {
+                    // New format: { accommodationEntries: [{ type, rate, nights }] }
+                    hotelTotal = c.accommodationEntries.reduce((sum, entry) => {
+                        return sum + (parseFloat(entry.rate||0) * parseFloat(entry.nights||0));
+                    }, 0);
+                }
                 
                 const receiptTotal = taxiTotal + fuelTotal + tollTotal + otherTotal;
                 const receiptAmtText = getThaiBahtText(receiptTotal);
@@ -614,21 +625,25 @@
 
                     templateHtml += `
                     <div class="pdf-page">
-                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px;">
-                            <img src="/logo.png" style="height: 60px;" onerror="this.style.display='none'">
-                            <div style="text-align: right; font-size: 12px; line-height: 1.4; font-weight: bold;">
-                                FM-SAM-001-04<br>
-                                ใบรายงานการเดินทางไปปฏิบัติงาน<br>
-                                วันที่ประกาศใช้ : 15/12/2568<br>
-                                รอบทบทวน : 15/12/2570
-                            </div>
-                        </div>
+                        <table style="width: 100%; border: none; margin-bottom: 5px; border-collapse: collapse;">
+                            <tr>
+                                <td style="width: 30%; border: none; vertical-align: top; padding: 0;">
+                                    <img src="./logo.png" style="height: 60px; display: block;">
+                                </td>
+                                <td style="width: 70%; border: none; vertical-align: top; padding: 0; text-align: right; font-size: 12px; line-height: 1.4; font-weight: bold;">
+                                    FM-SAM-001-04<br>
+                                    ใบรายงานการเดินทางไปปฏิบัติงาน<br>
+                                    วันที่ประกาศใช้ : 15/12/2568<br>
+                                    รอบทบทวน : 15/12/2570
+                                </td>
+                            </tr>
+                        </table>
 
                         <h2 style="text-align: center; font-weight: bold; font-size: 18px; margin-bottom: 10px;">ใบรายงานการเดินทางไปปฏิบัติงาน</h2>
-                        
-                        <div style="display: flex; justify-content: flex-end; align-items: baseline; margin-bottom: 10px;">
+
+                        <div style="text-align: right; margin-bottom: 10px;">
                             <span style="margin-right: 10px;">วันที่</span>
-                            <span style="width: 150px; border-bottom: 1px solid #000; text-align: center;">${dateStr}</span>
+                            <span style="display: inline-block; width: 150px; border-bottom: 1px solid #000; text-align: center;">${dateStr}</span>
                         </div>
 
                         <div style="line-height: 1.8;">
@@ -940,7 +955,7 @@
                                 </tr>
                                 <!-- row 14: ที่อยู่ -->
                                 <tr>
-                                    <td style="border-top: none; border-bottom: 1px solid #000; padding: 6px 8px;">
+                                    <td style="border-top: none; border-bottom: 1px solid #000; padding: 10px 8px; line-height: 1.8;">
                                         ที่อยู่${extraAddr ? ' &nbsp; ' + extraAddr : ''}
                                     </td>
                                     <td style="border-top: none; border-bottom: 1px solid #000;"></td>
