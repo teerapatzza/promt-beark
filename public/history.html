@@ -594,9 +594,9 @@
                 if (c.hotel && c.hotel.rate) {
                     // Old format: { hotel: { rate, nights } }
                     hotelTotal = (parseFloat(c.hotel.rate||0) * parseFloat(c.hotel.nights||0)) || 0;
-                } else if (c.accommodationEntries && c.accommodationEntries.length > 0) {
-                    // New format: { accommodationEntries: [{ type, rate, nights }] }
-                    hotelTotal = c.accommodationEntries.reduce((sum, entry) => {
+                } else if (c.hotelEntries && c.hotelEntries.entries && c.hotelEntries.entries.length > 0) {
+                    // New format: { hotelEntries: { name, entries: [{ type, rate, nights }] } }
+                    hotelTotal = c.hotelEntries.entries.reduce((sum, entry) => {
                         return sum + (parseFloat(entry.rate||0) * parseFloat(entry.nights||0));
                     }, 0);
                 }
@@ -628,10 +628,10 @@
                         // Old format
                         hotelSingle = c.hotel.type === 'พักเดี่ยว' ? '☑' : '☐';
                         hotelDouble = c.hotel.type === 'พักคู่' ? '☑' : '☐';
-                    } else if (c.accommodationEntries && c.accommodationEntries.length > 0) {
+                    } else if (c.hotelEntries && c.hotelEntries.entries && c.hotelEntries.entries.length > 0) {
                         // New format: check if any entry is พักเดี่ยว or พักคู่
-                        const hasSingle = c.accommodationEntries.some(e => e.type === 'พักเดี่ยว');
-                        const hasDouble = c.accommodationEntries.some(e => e.type === 'พักคู่');
+                        const hasSingle = c.hotelEntries.entries.some(e => e.type === 'พักเดี่ยว');
+                        const hasDouble = c.hotelEntries.entries.some(e => e.type === 'พักคู่');
                         hotelSingle = hasSingle ? '☑' : '☐';
                         hotelDouble = hasDouble ? '☑' : '☐';
                     }
@@ -711,7 +711,7 @@
                                 <td style="border: none; padding: 0;"></td>
                                 <td colspan="4" style="border: none; padding: 0;">
                                     1.2 &nbsp;&nbsp; ชื่อโรงแรม <span class="solid-line" style="width: 250px;">${
-                                        c.hotelName || (c.hotel && c.hotel.name) || ''
+                                        (c.hotelEntries && c.hotelEntries.name) || (c.hotel && c.hotel.name) || ''
                                     }</span>
                                 </td>
                             </tr>
@@ -731,10 +731,10 @@
                                         doubleNights = c.hotel.nights || '';
                                         doubleTotal = hotelTotal > 0 ? formatNumber(hotelTotal) : '';
                                     }
-                                } else if (c.accommodationEntries && c.accommodationEntries.length > 0) {
+                                } else if (c.hotelEntries && c.hotelEntries.entries && c.hotelEntries.entries.length > 0) {
                                     // New format: find first entry of each type
-                                    const singleEntry = c.accommodationEntries.find(e => e.type === 'พักเดี่ยว');
-                                    const doubleEntry = c.accommodationEntries.find(e => e.type === 'พักคู่');
+                                    const singleEntry = c.hotelEntries.entries.find(e => e.type === 'พักเดี่ยว');
+                                    const doubleEntry = c.hotelEntries.entries.find(e => e.type === 'พักคู่');
 
                                     if (singleEntry) {
                                         singleRate = singleEntry.rate || '';
