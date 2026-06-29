@@ -723,66 +723,59 @@
                             </tr>
                             ${(() => {
                                 // Support both old and new format for hotel entries
-                                let singleRate = '', singleNights = '', singleTotal = '';
-                                let doubleRate = '', doubleNights = '', doubleTotal = '';
+                                let row1Label = 'เดี่ยว', row1Rate = '', row1Nights = '', row1Total = '';
+                                let row2Label = 'คู่', row2Rate = '', row2Nights = '', row2Total = '';
 
                                 if (c.hotel && c.hotel.type) {
-                                    // Old format
+                                    // Old format (single entry only)
                                     if (c.hotel.type === 'พักเดี่ยว') {
-                                        singleRate = c.hotel.rate || '';
-                                        singleNights = c.hotel.nights || '';
-                                        singleTotal = hotelTotal > 0 ? formatNumber(hotelTotal) : '';
+                                        row1Rate = c.hotel.rate || '';
+                                        row1Nights = c.hotel.nights || '';
+                                        row1Total = hotelTotal > 0 ? formatNumber(hotelTotal) : '';
                                     } else if (c.hotel.type === 'พักคู่') {
-                                        doubleRate = c.hotel.rate || '';
-                                        doubleNights = c.hotel.nights || '';
-                                        doubleTotal = hotelTotal > 0 ? formatNumber(hotelTotal) : '';
+                                        row1Label = 'คู่';
+                                        row1Rate = c.hotel.rate || '';
+                                        row1Nights = c.hotel.nights || '';
+                                        row1Total = hotelTotal > 0 ? formatNumber(hotelTotal) : '';
                                     }
                                 } else if (c.hotelEntries && c.hotelEntries.entries && c.hotelEntries.entries.length > 0) {
-                                    // New format: sum all entries of each type
-                                    const singleEntries = c.hotelEntries.entries.filter(e => e.type === 'พักเดี่ยว');
-                                    const doubleEntries = c.hotelEntries.entries.filter(e => e.type === 'พักคู่');
+                                    // New format: show first 2 entries
+                                    const entries = c.hotelEntries.entries;
 
-                                    if (singleEntries.length > 0) {
-                                        // Sum all single room entries
-                                        const totalNights = singleEntries.reduce((sum, e) => sum + (parseFloat(e.nights)||0), 0);
-                                        const totalAmount = singleEntries.reduce((sum, e) => {
-                                            return sum + (parseFloat(e.rate||0) * parseFloat(e.nights||0));
-                                        }, 0);
-
-                                        // Show summary (average rate if multiple entries)
-                                        const avgRate = totalNights > 0 ? Math.round(totalAmount / totalNights) : 0;
-                                        singleRate = avgRate > 0 ? avgRate : '';
-                                        singleNights = totalNights > 0 ? totalNights : '';
-                                        singleTotal = totalAmount > 0 ? formatNumber(totalAmount) : '';
+                                    // First entry (always shown as row 1)
+                                    if (entries[0]) {
+                                        const e1 = entries[0];
+                                        row1Label = e1.type === 'พักเดี่ยว' ? 'เดี่ยว' : 'คู่';
+                                        row1Rate = e1.rate || '';
+                                        row1Nights = e1.nights || '';
+                                        const total = (parseFloat(e1.rate||0) * parseFloat(e1.nights||0));
+                                        row1Total = total > 0 ? formatNumber(total) : '';
                                     }
 
-                                    if (doubleEntries.length > 0) {
-                                        // Sum all double room entries
-                                        const totalNights = doubleEntries.reduce((sum, e) => sum + (parseFloat(e.nights)||0), 0);
-                                        const totalAmount = doubleEntries.reduce((sum, e) => {
-                                            return sum + (parseFloat(e.rate||0) * parseFloat(e.nights||0));
-                                        }, 0);
-
-                                        const avgRate = totalNights > 0 ? Math.round(totalAmount / totalNights) : 0;
-                                        doubleRate = avgRate > 0 ? avgRate : '';
-                                        doubleNights = totalNights > 0 ? totalNights : '';
-                                        doubleTotal = totalAmount > 0 ? formatNumber(totalAmount) : '';
+                                    // Second entry (shown as row 2 with dynamic label)
+                                    if (entries[1]) {
+                                        const e2 = entries[1];
+                                        row2Label = e2.type === 'พักเดี่ยว' ? 'เดี่ยว' : 'คู่';
+                                        row2Rate = e2.rate || '';
+                                        row2Nights = e2.nights || '';
+                                        const total = (parseFloat(e2.rate||0) * parseFloat(e2.nights||0));
+                                        row2Total = total > 0 ? formatNumber(total) : '';
                                     }
                                 }
 
                                 return `
                             <tr>
                                 <td style="border: none; padding: 0;"></td>
-                                <td style="border: none; padding: 0; padding-left: 25px;">อัตราที่พัก เดี่ยว <span class="solid-line" style="width: 60px;">${singleRate}</span> บาท X <span class="solid-line" style="width: 40px;">${singleNights}</span> คืน</td>
+                                <td style="border: none; padding: 0; padding-left: 25px;">อัตราที่พัก ${row1Label} <span class="solid-line" style="width: 60px;">${row1Rate}</span> บาท X <span class="solid-line" style="width: 40px;">${row1Nights}</span> คืน</td>
                                 <td style="width: 60px; text-align: right; border: none; padding: 0;">เป็นเงิน</td>
-                                <td style="width: 110px; border-bottom: 1px solid #000; text-align: right; padding: 0 5px;">${singleTotal}</td>
+                                <td style="width: 110px; border-bottom: 1px solid #000; text-align: right; padding: 0 5px;">${row1Total}</td>
                                 <td style="width: 40px; text-align: right; border: none; padding: 0;">บาท</td>
                             </tr>
                             <tr>
                                 <td style="border: none; padding: 0;"></td>
-                                <td style="border: none; padding: 0; padding-left: 95px;">คู่ <span class="solid-line" style="width: 60px;">${doubleRate}</span> บาท X <span class="solid-line" style="width: 40px;">${doubleNights}</span> คืน</td>
+                                <td style="border: none; padding: 0; padding-left: 95px;">${row2Label} <span class="solid-line" style="width: 60px;">${row2Rate}</span> บาท X <span class="solid-line" style="width: 40px;">${row2Nights}</span> คืน</td>
                                 <td style="text-align: right; border: none; padding: 0;">เป็นเงิน</td>
-                                <td style="border-bottom: 1px solid #000; text-align: right; padding: 0 5px;">${doubleTotal}</td>
+                                <td style="border-bottom: 1px solid #000; text-align: right; padding: 0 5px;">${row2Total}</td>
                                 <td style="text-align: right; border: none; padding: 0;">บาท</td>
                             </tr>`;
                             })()}
