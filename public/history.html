@@ -710,23 +710,63 @@
                             <tr>
                                 <td style="border: none; padding: 0;"></td>
                                 <td colspan="4" style="border: none; padding: 0;">
-                                    1.2 &nbsp;&nbsp; ชื่อโรงแรม <span class="solid-line" style="width: 250px;">${c.hotel.name || ''}</span>
+                                    1.2 &nbsp;&nbsp; ชื่อโรงแรม <span class="solid-line" style="width: 250px;">${
+                                        c.hotelName || (c.hotel && c.hotel.name) || ''
+                                    }</span>
                                 </td>
                             </tr>
+                            ${(() => {
+                                // Support both old and new format for hotel entries
+                                let singleRate = '', singleNights = '', singleTotal = '';
+                                let doubleRate = '', doubleNights = '', doubleTotal = '';
+
+                                if (c.hotel && c.hotel.type) {
+                                    // Old format
+                                    if (c.hotel.type === 'พักเดี่ยว') {
+                                        singleRate = c.hotel.rate || '';
+                                        singleNights = c.hotel.nights || '';
+                                        singleTotal = hotelTotal > 0 ? formatNumber(hotelTotal) : '';
+                                    } else if (c.hotel.type === 'พักคู่') {
+                                        doubleRate = c.hotel.rate || '';
+                                        doubleNights = c.hotel.nights || '';
+                                        doubleTotal = hotelTotal > 0 ? formatNumber(hotelTotal) : '';
+                                    }
+                                } else if (c.accommodationEntries && c.accommodationEntries.length > 0) {
+                                    // New format: find first entry of each type
+                                    const singleEntry = c.accommodationEntries.find(e => e.type === 'พักเดี่ยว');
+                                    const doubleEntry = c.accommodationEntries.find(e => e.type === 'พักคู่');
+
+                                    if (singleEntry) {
+                                        singleRate = singleEntry.rate || '';
+                                        singleNights = singleEntry.nights || '';
+                                        const total = (parseFloat(singleEntry.rate||0) * parseFloat(singleEntry.nights||0));
+                                        singleTotal = total > 0 ? formatNumber(total) : '';
+                                    }
+
+                                    if (doubleEntry) {
+                                        doubleRate = doubleEntry.rate || '';
+                                        doubleNights = doubleEntry.nights || '';
+                                        const total = (parseFloat(doubleEntry.rate||0) * parseFloat(doubleEntry.nights||0));
+                                        doubleTotal = total > 0 ? formatNumber(total) : '';
+                                    }
+                                }
+
+                                return `
                             <tr>
                                 <td style="border: none; padding: 0;"></td>
-                                <td style="border: none; padding: 0; padding-left: 25px;">อัตราที่พัก เดี่ยว <span class="solid-line" style="width: 60px;">${c.hotel.type === 'พักเดี่ยว' ? c.hotel.rate : ''}</span> บาท X <span class="solid-line" style="width: 40px;">${c.hotel.type === 'พักเดี่ยว' ? c.hotel.nights : ''}</span> คืน</td>
+                                <td style="border: none; padding: 0; padding-left: 25px;">อัตราที่พัก เดี่ยว <span class="solid-line" style="width: 60px;">${singleRate}</span> บาท X <span class="solid-line" style="width: 40px;">${singleNights}</span> คืน</td>
                                 <td style="width: 60px; text-align: right; border: none; padding: 0;">เป็นเงิน</td>
-                                <td style="width: 110px; border-bottom: 1px solid #000; text-align: right; padding: 0 5px;">${c.hotel.type === 'พักเดี่ยว' && hotelTotal > 0 ? formatNumber(hotelTotal) : ''}</td>
+                                <td style="width: 110px; border-bottom: 1px solid #000; text-align: right; padding: 0 5px;">${singleTotal}</td>
                                 <td style="width: 40px; text-align: right; border: none; padding: 0;">บาท</td>
                             </tr>
                             <tr>
                                 <td style="border: none; padding: 0;"></td>
-                                <td style="border: none; padding: 0; padding-left: 95px;">คู่ <span class="solid-line" style="width: 60px;">${c.hotel.type === 'พักคู่' ? c.hotel.rate : ''}</span> บาท X <span class="solid-line" style="width: 40px;">${c.hotel.type === 'พักคู่' ? c.hotel.nights : ''}</span> คืน</td>
+                                <td style="border: none; padding: 0; padding-left: 95px;">คู่ <span class="solid-line" style="width: 60px;">${doubleRate}</span> บาท X <span class="solid-line" style="width: 40px;">${doubleNights}</span> คืน</td>
                                 <td style="text-align: right; border: none; padding: 0;">เป็นเงิน</td>
-                                <td style="border-bottom: 1px solid #000; text-align: right; padding: 0 5px;">${c.hotel.type === 'พักคู่' && hotelTotal > 0 ? formatNumber(hotelTotal) : ''}</td>
+                                <td style="border-bottom: 1px solid #000; text-align: right; padding: 0 5px;">${doubleTotal}</td>
                                 <td style="text-align: right; border: none; padding: 0;">บาท</td>
-                            </tr>
+                            </tr>`;
+                            })()}
                             <tr>
                                 <td style="border: none; padding: 0;"></td>
                                 <td style="border: none; padding: 0; padding-left: 25px;">(ใบสำคัญที่ <span class="solid-line" style="width: 150px;"></span>)</td>
