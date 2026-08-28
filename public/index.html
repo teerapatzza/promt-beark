@@ -86,6 +86,49 @@
         }
         .scene svg { width: 100%; height: 100%; display: block; }
         @media (max-width: 720px) { .scene { opacity: .3; bottom: 84px; } }
+        /* ── รูปพื้นหลัง ─────────────────────────────────────
+           เบลอแรงและหรี่ลง ทำหน้าที่เป็นบรรยากาศ ไม่ใช่ภาพเด่น
+           ขยับสวนทางเมาส์เล็กน้อย ให้รู้สึกมีระยะลึก
+           ถ้าไม่มีไฟล์รูป ชั้นนี้จะไม่ถูกเปิด แล้วใช้ฉากลายเส้นแทน */
+        .photo {
+            position: fixed; inset: -40px;      /* เผื่อขอบ กันขอบขาวตอนเบลอและขยับ */
+            z-index: 0; pointer-events: none;
+            background-image: var(--hero, none);
+            background-size: cover;
+            background-position: center 38%;
+            filter: blur(18px) saturate(.82);
+            opacity: 0;
+            transform: scale(1.08);
+            transition: opacity .8s ease;
+            will-change: transform;
+        }
+        body.has-photo .photo { opacity: .5; }
+        /* มีรูปแล้วลดฉากลายเส้นลง ไม่ให้ตีกันสองชั้น */
+        body.has-photo .scene { opacity: .14; }
+
+        /* ม่านไล่สี: กันตัวหนังสือกลืนกับรูป และคุมโทนให้เข้ากับสีสถาบัน */
+        .scrim {
+            position: fixed; inset: 0; z-index: 0; pointer-events: none;
+            opacity: 0; transition: opacity .8s ease;
+            background:
+                linear-gradient(180deg, rgba(244,247,251,.94) 0%,
+                                        rgba(244,247,251,.80) 34%,
+                                        rgba(238,242,247,.72) 62%,
+                                        rgba(238,242,247,.88) 100%),
+                linear-gradient(100deg, rgba(22,22,127,.10), transparent 58%);
+        }
+        body.has-photo .scrim { opacity: 1; }
+
+        /* บนรูป ตัวหนังสือต้องเข้มขึ้นและมีเงาบางๆ ถึงจะอ่านสบาย */
+        body.has-photo .welcome-card h2 { text-shadow: 0 1px 0 rgba(255,255,255,.85); }
+        body.has-photo .welcome-card p,
+        body.has-photo .eyebrow { color: #44546b; }
+        body.has-photo .menu-card { background: rgba(255,255,255,.93); backdrop-filter: blur(6px); }
+        body.has-photo .footer { background: rgba(240,244,249,.9); }
+
+        /* ชื่อผู้ใช้ในคำทักทาย — เว้นวรรคและแยกน้ำหนักให้อ่านเป็นชื่อ */
+        #welcomeName { white-space: nowrap; }
+        #welcomeName .who { color: var(--brand); }
         .page { position: relative; z-index: 1; display: flex; flex-direction: column; flex: 1; }
 
         /* ── หัวเว็บ ── */
@@ -256,6 +299,8 @@
     </style>
 </head>
 <body>
+    <div class="photo" aria-hidden="true"></div>
+    <div class="scrim" aria-hidden="true"></div>
     <canvas id="bgfx" aria-hidden="true"></canvas>
     <div class="glow" aria-hidden="true"></div>
 
@@ -509,6 +554,14 @@
             // ตอบสนองเมาส์ยังทำงานแม้ตั้งค่าลดการเคลื่อนไหว
             // เพราะเป็นการตอบสนองการกระทำของผู้ใช้ ไม่ใช่ภาพไหวเอง
             if (reduce) paintOnce();
+
+            // รูปพื้นหลังเลื่อนสวนทางนิดเดียว (สูงสุด ~14px) เกินกว่านี้จะเวียนหัว
+            if (photo && !reduce) {
+                var px = (mx / window.innerWidth  - 0.5) * -22;
+                var py = (my / window.innerHeight - 0.5) * -14;
+                photo.style.transform =
+                    'scale(1.08) translate3d(' + px.toFixed(1) + 'px,' + py.toFixed(1) + 'px,0)';
+            }
         }, { passive: true });
 
         window.addEventListener('pointerleave', function () {
@@ -527,6 +580,21 @@
         document.addEventListener('visibilitychange', function () {
             if (document.hidden) stop(); else start();
         });
+
+        /* ── รูปพื้นหลัง ──
+           เปิดใช้เฉพาะเมื่อโหลดไฟล์ได้จริง ถ้าไม่มีไฟล์ก็ใช้ฉากลายเส้นต่อไป
+           หน้าเว็บจึงไม่พังไม่ว่าจะมีรูปหรือไม่ */
+        var photo = document.querySelector('.photo');
+        var HERO = 'hero-bg.jpg';
+        (function () {
+            var probe = new Image();
+            probe.onload = function () {
+                if (photo) photo.style.setProperty('--hero', 'url("' + HERO + '")');
+                document.body.classList.add('has-photo');
+            };
+            probe.onerror = function () { /* ไม่มีรูป ใช้ฉากลายเส้นตามเดิม */ };
+            probe.src = HERO;
+        })();
 
         build();
         paintOnce();
@@ -568,7 +636,10 @@
                     const nick = String(user.email || '').split('@')[0]
                         .replace(/[._-]+/g, ' ').trim();
                     const el = document.getElementById('welcomeName');
-                    if (el && nick) el.textContent = ' คุณ' + nick;
+                    // เว้นวรรคทั้งหน้าและหลังคำว่า "คุณ" ไม่งั้นชื่อจะติดกันอ่านยาก
+                    if (el && nick) el.innerHTML =
+                        ' คุณ <span class="who"></span>';
+                    if (el && nick) el.querySelector('.who').textContent = nick;
                     const sub = document.getElementById('welcomeSub');
                     if (sub) sub.textContent = user.role === 'admin'
                         ? 'คุณเข้าใช้งานในสิทธิ์ผู้ดูแลระบบ — เลือกเมนูด้านล่างเพื่อเริ่มใช้งาน'
