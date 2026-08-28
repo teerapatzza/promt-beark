@@ -19,6 +19,27 @@
 
   var orig = window.fetch.bind(window);
 
+  /* ── ฐาน path ของแอป ──────────────────────────────────────
+     UAT เสิร์ฟที่ราก (localhost:8081/) แต่ production อยู่ใต้ /prompt/
+     โค้ดเรียก fetch('/stats') ซึ่งบน production จะกลายเป็น
+     https://209.15.119.96/stats -> หลุดออกนอกแอปเราไปโดนของทีมอื่น -> 404
+     (ยืนยันแล้ว: /prompt/stats = 401 ถึงเรา แต่ /stats = 404 ไม่ถึง)
+     จึงเติมฐาน path ให้อัตโนมัติ แก้ที่เดียวได้ทุกหน้า
+     และไม่ต้องไปแตะ nginx ของเครื่องซึ่งใช้ร่วมกับทีมอื่น */
+  var BASE = (function () {
+    var m = /^(\/[^\/]+)\//.exec(location.pathname || '/');
+    // นับเป็นฐานเฉพาะเมื่อหน้าเว็บถูกเสิร์ฟใต้โฟลเดอร์นั้นจริง
+    return (m && m[1] !== '/data') ? m[1] : '';
+  })();
+  window.__apiBase = BASE;
+
+  function withBase(url) {
+    if (!BASE) return url;
+    if (url.charAt(0) !== '/') return url;                     // path สัมพัทธ์ ไม่ต้องแตะ
+    if (url === BASE || url.indexOf(BASE + '/') === 0) return url;  // เติมไปแล้ว
+    return BASE + url;
+  }
+
   function isOwnApi(url) {
     if (!url) return false;
     if (url.indexOf('//') === 0) return false;                 // //cdn...
@@ -33,6 +54,7 @@
 
     if (!isOwnApi(url)) return orig(input, init);
 
+    var target = withBase(url);
     init = init ? Object.assign({}, init) : {};
 
     var headers = new Headers(
@@ -51,7 +73,7 @@
     // ส่ง cookie ไปด้วย เผื่อ backend รุ่นเก่าที่ยังอ่านแต่ cookie
     if (!init.credentials) init.credentials = 'same-origin';
 
-    return orig(typeof input === 'string' ? input : input.url, init)
+    return orig(target, init)
       .then(function (res) {
         // เซสชันหมดอายุ: ต้องบอกผู้ใช้ ห้ามเด้งเงียบๆ กลับหน้าแรก
         if (res.status === 401 && url.indexOf('/auth/login') < 0 && url.indexOf('/auth/register') < 0) {

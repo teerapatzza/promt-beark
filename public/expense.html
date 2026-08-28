@@ -2613,7 +2613,9 @@
                 return;
             }
             if (res.status === 401) {
-                window.location.replace('/login.html');
+                // path สัมพัทธ์ — production เสิร์ฟใต้ /prompt/ ถ้าใช้ '/login.html'
+                // จะเด้งออกไปนอกแอปเราแล้วเจอหน้าของทีมอื่น
+                window.location.replace('login.html');
                 return;
             }
             const errData = await res.json().catch(() => ({}));
