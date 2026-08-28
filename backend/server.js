@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 const cookieParser = require('cookie-parser');
 const path = require('path');
+const fs = require('fs');
 const { validateExpense } = require('./validation');
 
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'data', 'prompt-berk.db');
@@ -57,6 +58,33 @@ db.exec(`
     created_at    TEXT DEFAULT (datetime('now')),
     updated_at    TEXT DEFAULT (datetime('now'))
   );
+
+  -- แคชผลค้นหาพิกัด: ตำบล/อำเภอ/จังหวัด ไม่ย้ายที่ ถามครั้งเดียวใช้ได้ตลอด
+  -- ช่วยไม่ให้ยิงถาม OSM/Longdo ซ้ำ ซึ่งเป็นบริการฟรีที่มีขีดจำกัด
+  CREATE TABLE IF NOT EXISTS geocode_cache (
+    q          TEXT PRIMARY KEY,
+    result     TEXT NOT NULL,
+    provider   TEXT,
+    hits       INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+
+  -- สมุดสถานที่ขององค์กร: จำทุกที่ที่มีคนเลือกใช้จริง
+  -- ผู้ให้บริการภายนอกจับคู่แบบตรงตัว พิมพ์ผิดนิดเดียวก็ไม่เจอ
+  -- ตารางนี้ใช้เทียบความคล้ายในเครื่อง เพื่อเสนอ "คุณหมายถึง...?" ได้แม้พิมพ์ผิด
+  -- และยิ่งใช้บ่อยยิ่งแม่น เพราะผู้ประสานงานมักไปที่เดิมซ้ำๆ
+  CREATE TABLE IF NOT EXISTS places (
+    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    name     TEXT NOT NULL,
+    norm     TEXT NOT NULL,
+    address  TEXT,
+    lat      REAL NOT NULL,
+    lng      REAL NOT NULL,
+    source   TEXT,
+    uses     INTEGER DEFAULT 1,
+    last_at  TEXT DEFAULT (datetime('now'))
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_places_norm ON places(norm);
 `);
 
 // Add columns to existing tables if they don't exist yet (idempotent)
@@ -86,6 +114,21 @@ const DEFAULT_SETTINGS = {
     'เจ้าหน้าที่',
     'ผู้อำนวยการ',
     'รองผู้อำนวยการ'
+  ],
+  affiliationList: [    // รายการสังกัด/กลุ่มงาน (สำหรับ dropdown)
+    'กลุ่มงานบริหารทั่วไป',
+    'กลุ่มงานการพยาบาล',
+    'กลุ่มงานเภสัชกรรม',
+    'กลุ่มงานทันตกรรม',
+    'กลุ่มงานเวชกรรม',
+    'กลุ่มงานเทคนิคการแพทย์',
+    'กลุ่มงานรังสีวิทยา',
+    'กลุ่มงานโภชนศาสตร์',
+    'กลุ่มงานสาธารณสุข',
+    'กลุ่มงานการเงินและบัญชี',
+    'กลุ่มงานพัฒนาคุณภาพ',
+    'กลุ่มงานทรัพยากรบุคคล',
+    'งานอื่นๆ'
   ]
 };
 
@@ -119,8 +162,13 @@ function getSessionUser(token) {
   return row || null;
 }
 
+function readToken(req) {
+  const bearer = /^Bearer\s+(.+)$/i.exec(req.headers.authorization || '');
+  return req.cookies?.session || (bearer ? bearer[1].trim() : null);
+}
+
 function requireAuth(req, res, next) {
-  const user = getSessionUser(req.cookies?.session);
+  const user = getSessionUser(readToken(req));
   if (!user) return res.status(401).json({ error: 'Unauthorized' });
   req.user = user;
   next();
@@ -158,7 +206,7 @@ app.post('/auth/register', (req, res) => {
 
   const token = createSession(result.lastInsertRowid);
   res.cookie('session', token, { httpOnly: true, sameSite: 'lax', maxAge: SESSION_TTL_HOURS * 3600 * 1000 });
-  res.status(201).json({ id: result.lastInsertRowid, email: email.toLowerCase(), role });
+  res.status(201).json({ id: result.lastInsertRowid, email: email.toLowerCase(), role, token: token });
 });
 
 app.post('/auth/login', (req, res) => {
@@ -171,11 +219,11 @@ app.post('/auth/login', (req, res) => {
 
   const token = createSession(user.id);
   res.cookie('session', token, { httpOnly: true, sameSite: 'lax', maxAge: SESSION_TTL_HOURS * 3600 * 1000 });
-  res.json({ id: user.id, email: user.email, role: user.role });
+  res.json({ id: user.id, email: user.email, role: user.role, token: token });
 });
 
 app.post('/auth/logout', (req, res) => {
-  const token = req.cookies?.session;
+  const token = readToken(req);
   if (token) db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
   res.clearCookie('session');
   res.json({ ok: true });
@@ -198,7 +246,7 @@ app.put('/auth/change-password', requireAuth, (req, res) => {
   db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, req.user.id);
 
   // Invalidate all other sessions
-  db.prepare('DELETE FROM sessions WHERE user_id = ? AND token != ?').run(req.user.id, req.cookies.session);
+  db.prepare('DELETE FROM sessions WHERE user_id = ? AND token IS NOT ?').run(req.user.id, readToken(req));
   res.json({ ok: true });
 });
 
@@ -401,6 +449,38 @@ app.put('/settings', requireAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
+/**
+ * เติมรายการใหม่เข้า "ตำแหน่ง" หรือ "สังกัด" — ผู้ใช้ทั่วไปทำได้
+ *
+ * เหตุผล: ไม่มีใครรู้ทุกตำแหน่งตั้งแต่วันแรก ถ้าล็อกให้เลือกจาก dropdown อย่างเดียว
+ * คนที่ตำแหน่งยังไม่มีในรายการจะทำงานไม่ได้ จึงให้พิมพ์เองได้ก่อน แล้วระบบเก็บสะสมไว้
+ * เมื่อรายการครบพอแล้ว admin ค่อยพิจารณาล็อกเป็น dropdown อย่างเดียว
+ *
+ * ขอบเขตแคบไว้เพื่อความปลอดภัย: เพิ่มได้เฉพาะ 2 รายการนี้ แก้/ลบของเดิมไม่ได้
+ */
+const APPENDABLE_LISTS = ['positionList', 'affiliationList'];
+
+app.post('/settings/list-append', requireAuth, (req, res) => {
+  const { key, value } = req.body || {};
+  if (APPENDABLE_LISTS.indexOf(key) < 0)
+    return res.status(400).json({ error: 'เพิ่มได้เฉพาะรายการตำแหน่งและสังกัดเท่านั้น' });
+
+  const v = String(value == null ? '' : value).trim().replace(/\s+/g, ' ');
+  if (!v)            return res.status(400).json({ error: 'ค่าว่าง' });
+  if (v.length > 120) return res.status(400).json({ error: 'ข้อความยาวเกินไป (เกิน 120 ตัวอักษร)' });
+
+  const cur = getSetting(key);
+  const list = Array.isArray(cur) ? cur.slice() : [];
+  // มีอยู่แล้วก็ถือว่าสำเร็จ ไม่ต้องเพิ่มซ้ำ
+  if (list.some(x => String(x).trim() === v))
+    return res.json({ ok: true, added: false, list });
+
+  list.push(v);
+  setSetting(key, list);
+  console.log('[list-append] ' + key + ' += "' + v + '" โดย ' + req.user.email);
+  res.json({ ok: true, added: true, list });
+});
+
 // ── Profiles ──────────────────────────────────────────────
 
 app.get('/profiles', requireAuth, (req, res) => {
@@ -448,13 +528,20 @@ app.put('/profiles/:id', requireAuth, (req, res) => {
   const exists = db.prepare('SELECT id, owner_user_id, is_global FROM profiles WHERE id = ?').get(id);
   if (!exists) return res.status(404).json({ error: 'Profile not found' });
 
-  // Global profiles (is_global = 1) can only be edited by admin
-  if (exists.is_global === 1 && req.user.role !== 'admin')
-    return res.status(403).json({ error: 'Only admin can edit global profiles' });
-  if (exists.owner_user_id !== null && req.user.role !== 'admin' && exists.owner_user_id !== req.user.id)
-    return res.status(403).json({ error: 'Forbidden' });
+  // โปรไฟล์ส่วนกลาง: ผู้ใช้ทุกคนแก้ไขได้ (ผู้ประสานงานต้องดูแลทะเบียนนี้เป็นงานประจำ)
+  // แต่ "ลบ" ยังสงวนไว้ให้ admin เพราะย้อนกลับไม่ได้ — ดู DELETE ด้านล่าง
+  // โปรไฟล์ส่วนตัวของคนอื่น ยังแก้ไม่ได้เหมือนเดิม
+  if (exists.is_global !== 1 &&
+      exists.owner_user_id !== null &&
+      req.user.role !== 'admin' &&
+      exists.owner_user_id !== req.user.id)
+    return res.status(403).json({ error: 'แก้ไขได้เฉพาะโปรไฟล์ของตัวเอง' });
 
   const p = req.body;
+  // บันทึกว่าใครแก้ล่าสุด เพื่อให้ตรวจย้อนหลังได้ว่าใครเปลี่ยนอะไร
+  p.lastEditedBy = req.user.email;
+  p.lastEditedAt = new Date().toISOString();
+
   db.prepare("UPDATE profiles SET data = ?, updated_at = datetime('now') WHERE id = ?").run(JSON.stringify(p), id);
   p.id = id;
   p.ownerUserId = exists.owner_user_id;
@@ -483,32 +570,347 @@ app.delete('/profiles/:id', requireAuth, (req, res) => {
 
 const LONGDO_API_KEY = '5528d1b402a5fd11be6eec82fd167c4b';
 
+// ── แคชผลค้นหาพิกัด ────────────────────────────────────────
+// ตำบล/อำเภอ/จังหวัดไม่ย้ายที่ ถามครั้งเดียวเก็บไว้ใช้ตลอด
+// ลดการยิงถาม OSM (จำกัด 1 คำขอ/วินาที) และ Longdo (มีโควตา) ลงเกือบเป็นศูนย์
+const cacheGet = db.prepare(
+  "SELECT result, provider, (julianday('now') - julianday(created_at)) age FROM geocode_cache WHERE q = ?");
+const cacheHit = db.prepare('UPDATE geocode_cache SET hits = hits + 1 WHERE q = ?');
+const cachePut = db.prepare(
+  'INSERT OR REPLACE INTO geocode_cache (q, result, provider, hits) VALUES (?, ?, ?, 0)'
+);
+
+const cacheKey = s => s.trim().replace(/\s+/g, ' ').toLowerCase();
+
+// OSM ขอไม่ให้ยิงถี่กว่า 1 ครั้ง/วินาที — เข้าคิวให้ห่างกันอย่างน้อย 1.1 วินาที
+let osmLast = 0;
+async function osmThrottle() {
+  const wait = 1100 - (Date.now() - osmLast);
+  if (wait > 0) await new Promise(r => setTimeout(r, wait));
+  osmLast = Date.now();
+}
+
+/* ── แตกคำค้นเป็นหลายแบบ ───────────────────────────────────
+   ทั้ง Longdo และ OSM จับคู่แบบตรงตัว ไม่ได้ตัดคำภาษาไทยให้
+   วัดจริงแล้ว: "โรงแรมทีเค.พาเลซ" -> ไม่เจอทั้งสองเจ้า
+                "โรงแรม ทีเค.พาเลซ" -> OSM เจอ
+                "ทีเค พาเลซ"       -> Longdo เจอ
+   ข้อมูลมีอยู่ครบ แค่คำนำหน้าที่เขียนติดกันกับจุด . ทำให้จับคู่ไม่ติด
+   จึงสร้างคำค้นหลายแบบแล้วไล่ถามจนกว่าจะเจอ — ทดสอบแล้วกู้กลับได้ 5/5 เคส */
+
+const PLACE_PREFIX = [
+  'โรงพยาบาลส่งเสริมสุขภาพตำบล', 'โรงพยาบาลสมเด็จพระยุพราช', 'โรงพยาบาล',
+  'สำนักงานสาธารณสุขจังหวัด', 'สำนักงานสาธารณสุขอำเภอ', 'สำนักงาน',
+  'มหาวิทยาลัยราชภัฏ', 'มหาวิทยาลัย', 'วิทยาลัย', 'โรงเรียน', 'โรงแรม',
+  'สถาบัน', 'ศูนย์', 'ที่ว่าการอำเภอ', 'ที่ว่าการ', 'เทศบาลตำบล', 'เทศบาลเมือง',
+  'เทศบาลนคร', 'เทศบาล', 'องค์การบริหารส่วนตำบล', 'อาคาร', 'บริษัท', 'ห้างสรรพสินค้า', 'วัด'
+];
+
+const PLACE_ABBR = [
+  ['รพ.สต.', 'โรงพยาบาลส่งเสริมสุขภาพตำบล'], ['รพ.', 'โรงพยาบาล'],
+  ['สสจ.', 'สำนักงานสาธารณสุขจังหวัด'],      ['สสอ.', 'สำนักงานสาธารณสุขอำเภอ'],
+  ['ม.', 'มหาวิทยาลัย'],  ['รร.', 'โรงเรียน'],
+  ['สนง.', 'สำนักงาน'],   ['อบต.', 'องค์การบริหารส่วนตำบล'], ['ทต.', 'เทศบาลตำบล']
+];
+
+function expandQuery(q) {
+  const out = [], seen = new Set();
+  const add = s => {
+    s = String(s || '').replace(/\s+/g, ' ').trim();
+    if (s.length >= 2 && !seen.has(s.toLowerCase())) { seen.add(s.toLowerCase()); out.push(s); }
+  };
+  add(q);
+
+  // ขยายตัวย่อที่ขึ้นต้น เช่น รพ.ศิริราช -> โรงพยาบาล ศิริราช
+  let base = q;
+  for (const [ab, full] of PLACE_ABBR) {
+    if (q.startsWith(ab)) { base = full + ' ' + q.slice(ab.length); add(base); break; }
+  }
+
+  add(base.replace(/\./g, ' '));   // จุด -> เว้นวรรค  (ท่าที่ Longdo ชอบ)
+  add(base.replace(/\./g, ''));    // ตัดจุดทิ้ง
+
+  // แยกคำนำหน้าที่เขียนติดกันออก  "โรงแรมทีเค" -> "โรงแรม ทีเค" และ "ทีเค"
+  for (const p of PLACE_PREFIX) {
+    if (base.startsWith(p) && base.length > p.length) {
+      const rest = base.slice(p.length).trim();
+      if (rest.length >= 2) {
+        add(p + ' ' + rest);
+        add(p + ' ' + rest.replace(/\./g, ' '));
+        add(rest);
+        add(rest.replace(/\./g, ' '));
+      }
+      break;
+    }
+  }
+  return out.slice(0, 8);
+}
+
+/* ── เทียบความคล้ายของข้อความ (สำหรับกรณีพิมพ์ผิด) ────────── */
+// ตัดเว้นวรรค จุด และวรรณยุกต์ออกก่อนเทียบ
+// "โรงเรม" กับ "โรงแรม" จะต่างกันแค่ 1 ตัวอักษร จับได้
+const normPlace = s => String(s || '')
+  .toLowerCase()
+  .replace(/[่-๎]/g, '')     // ่ ้ ๊ ๋ ็ ์ ฯลฯ
+  .replace(/[\s.,\-()"'’]/g, '');
+
+function editDistance(a, b, cap) {
+  if (Math.abs(a.length - b.length) > cap) return cap + 1;
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    let best = i;
+    for (let j = 1; j <= b.length; j++) {
+      cur[j] = a[i - 1] === b[j - 1]
+        ? prev[j - 1]
+        : 1 + Math.min(prev[j - 1], prev[j], cur[j - 1]);
+      if (cur[j] < best) best = cur[j];
+    }
+    if (best > cap) return cap + 1;   // ตัดออกเร็ว ไม่ต้องคำนวณต่อ
+    prev = cur;
+  }
+  return prev[b.length];
+}
+
+const placeAll    = db.prepare('SELECT name, address, lat, lng, uses FROM places');
+const placeUpsert = db.prepare(`
+  INSERT INTO places (name, norm, address, lat, lng, source)
+  VALUES (@name, @norm, @address, @lat, @lng, @source)
+  ON CONFLICT(norm) DO UPDATE SET uses = uses + 1, last_at = datetime('now')`);
+
+// เริ่มต้นสมุดสถานที่จากผลค้นหาที่เคยสำเร็จมาแล้ว จะได้ไม่ว่างเปล่าตั้งแต่วันแรก
+try {
+  if (db.prepare('SELECT COUNT(*) n FROM places').get().n === 0) {
+    let n = 0;
+    const seed = db.transaction(rows => {
+      for (const r of rows) {
+        let d; try { d = JSON.parse(r.result).data; } catch (_) { continue; }
+        if (!Array.isArray(d)) continue;
+        for (const x of d.slice(0, 2)) {
+          const la = parseFloat(x.lat), lo = parseFloat(x.lon);
+          const norm = normPlace(x.name);
+          if (!isFinite(la) || !isFinite(lo) || norm.length < 2) continue;
+          placeUpsert.run({
+            name: String(x.name).slice(0, 200), norm,
+            address: String(x.address || '').slice(0, 300),
+            lat: la, lng: lo, source: 'seed'
+          });
+          n++;
+        }
+      }
+    });
+    seed(db.prepare("SELECT result FROM geocode_cache WHERE provider NOT IN ('none','suggest')").all());
+    if (n) console.log(`[places] เริ่มต้นสมุดสถานที่จากแคชเดิม ${n} รายการ`);
+  }
+} catch (e) { console.error('[places] seed failed:', e.message); }
+
+/** หาสถานที่ในสมุดขององค์กรที่ชื่อใกล้เคียงกับที่พิมพ์มา */
+function similarPlaces(q, limit) {
+  const nq = normPlace(q);
+  if (nq.length < 3) return [];
+  // ยอมให้ผิดได้ราว 1 ใน 4 ของความยาว อย่างน้อย 1 อย่างมาก 4
+  const cap = Math.max(1, Math.min(4, Math.floor(nq.length / 4)));
+  const scored = [];
+  for (const p of placeAll.all()) {
+    const np = normPlace(p.name);
+    let d;
+    if (np.indexOf(nq) >= 0) d = 0;                       // เป็นส่วนหนึ่งของชื่อ = ตรงเป๊ะ
+    else {
+      d = editDistance(nq, np, cap);
+      // เทียบกับช่วงต้นของชื่อด้วย เผื่อพิมพ์มาแค่บางส่วน
+      if (d > cap && np.length > nq.length)
+        d = editDistance(nq, np.slice(0, nq.length), cap);
+    }
+    if (d <= cap) scored.push({ d, uses: p.uses, p });
+  }
+  scored.sort((a, b) => a.d - b.d || b.uses - a.uses);
+  return scored.slice(0, limit || 5).map(s => ({
+    name: s.p.name, address: s.p.address || '', lat: s.p.lat, lon: s.p.lng,
+    source: 'saved', uses: s.p.uses
+  }));
+}
+
+async function askLongdo(q) {
+  const url = `https://search.longdo.com/mapsearch/json/search?keyword=${encodeURIComponent(q)}&limit=6&key=${LONGDO_API_KEY}`;
+  const d = await (await fetch(url)).json();
+  return (d.data || [])
+    .filter(x => x.lat && x.lon && !/^tag:/i.test(x.name || ''))
+    .map(x => ({ name: x.name, address: x.address || '', lat: x.lat, lon: x.lon, source: 'longdo' }));
+}
+
+async function askOsm(q) {
+  await osmThrottle();
+  const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=6&countrycodes=th&accept-language=th`;
+  const d = await (await fetch(url, { headers: { 'User-Agent': 'promt-beark-app/1.0' } })).json();
+  return (d || []).map(x => ({
+    name: x.display_name.split(',')[0].trim(), address: x.display_name,
+    lat: x.lat, lon: x.lon, source: 'osm'
+  }));
+}
+
+/** รวมผลจากหลายแหล่ง ตัดตัวซ้ำ (ชื่อคล้ายกัน + พิกัดใกล้กันมาก) */
+function mergeHits(lists, limit) {
+  const out = [], seen = [];
+  for (const it of [].concat(...lists)) {
+    if (!it.lat || !it.lon) continue;
+    const la = parseFloat(it.lat), lo = parseFloat(it.lon);
+    if (!isFinite(la) || !isFinite(lo)) continue;
+    const nn = normPlace(it.name);
+    const dup = seen.some(s =>
+      Math.abs(s.la - la) < 0.002 && Math.abs(s.lo - lo) < 0.002 &&
+      (s.nn === nn || s.nn.indexOf(nn) === 0 || nn.indexOf(s.nn) === 0));
+    if (dup) continue;
+    seen.push({ la, lo, nn });
+    out.push(it);
+    if (out.length >= (limit || 8)) break;
+  }
+  return out;
+}
+
 app.get('/map-search', requireAuth, async (req, res) => {
   const q = (req.query.q || '').trim();
   if (!q) return res.status(400).json({ error: 'q is required' });
-  try {
-    const longdoUrl = `https://search.longdo.com/mapsearch/json/search?keyword=${encodeURIComponent(q)}&limit=6&key=${LONGDO_API_KEY}`;
-    const r = await fetch(longdoUrl);
-    const data = await r.json();
-    if (data.data && data.data.length > 0) return res.json(data);
 
-    const nomUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=6&countrycodes=th&accept-language=th`;
-    const nr = await fetch(nomUrl, { headers: { 'User-Agent': 'promt-beark-app/1.0' } });
-    const ndata = await nr.json();
-    if (ndata && ndata.length > 0) {
-      return res.json({
-        data: ndata.map(item => ({
-          name: item.display_name.split(',')[0].trim(),
-          address: item.display_name,
-          lat: item.lat,
-          lon: item.lon
-        }))
-      });
-    }
-    return res.json({ data: [] });
-  } catch (e) {
-    res.status(502).json({ error: 'upstream error' });
+  const key = cacheKey(q);
+  const cached = cacheGet.get(key);
+  // ผลว่างเก็บไว้ได้ไม่เกิน 1 วัน — สถานที่ใหม่ถูกเพิ่มลงแผนที่ตลอด
+  // ถ้าจำ "ไม่เจอ" ไว้ตลอดกาล ที่ที่เพิ่งถูกเพิ่มจะไม่มีวันค้นเจอเลย
+  const stale = cached && cached.provider === 'none' && cached.age > 1;
+  if (cached && !stale) {
+    cacheHit.run(key);
+    res.set('X-Geocode-Cache', 'hit');
+    const c = JSON.parse(cached.result);
+    // ผลว่างที่เคยแคชไว้ ยังต้องลองเทียบกับสมุดสถานที่ เพราะสมุดโตขึ้นทุกวัน
+    if (!(c.data || []).length) c.didYouMean = similarPlaces(q, 5);
+    return res.json(c);
   }
+
+  try {
+    // สมุดสถานที่ขององค์กรมาก่อน — ที่ที่เคยใช้จริงย่อมตรงใจกว่าผลจากภายนอก
+    const saved = similarPlaces(q, 3).filter(p => normPlace(p.name).indexOf(normPlace(q)) >= 0);
+
+    let hits = [], usedQuery = q;
+    for (const v of expandQuery(q)) {
+      const [lo, os] = await Promise.all([
+        askLongdo(v).catch(() => []),
+        askOsm(v).catch(() => [])
+      ]);
+      const m = mergeHits([lo, os], 8);
+      if (m.length) { hits = m; usedQuery = v; break; }
+    }
+
+    const merged = mergeHits([saved, hits], 8);
+    const out = { data: merged };
+    // บอกผู้ใช้ด้วยว่าระบบไปค้นด้วยคำอะไรจริงๆ จะได้ไม่งงว่าทำไมผลไม่ตรงกับที่พิมพ์
+    if (merged.length && usedQuery !== q) out.usedQuery = usedQuery;
+    if (!merged.length) out.didYouMean = similarPlaces(q, 5);
+
+    cachePut.run(key, JSON.stringify({ data: merged, usedQuery: out.usedQuery }),
+      merged.length ? 'expanded' : 'none');
+    res.set('X-Geocode-Cache', 'miss');
+    return res.json(out);
+  } catch (e) {
+    res.status(502).json({ error: 'ค้นหาไม่สำเร็จ ระบบแผนที่ภายนอกไม่ตอบสนอง ลองใหม่อีกครั้ง' });
+  }
+});
+
+/* ── คำแนะนำระหว่างพิมพ์ ────────────────────────────────────
+   Longdo มี endpoint suggest ที่เติมชื่อเต็มให้จากคำที่พิมพ์ไม่จบ
+   วัดแล้ว: "โรงพยาบาลศิร" -> 8 ชื่อ มีโรงพยาบาลศิริราชอยู่ด้วย
+   ผสมกับสมุดสถานที่ขององค์กร ซึ่งทนคำพิมพ์ผิดได้ */
+app.get('/map-suggest', requireAuth, async (req, res) => {
+  const q = (req.query.q || '').trim();
+  if (q.length < 2) return res.json({ data: [] });
+
+  const key = 'sg:' + cacheKey(q);
+  const cached = cacheGet.get(key);
+  let remote;
+  // คำแนะนำที่ว่างเปล่าก็เก็บไว้ไม่เกิน 1 วันเช่นกัน ด้วยเหตุผลเดียวกัน
+  if (cached && !(cached.age > 1 && !JSON.parse(cached.result).length)) {
+    cacheHit.run(key); remote = JSON.parse(cached.result);
+  }
+  else {
+    remote = [];
+    // ถามไม่เกิน 3 แบบ เพราะ suggest ต้องตอบไว ผู้ใช้กำลังพิมพ์อยู่
+    for (const v of expandQuery(q).slice(0, 3)) {
+      try {
+        const url = `https://search.longdo.com/mapsearch/json/suggest?keyword=${encodeURIComponent(v)}&limit=8&key=${LONGDO_API_KEY}`;
+        const d = await (await fetch(url)).json();
+        (d.data || []).forEach(x => {
+          const w = String((x && x.w) || '').replace(/^tag:\s*/i, '').trim();
+          if (w) remote.push(w);
+        });
+      } catch (_) { /* ผู้ให้บริการล่ม ยังมีสมุดสถานที่ในเครื่องให้ใช้ */ }
+      if (remote.length >= 8) break;
+    }
+    cachePut.run(key, JSON.stringify(remote), 'suggest');
+  }
+
+  // สถานที่ที่องค์กรเคยใช้ ขึ้นก่อนเสมอ — ทนคำพิมพ์ผิด และตรงกับงานจริงมากกว่า
+  const out = [], seen = new Set();
+  const push = (text, kind, extra) => {
+    const n = normPlace(text);
+    if (!text || seen.has(n)) return;
+    seen.add(n);
+    out.push(Object.assign({ text, kind }, extra || {}));
+  };
+  similarPlaces(q, 4).forEach(p => push(p.name, 'saved', { address: p.address, uses: p.uses }));
+  remote.forEach(w => push(w, 'remote'));
+
+  res.json({ data: out.slice(0, 8) });
+});
+
+/* ── จัดการสมุดสถานที่ (แอดมินเท่านั้น) ────────────────────
+   สมุดโตเองอัตโนมัติจากการใช้งาน จึงมีโอกาสมีขยะปนเข้ามา
+   เช่นตอนเริ่มต้นระบบดึงจากแคชเดิม ซึ่งมีทั้งชื่อสถานที่และชื่อถนน/ซอย
+   ที่มาจากการค้นหาที่อยู่บ้านปนกัน แอดมินต้องกวาดออกได้ */
+app.get('/places', requireAdmin, (req, res) => {
+  const q = String(req.query.q || '').trim().toLowerCase();
+  let rows = db.prepare(`
+    SELECT id, name, address, lat, lng, source, uses, last_at
+    FROM places ORDER BY uses DESC, name COLLATE NOCASE`).all();
+  if (q) rows = rows.filter(r =>
+    (r.name + ' ' + (r.address || '')).toLowerCase().indexOf(q) >= 0);
+  res.json({
+    items: rows.slice(0, 500),
+    total: rows.length,
+    bySource: db.prepare('SELECT source, COUNT(*) n FROM places GROUP BY source').all()
+  });
+});
+
+app.delete('/places/:id', requireAdmin, (req, res) => {
+  const r = db.prepare('DELETE FROM places WHERE id = ?').run(parseInt(req.params.id, 10));
+  if (!r.changes) return res.status(404).json({ error: 'ไม่พบสถานที่นี้ อาจถูกลบไปแล้ว' });
+  res.json({ ok: true });
+});
+
+/** จำสถานที่ที่ผู้ใช้เลือกจริง เพื่อให้ครั้งต่อไปค้นเจอแม้พิมพ์ผิด */
+app.post('/map-pick', requireAuth, (req, res) => {
+  const { name, address, lat, lng, source } = req.body || {};
+  const nm = String(name || '').trim();
+  const la = parseFloat(lat), lo = parseFloat(lng);
+  if (!nm || !isFinite(la) || !isFinite(lo))
+    return res.status(400).json({ error: 'ต้องมีชื่อสถานที่และพิกัด' });
+  const norm = normPlace(nm);
+  if (norm.length < 2) return res.status(400).json({ error: 'ชื่อสถานที่สั้นเกินไป' });
+  placeUpsert.run({
+    name: nm.slice(0, 200), norm, address: String(address || '').slice(0, 300),
+    lat: la, lng: lo, source: String(source || 'search').slice(0, 20)
+  });
+  res.json({ ok: true });
+});
+
+// สถิติแคช — ให้ admin ดูว่าประหยัดการเรียกภายนอกไปเท่าไร
+app.get('/map-cache-stats', requireAdmin, (_req, res) => {
+  const rows = db.prepare(
+    'SELECT provider, COUNT(*) n, SUM(hits) hits FROM geocode_cache GROUP BY provider'
+  ).all();
+  const total = db.prepare('SELECT COUNT(*) n, SUM(hits) hits FROM geocode_cache').get();
+  res.json({
+    entries: total.n || 0,
+    servedFromCache: total.hits || 0,
+    byProvider: rows
+  });
 });
 
 app.get('/map-route', requireAuth, async (req, res) => {
@@ -521,6 +923,266 @@ app.get('/map-route', requireAuth, async (req, res) => {
     res.json(data);
   } catch (e) {
     res.status(502).json({ error: 'upstream error' });
+  }
+});
+
+// ── สถิติสำหรับ Dashboard ─────────────────────────────────
+// รวบรวม 5 มุมมอง: หน่วยงาน / เวลา / ประเภทค่าใช้จ่าย / ปลายทาง / รายบุคคล
+
+const num = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
+
+/** แยกยอดเงินของใบเบิกออกเป็นประเภทค่าใช้จ่าย */
+function costBreakdown(md) {
+  const c = (md && md._costs) || {};
+  const t = (md && md._travel) || {};
+  const km = num(t.distOut) + num(t.distRet);
+  const fuel = km * num(c.fuelRate);
+
+  let hotel = 0;
+  const h = c.hotelEntries;
+  if (Array.isArray(h)) {
+    h.forEach(x => (x && Array.isArray(x.entries) ? x.entries : [x]).forEach(e => {
+      if (e) hotel += num(e.rate) * num(e.nights);
+    }));
+  } else if (h && Array.isArray(h.entries)) {
+    h.entries.forEach(e => { if (e) hotel += num(e.rate) * num(e.nights); });
+  }
+
+  let taxi = 0;
+  (Array.isArray(c.taxiEntries) ? c.taxiEntries : []).forEach(e => { taxi += num(e && e.amount); });
+
+  return {
+    fuel, hotel, taxi,
+    air:   num(c.airAmount),
+    toll:  num(c.tollAmount),
+    other: num(c.otherAmount),
+    km
+  };
+}
+
+app.get('/stats', requireAdmin, (_req, res) => {
+  const rows = db.prepare('SELECT id, data, created_at FROM expenses').all();
+  const exps = rows.map(r => {
+    let o = {}; try { o = JSON.parse(r.data); } catch (e) {}
+    o.id = r.id;
+    if (!o.createdAt) o.createdAt = r.created_at;
+    return o;
+  });
+
+  const add = (map, key, amount, extraKm) => {
+    const k = (key && String(key).trim()) || 'ไม่ระบุ';
+    if (!map[k]) map[k] = { name: k, count: 0, total: 0, km: 0 };
+    map[k].count++;
+    map[k].total += amount;
+    map[k].km += extraKm || 0;
+  };
+
+  const byAffil = {}, byMonth = {}, byProv = {}, byPerson = {};
+  const cost = { fuel: 0, hotel: 0, taxi: 0, air: 0, toll: 0, other: 0 };
+  let grand = 0, totalKm = 0;
+
+  exps.forEach(e => {
+    const md = e.inputMetadata || {};
+    const amt = num(e.amount);
+    const b = costBreakdown(md);
+    grand += amt;
+    totalKm += b.km;
+    Object.keys(cost).forEach(k => { cost[k] += b[k]; });
+
+    add(byAffil, md._affiliation, amt, 0);
+    add(byPerson, e.requestedBy, amt, 0);
+    add(byProv, md._travel && md._travel.toProv, amt, b.km);
+    add(byMonth, String(e.createdAt || '').slice(0, 7), amt, 0);
+  });
+
+  const sortDesc = m => Object.values(m)
+    .map(x => ({ ...x, avg: x.count ? Math.round((x.total / x.count) * 100) / 100 : 0 }))
+    .sort((a, b) => b.total - a.total);
+
+  // ใครยังไม่เคยเบิก — เทียบรายชื่อในทะเบียนโปรไฟล์กับผู้ที่เคยยื่น
+  const claimed = new Set(Object.keys(byPerson));
+  const never = [];
+  db.prepare('SELECT data FROM profiles').all().forEach(r => {
+    let p = {}; try { p = JSON.parse(r.data); } catch (e) { return; }
+    if (p.fullName && !claimed.has(p.fullName.trim())) never.push(p.fullName.trim());
+  });
+
+  const months = Object.values(byMonth).sort((a, b) => a.name.localeCompare(b.name));
+  const peak = months.reduce((m, x) => (!m || x.total > m.total ? x : m), null);
+
+  res.json({
+    summary: {
+      users:     db.prepare('SELECT COUNT(*) c FROM users').get().c,
+      profiles:  db.prepare('SELECT COUNT(*) c FROM profiles').get().c,
+      expenses:  exps.length,
+      totalAmount: Math.round(grand * 100) / 100,
+      avgAmount:   exps.length ? Math.round((grand / exps.length) * 100) / 100 : 0,
+      totalKm:     Math.round(totalKm),
+      currency: 'THB'
+    },
+    byAffiliation: sortDesc(byAffil),
+    byMonth: months.map(m => ({ ...m, avg: m.count ? Math.round((m.total / m.count) * 100) / 100 : 0 })),
+    peakMonth: peak ? peak.name : null,
+    byCostType: Object.entries(cost)
+      .map(([k, v]) => ({
+        type: { fuel: 'ค่าน้ำมัน', hotel: 'ค่าที่พัก', taxi: 'ค่าแท็กซี่',
+                air: 'ค่าเครื่องบิน', toll: 'ค่าทางด่วน', other: 'อื่นๆ' }[k],
+        key: k,
+        total: Math.round(v * 100) / 100,
+        pct: grand ? Math.round((v / grand) * 1000) / 10 : 0
+      }))
+      .sort((a, b) => b.total - a.total),
+    byProvince: sortDesc(byProv).map(x => ({ ...x, km: Math.round(x.km) })),
+    byPerson: { top: sortDesc(byPerson).slice(0, 10), neverClaimed: never.length, neverList: never.slice(0, 20) }
+  });
+});
+
+/* ── บันทึกรายการทั้งระบบ (แอดมินเท่านั้น) ─────────────────
+   ผู้ใช้ทั่วไปเห็นเฉพาะรายการของตัวเอง (ดู GET /expenses)
+   ตรงนี้ให้แอดมินไล่ดูของทุกคนได้ ไว้ตรวจสอบเวลามีคนติดปัญหา
+   อ่านอย่างเดียว ไม่มีทางแก้หรือลบจากช่องทางนี้ */
+app.get('/expense-log', requireAdmin, (req, res) => {
+  const rows = db.prepare(`
+    SELECT e.id, e.data, e.created_at, e.user_id, u.email owner_email
+    FROM expenses e LEFT JOIN users u ON u.id = e.user_id
+    ORDER BY e.id DESC`).all();
+
+  const items = rows.map(r => {
+    let o = {}; try { o = JSON.parse(r.data); } catch (_) {}
+    const md = o.inputMetadata || {};
+    const tv = md._travel || {};
+    return {
+      id: r.id,
+      createdAt: o.createdAt || r.created_at,
+      byUserId: r.user_id,
+      byUser: r.owner_email || 'ไม่ทราบผู้บันทึก',
+      byEmail: r.owner_email || '',
+      traveler: (o.requestedBy || '').trim() || 'ไม่ระบุ',
+      affiliation: (md._affiliation || '').trim(),
+      position: (md._position || '').trim(),
+      category: md._budgetCategoryId || '',
+      purpose: (o.purpose || o.description || '').trim(),
+      toProv: (tv.toProv || '').trim(),
+      travelFrom: (tv.from || '').trim(),
+      travelTo: (tv.to || '').trim(),
+      dateFrom: tv.dateFrom || o.dateFrom || '',
+      dateTo: tv.dateTo || o.dateTo || '',
+      amount: Number(o.amount) || 0,
+      km: costBreakdown(md).km,
+      // ธงเตือน ช่วยให้แอดมินเห็นทันทีว่ารายการไหนน่าจะมีปัญหา
+      flags: [
+        !(Number(o.amount) > 0)                        ? 'ยอดเงินเป็นศูนย์' : '',
+        tv.distanceSource === 'manual'                 ? 'กรอกระยะทางเอง'   : '',
+        (tv.toGeo && tv.toGeo.precision === 'province')? 'หมุดปลายทางหยาบ'  : '',
+        !(o.requestedBy || '').trim()                  ? 'ไม่ระบุผู้เดินทาง' : ''
+      ].filter(Boolean)
+    };
+  });
+
+  const norm = s => String(s || '').toLowerCase().trim();
+  let out = items;
+
+  const qs = norm(req.query.q);
+  if (qs) out = out.filter(x =>
+    [x.traveler, x.byUser, x.byEmail, x.purpose, x.toProv, x.affiliation, String(x.id)]
+      .some(v => norm(v).indexOf(qs) >= 0));
+
+  if (req.query.user)  out = out.filter(x => String(x.byUserId) === String(req.query.user));
+  if (req.query.prov)  out = out.filter(x => x.toProv === req.query.prov);
+  if (req.query.from)  out = out.filter(x => String(x.createdAt).slice(0, 10) >= req.query.from);
+  if (req.query.to)    out = out.filter(x => String(x.createdAt).slice(0, 10) <= req.query.to);
+  if (req.query.flagged === '1') out = out.filter(x => x.flags.length > 0);
+
+  const page  = Math.max(1, parseInt(req.query.page || '1', 10) || 1);
+  const size  = Math.min(200, Math.max(10, parseInt(req.query.size || '50', 10) || 50));
+  const total = out.length;
+
+  res.json({
+    items: out.slice((page - 1) * size, page * size),
+    page, size, total,
+    pages: Math.max(1, Math.ceil(total / size)),
+    sumAmount: Math.round(out.reduce((s, x) => s + x.amount, 0) * 100) / 100,
+    flaggedCount: out.filter(x => x.flags.length).length,
+    // ตัวเลือกสำหรับช่องกรอง สร้างจากข้อมูลจริง ไม่ต้องพิมพ์เอง
+    users: Object.values(items.reduce((m, x) => {
+      if (x.byUserId != null && !m[x.byUserId])
+        m[x.byUserId] = { id: x.byUserId, name: x.byUser };
+      return m;
+    }, {})).sort((a, b) => a.name.localeCompare(b.name, 'th')),
+    provinces: Array.from(new Set(items.map(x => x.toProv).filter(Boolean)))
+      .sort((a, b) => a.localeCompare(b, 'th'))
+  });
+});
+
+/** รายการเดียวแบบเต็ม ให้แอดมินเปิดดู/ออก PDF ได้ */
+app.get('/expense-log/:id', requireAdmin, (req, res) => {
+  const r = db.prepare(`
+    SELECT e.id, e.data, e.created_at, e.user_id, u.email owner_email
+    FROM expenses e LEFT JOIN users u ON u.id = e.user_id WHERE e.id = ?`).get(parseInt(req.params.id, 10));
+  if (!r) return res.status(404).json({ error: 'ไม่พบรายการนี้ อาจถูกลบไปแล้ว' });
+  let o = {}; try { o = JSON.parse(r.data); } catch (_) {}
+  o.id = r.id;
+  o.userId = r.user_id;
+  o.ownerEmail = r.owner_email || '';
+  if (!o.createdAt) o.createdAt = r.created_at;
+  res.json(o);
+});
+
+// ── สำรองข้อมูลอัตโนมัติ ──────────────────────────────────
+// สำรองตอนเปิดระบบ แล้วทุก 6 ชั่วโมง เก็บย้อนหลัง 14 ชุด
+// ใช้ db.backup() ของ SQLite ซึ่งสำรองได้ปลอดภัยแม้มีคนใช้งานอยู่
+const BACKUP_DIR   = process.env.BACKUP_DIR || path.join(path.dirname(DB_PATH), 'backups');
+const BACKUP_KEEP  = parseInt(process.env.BACKUP_KEEP || '14', 10);
+const BACKUP_HOURS = parseInt(process.env.BACKUP_HOURS || '6', 10);
+
+async function runBackup(tag) {
+  try {
+    fs.mkdirSync(BACKUP_DIR, { recursive: true });
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const file = path.join(BACKUP_DIR, `prompt-berk-${stamp}${tag ? '-' + tag : ''}.db`);
+    await db.backup(file);
+
+    // ลบชุดเก่าเกินจำนวนที่เก็บ
+    const all = fs.readdirSync(BACKUP_DIR)
+      .filter(f => f.startsWith('prompt-berk-') && f.endsWith('.db'))
+      .sort();
+    while (all.length > BACKUP_KEEP) {
+      const old = all.shift();
+      try { fs.unlinkSync(path.join(BACKUP_DIR, old)); } catch (_) {}
+    }
+    const kb = Math.round(fs.statSync(file).size / 1024);
+    console.log(`[backup] ${path.basename(file)} (${kb} KB) — เก็บไว้ ${all.length} ชุด`);
+    return { file: path.basename(file), sizeKb: kb, kept: all.length };
+  } catch (e) {
+    console.error('[backup] ล้มเหลว:', e.message);
+    return { error: e.message };
+  }
+}
+
+runBackup('startup');
+setInterval(() => runBackup('auto'), BACKUP_HOURS * 3600 * 1000);
+
+// สำรองทันทีตามคำสั่ง — ใช้ก่อนทำอะไรที่เสี่ยง
+app.post('/backup', requireAdmin, async (_req, res) => {
+  const r = await runBackup('manual');
+  if (r.error) return res.status(500).json({ error: r.error });
+  res.json(r);
+});
+
+// ดูรายการไฟล์สำรองที่มี
+app.get('/backup', requireAdmin, (_req, res) => {
+  try {
+    if (!fs.existsSync(BACKUP_DIR)) return res.json({ dir: BACKUP_DIR, files: [] });
+    const files = fs.readdirSync(BACKUP_DIR)
+      .filter(f => f.endsWith('.db'))
+      .map(f => {
+        const st = fs.statSync(path.join(BACKUP_DIR, f));
+        return { name: f, sizeKb: Math.round(st.size / 1024), at: st.mtime.toISOString() };
+      })
+      .sort((a, b) => b.name.localeCompare(a.name));
+    res.json({ dir: BACKUP_DIR, keep: BACKUP_KEEP, everyHours: BACKUP_HOURS, files });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
 });
 

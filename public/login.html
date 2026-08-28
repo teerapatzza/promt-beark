@@ -1,265 +1,516 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
+    <script src="api-fetch.js"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>เข้าสู่ระบบ — Prompt-Berk</title>
+  <title>เข้าสู่ระบบ — Promt-Beark Budget System v2.0</title>
+
+  <!-- Google Fonts - Prompt -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg-light: #f8f9fa;
+      --bg-secondary: #e9ecef;
+      --card-white: #ffffff;
+      --border-light: #dee2e6;
+      /* หมายเหตุ: ชื่อตัวแปรยังเป็น gold ตามของเดิม แต่ค่าเปลี่ยนเป็นน้ำเงินแล้ว
+               เพื่อให้ทุกหน้าใช้สีเดียวกัน (แก้ 26 ส.ค. 2569) */
+            --gold: #3B82F6;
+      --gold-light: #2563EB;
+      --blue: #3B82F6;
+      --blue-dark: #2563EB;
+      --text-dark: #1f2937;
+      --text-muted: #6b7280;
+      --success: #10B981;
+      --error: #EF4444;
+    }
 
     body {
-      font-family: 'Segoe UI', Tahoma, sans-serif;
-      background: linear-gradient(135deg, #1a237e 0%, #283593 50%, #3949ab 100%);
+      font-family: 'IBM Plex Sans Thai', 'IBM Plex Sans', sans-serif;
+      background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #dbeafe 100%);
       min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
+      color: var(--text-dark);
+      position: relative;
+      overflow: auto;
+      padding: 20px 0;
+    }
+
+    /* Animated background particles */
+    body::before {
+      content: '';
+      position: absolute;
+      width: 200%;
+      height: 200%;
+      background-image:
+        radial-gradient(circle at 20% 50%, rgba(59, 130, 246, 0.08) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(59, 130, 246, 0.08) 0%, transparent 50%);
+      animation: float 20s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translate(0, 0); }
+      50% { transform: translate(-50px, -50px); }
     }
 
     .card {
-      background: #fff;
-      border-radius: 16px;
-      box-shadow: 0 8px 40px rgba(0,0,0,0.25);
+      background: var(--card-white);
+      border-radius: 24px;
+      box-shadow:
+        0 20px 60px rgba(0, 0, 0, 0.08),
+        0 0 0 1px var(--border-light);
       width: 100%;
-      max-width: 420px;
-      padding: 40px 36px;
+      max-width: 460px;
+      padding: 48px 40px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, var(--gold) 0%, var(--gold-light) 50%, var(--blue) 100%);
+      border-radius: 24px 24px 0 0;
     }
 
     .logo {
       text-align: center;
-      margin-bottom: 28px;
+      margin-bottom: 36px;
     }
+
+    .logo-icon {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 16px;
+      background: linear-gradient(135deg, var(--gold) 0%, var(--gold-light) 100%);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 8px 24px rgba(59, 130, 246, 0.3);
+    }
+
+    .logo-icon svg {
+      width: 36px;
+      height: 36px;
+      color: var(--bg-dark);
+    }
+
     .logo h1 {
-      font-size: 1.6rem;
+      font-size: 1.75rem;
       font-weight: 700;
-      color: #1a237e;
+      color: var(--text-dark);
       letter-spacing: -0.5px;
+      margin-bottom: 4px;
     }
+
     .logo p {
-      color: #888;
-      font-size: 0.88rem;
-      margin-top: 4px;
+      color: var(--text-muted);
+      font-size: 0.875rem;
+      font-weight: 400;
+    }
+
+    .version {
+      display: inline-block;
+      background: rgba(59, 130, 246, 0.1);
+      color: var(--gold);
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin-top: 8px;
+      border: 1px solid rgba(59, 130, 246, 0.3);
     }
 
     .tabs {
       display: flex;
-      border-bottom: 2px solid #e0e0e0;
-      margin-bottom: 28px;
+      background: var(--bg-light);
+      border-radius: 12px;
+      padding: 4px;
+      margin-bottom: 32px;
+      border: 1px solid var(--border-light);
     }
+
     .tab {
       flex: 1;
       text-align: center;
-      padding: 10px 0;
+      padding: 12px 0;
       cursor: pointer;
       font-weight: 600;
-      font-size: 0.95rem;
-      color: #999;
-      border-bottom: 3px solid transparent;
-      margin-bottom: -2px;
-      transition: color 0.2s, border-color 0.2s;
+      font-size: 0.9375rem;
+      color: var(--text-muted);
+      border-radius: 8px;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
     }
+
     .tab.active {
-      color: #1a237e;
-      border-bottom-color: #1a237e;
+      background: linear-gradient(135deg, var(--gold) 0%, var(--gold-light) 100%);
+      color: white;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+
+    .tab:not(.active):hover {
+      color: var(--text-dark);
+      background: rgba(59, 130, 246, 0.1);
     }
 
     .form-group {
-      margin-bottom: 18px;
+      margin-bottom: 20px;
     }
+
     label {
       display: block;
-      font-size: 0.85rem;
+      font-size: 0.875rem;
       font-weight: 600;
-      color: #555;
-      margin-bottom: 6px;
+      color: var(--text-dark);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
-    input[type="email"], input[type="password"] {
+
+    label svg {
+      width: 16px;
+      height: 16px;
+      color: var(--gold);
+    }
+
+    input[type="email"],
+    input[type="password"],
+    input[type="text"] {
       width: 100%;
-      padding: 11px 14px;
-      border: 1.5px solid #ddd;
-      border-radius: 8px;
-      font-size: 0.95rem;
+      padding: 14px 16px;
+      background: white;
+      border: 1.5px solid var(--border-light);
+      border-radius: 12px;
+      font-size: 0.9375rem;
+      color: var(--text-dark);
       outline: none;
-      transition: border-color 0.2s;
+      transition: all 0.3s;
+      font-family: 'IBM Plex Sans Thai', 'IBM Plex Sans', sans-serif;
     }
-    input:focus { border-color: #3949ab; }
+
+    input::placeholder {
+      color: var(--text-muted);
+    }
+
+    input:focus {
+      border-color: var(--gold);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
 
     .btn {
       width: 100%;
-      padding: 13px;
-      background: #1a237e;
+      padding: 16px;
+      background: linear-gradient(135deg, var(--blue) 0%, var(--blue-dark) 100%);
       color: #fff;
       border: none;
-      border-radius: 8px;
+      border-radius: 12px;
       font-size: 1rem;
       font-weight: 700;
       cursor: pointer;
-      transition: background 0.2s;
-      margin-top: 4px;
+      transition: all 0.3s;
+      margin-top: 8px;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+      font-family: 'IBM Plex Sans Thai', 'IBM Plex Sans', sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
     }
-    .btn:hover { background: #283593; }
-    .btn:disabled { background: #9fa8da; cursor: not-allowed; }
 
-    .error-box {
-      background: #ffebee;
-      color: #c62828;
-      border: 1px solid #ef9a9a;
-      border-radius: 8px;
-      padding: 10px 14px;
-      font-size: 0.88rem;
-      margin-bottom: 16px;
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(59, 130, 246, 0.4);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    .btn svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    .alert {
+      padding: 14px 16px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      font-size: 0.875rem;
       display: none;
-    }
-    .success-box {
-      background: #e8f5e9;
-      color: #2e7d32;
-      border: 1px solid #a5d6a7;
-      border-radius: 8px;
-      padding: 10px 14px;
-      font-size: 0.88rem;
-      margin-bottom: 16px;
-      display: none;
+      border: 1px solid;
     }
 
-    .panel { display: none; }
-    .panel.active { display: block; }
+    .alert.error {
+      background: rgba(239, 68, 68, 0.1);
+      color: var(--error);
+      border-color: rgba(239, 68, 68, 0.3);
+      display: block;
+    }
 
-    .hint {
+    .alert.success {
+      background: rgba(16, 185, 129, 0.1);
+      color: var(--success);
+      border-color: rgba(16, 185, 129, 0.3);
+      display: block;
+    }
+
+    .footer {
       text-align: center;
-      font-size: 0.8rem;
-      color: #aaa;
-      margin-top: 20px;
+      margin-top: 32px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border-light);
+      color: var(--text-muted);
+      font-size: 0.8125rem;
+    }
+
+    .footer a {
+      color: var(--gold);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .footer a:hover {
+      text-decoration: underline;
+    }
+
+    #formLogin, #formRegister { display: none; }
+    #formLogin.active, #formRegister.active { display: block; }
+
+    @media (max-width: 480px) {
+      .card {
+        padding: 32px 24px;
+        border-radius: 16px;
+      }
+
+      .logo h1 {
+        font-size: 1.5rem;
+      }
     }
   </style>
 </head>
 <body>
-<div class="card">
-  <div class="logo">
-    <h1>Prompt-Berk</h1>
-    <p>ระบบเบิกค่าใช้จ่าย</p>
+  <div class="card">
+    <!-- Logo -->
+    <div class="logo">
+      <div class="logo-icon">
+        <!-- Document + Dollar Icon (Invoice/Receipt) -->
+        <svg fill="currentColor" viewBox="0 0 24 24">
+          <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6zm5-1h2v-1.5h1c.55 0 1-.45 1-1v-3c0-.55-.45-1-1-1h-3v-1h4V10h-2V8.5h-2V10h-1c-.55 0-1 .45-1 1v3c0 .55.45 1 1 1h3v1H9v1.5h2V19z"/>
+        </svg>
+      </div>
+      <h1>Promt-Beark</h1>
+      <p>ระบบจัดการงบประมาณ</p>
+      <div class="version">v2.0.0</div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('login')">เข้าสู่ระบบ</div>
+      <div class="tab" onclick="switchTab('register')">สมัครสมาชิก</div>
+    </div>
+
+    <!-- Login Form -->
+    <form id="formLogin" class="active" onsubmit="handleLogin(event)">
+      <div id="loginAlert" class="alert"></div>
+
+      <div class="form-group">
+        <label>
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207"/>
+          </svg>
+          อีเมล
+        </label>
+        <input type="email" id="loginEmail" placeholder="your@email.com" required autocomplete="email">
+      </div>
+
+      <div class="form-group">
+        <label>
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+          </svg>
+          รหัสผ่าน
+        </label>
+        <input type="password" id="loginPassword" placeholder="••••••••" required autocomplete="current-password">
+      </div>
+
+      <button type="submit" class="btn">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/>
+        </svg>
+        เข้าสู่ระบบ
+      </button>
+    </form>
+
+    <!-- Register Form -->
+    <form id="formRegister" onsubmit="handleRegister(event)">
+      <div id="registerAlert" class="alert"></div>
+
+      <div class="form-group">
+        <label>
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207"/>
+          </svg>
+          อีเมล
+        </label>
+        <input type="email" id="regEmail" placeholder="your@email.com" required autocomplete="email">
+      </div>
+
+      <div class="form-group">
+        <label>
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+          </svg>
+          รหัสผ่าน
+        </label>
+        <input type="password" id="regPassword" placeholder="••••••••" required autocomplete="new-password">
+      </div>
+
+      <div class="form-group">
+        <label>
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          ยืนยันรหัสผ่าน
+        </label>
+        <input type="password" id="regPasswordConfirm" placeholder="••••••••" required autocomplete="new-password">
+      </div>
+
+      <button type="submit" class="btn">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
+        </svg>
+        สมัครสมาชิก
+      </button>
+    </form>
+
+    <!-- Footer -->
+    <div class="footer">
+      <p>สำหรับ <strong>สถาบันพัฒนาและรับรองคุณภาพโรงพยาบาล</strong></p>
+      <p style="margin-top: 8px;">Powered by <a href="#">Promt-Beark v2.0.0</a></p>
+    </div>
   </div>
 
-  <div class="tabs">
-    <div class="tab active" onclick="switchTab('login')">เข้าสู่ระบบ</div>
-    <div class="tab" onclick="switchTab('register')">สมัครใช้งาน</div>
-  </div>
+  <script>
+    // Tab switching
+    function switchTab(tab) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('form').forEach(f => f.classList.remove('active'));
 
-  <!-- Login Panel -->
-  <div class="panel active" id="panel-login">
-    <div class="error-box" id="login-error"></div>
-    <div class="form-group">
-      <label for="login-email">อีเมล</label>
-      <input type="email" id="login-email" placeholder="your@email.com" autocomplete="email">
-    </div>
-    <div class="form-group">
-      <label for="login-password">รหัสผ่าน</label>
-      <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password">
-    </div>
-    <button class="btn" id="login-btn" onclick="doLogin()">เข้าสู่ระบบ</button>
-    <p class="hint">ลืมรหัสผ่าน? ติดต่อ admin เพื่อ reset</p>
-  </div>
+      if (tab === 'login') {
+        document.querySelector('.tab:first-child').classList.add('active');
+        document.getElementById('formLogin').classList.add('active');
+      } else {
+        document.querySelector('.tab:last-child').classList.add('active');
+        document.getElementById('formRegister').classList.add('active');
+      }
+    }
 
-  <!-- Register Panel -->
-  <div class="panel" id="panel-register">
-    <div class="error-box" id="register-error"></div>
-    <div class="success-box" id="register-success"></div>
-    <div class="form-group">
-      <label for="reg-email">อีเมล</label>
-      <input type="email" id="reg-email" placeholder="your@email.com" autocomplete="email">
-    </div>
-    <div class="form-group">
-      <label for="reg-password">รหัสผ่าน</label>
-      <input type="password" id="reg-password" placeholder="อย่างน้อย 6 ตัวอักษร" autocomplete="new-password">
-    </div>
-    <div class="form-group">
-      <label for="reg-confirm">ยืนยันรหัสผ่าน</label>
-      <input type="password" id="reg-confirm" placeholder="••••••••" autocomplete="new-password">
-    </div>
-    <button class="btn" id="register-btn" onclick="doRegister()">สมัครใช้งาน</button>
-  </div>
-</div>
+    // Handle Login
+    async function handleLogin(e) {
+      e.preventDefault();
+      const email = document.getElementById('loginEmail').value;
+      const password = document.getElementById('loginPassword').value;
+      const alert = document.getElementById('loginAlert');
 
-<script>
-  // If already logged in, redirect
-  fetch('/auth/me').then(r => {
-    if (r.ok) window.location.replace('/prompt');
-  });
+      try {
+        const res = await fetch('/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
 
-  function switchTab(tab) {
-    document.querySelectorAll('.tab').forEach((t, i) => t.classList.toggle('active', (i === 0) === (tab === 'login')));
-    document.querySelectorAll('.panel').forEach((p, i) => p.classList.toggle('active', (i === 0) === (tab === 'login')));
-  }
+        const data = await res.json();
 
-  function showError(id, msg) {
-    const el = document.getElementById(id);
-    el.textContent = msg;
-    el.style.display = 'block';
-  }
-  function hideError(id) { document.getElementById(id).style.display = 'none'; }
+        if (res.ok) {
+          console.log('✅ Login Success:', data);
+          if (data.token) {
+            localStorage.setItem('token', data.token);
+            console.log('💾 Token saved to localStorage');
+          }
+          alert.className = 'alert success';
+          alert.textContent = '✓ เข้าสู่ระบบสำเร็จ กำลังเปลี่ยนหน้า...';
+          setTimeout(() => {
+            window.location.replace('index.html');
+          }, 800);
+        } else {
+          alert.className = 'alert error';
+          alert.textContent = '✗ ' + (data.error || data.message || 'เข้าสู่ระบบไม่สำเร็จ');
+        }
+      } catch (err) {
+        alert.className = 'alert error';
+        alert.textContent = '✗ เกิดข้อผิดพลาดในการเชื่อมต่อ';
+      }
+    }
 
-  // Enter key support
-  document.getElementById('login-password').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
-  document.getElementById('reg-confirm').addEventListener('keydown', e => { if (e.key === 'Enter') doRegister(); });
+    // Handle Register
+    async function handleRegister(e) {
+      e.preventDefault();
+      const email = document.getElementById('regEmail').value;
+      const password = document.getElementById('regPassword').value;
+      const passwordConfirm = document.getElementById('regPasswordConfirm').value;
+      const alert = document.getElementById('registerAlert');
 
-  async function doLogin() {
-    hideError('login-error');
-    const email = document.getElementById('login-email').value.trim();
-    const password = document.getElementById('login-password').value;
-    if (!email || !password) return showError('login-error', 'กรุณากรอกอีเมลและรหัสผ่าน');
-
-    const btn = document.getElementById('login-btn');
-    btn.disabled = true;
-    btn.textContent = 'กำลังเข้าสู่ระบบ...';
-
-    try {
-      const r = await fetch('/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
-      const data = await r.json();
-      if (!r.ok) {
-        showError('login-error', data.error || 'เข้าสู่ระบบไม่สำเร็จ');
+      if (password !== passwordConfirm) {
+        alert.className = 'alert error';
+        alert.textContent = '✗ รหัสผ่านไม่ตรงกัน';
         return;
       }
-      window.location.replace('/prompt');
-    } finally {
-      btn.disabled = false;
-      btn.textContent = 'เข้าสู่ระบบ';
-    }
-  }
 
-  async function doRegister() {
-    hideError('register-error');
-    document.getElementById('register-success').style.display = 'none';
-    const email = document.getElementById('reg-email').value.trim();
-    const password = document.getElementById('reg-password').value;
-    const confirm = document.getElementById('reg-confirm').value;
-    if (!email || !password) return showError('register-error', 'กรุณากรอกอีเมลและรหัสผ่าน');
-    if (password !== confirm) return showError('register-error', 'รหัสผ่านไม่ตรงกัน');
-    if (password.length < 6) return showError('register-error', 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร');
+      try {
+        const res = await fetch('/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
 
-    const btn = document.getElementById('register-btn');
-    btn.disabled = true;
-    btn.textContent = 'กำลังสมัคร...';
+        const data = await res.json();
 
-    try {
-      const r = await fetch('/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
-      const data = await r.json();
-      if (!r.ok) {
-        showError('register-error', data.error || 'สมัครไม่สำเร็จ');
-        return;
+        if (res.ok) {
+          if (data.token) {
+            localStorage.setItem('token', data.token);
+          }
+          alert.className = 'alert success';
+          alert.textContent = '✓ สมัครสมาชิกสำเร็จ กำลังเข้าสู่ระบบ...';
+          setTimeout(() => {
+            window.location.replace('index.html');
+          }, 800);
+        } else {
+          alert.className = 'alert error';
+          alert.textContent = '✗ ' + (data.error || data.message || 'สมัครสมาชิกไม่สำเร็จ');
+        }
+      } catch (err) {
+        alert.className = 'alert error';
+        alert.textContent = '✗ เกิดข้อผิดพลาดในการเชื่อมต่อ';
       }
-      window.location.replace('/prompt');
-    } finally {
-      btn.disabled = false;
-      btn.textContent = 'สมัครใช้งาน';
     }
-  }
-</script>
+
+    // ถูกพากลับมาเพราะเซสชันหมดอายุ — ต้องบอกเหตุผล ไม่ใช่เด้งมาเฉยๆ
+    (function () {
+      if (new URLSearchParams(location.search).get('reason') !== 'expired') return;
+      const a = document.getElementById('loginAlert');
+      if (!a) return;
+      a.className = 'alert error';
+      a.textContent = '⚠ เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่';
+    })();
+  </script>
 </body>
 </html>

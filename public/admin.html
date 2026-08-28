@@ -1,53 +1,296 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
+    <script src="api-fetch.js"></script>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <parameter name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ตั้งค่าระบบ (Admin) - Prompt-Berk</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['IBM Plex Sans Thai', 'IBM Plex Sans', 'sans-serif'],
+                        display: ['IBM Plex Sans Thai', 'sans-serif']
+                    },
+                    animation: {
+                        'shimmer': 'shimmer 2s linear infinite',
+                        'float': 'float 3s ease-in-out infinite',
+                        'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'gradient': 'gradient 8s linear infinite',
+                    },
+                    keyframes: {
+                        shimmer: {
+                            '0%': { backgroundPosition: '-1000px 0' },
+                            '100%': { backgroundPosition: '1000px 0' }
+                        },
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-10px)' }
+                        },
+                        gradient: {
+                            '0%, 100%': { backgroundPosition: '0% 50%' },
+                            '50%': { backgroundPosition: '100% 50%' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        body { font-family: 'Sarabun', sans-serif; }
-        .nav-item { transition: background 0.15s, color 0.15s; }
-        .nav-item.active { background: rgba(255,255,255,0.12); color: #fff; }
-        .nav-item:not(.active) { color: #94a3b8; }
-        .nav-item:not(.active):hover { background: rgba(255,255,255,0.07); color: #cbd5e1; }
-        .att-drag-over { outline: 2px dashed #3b82f6; background: #eff6ff !important; }
-        .att-row-dragging { opacity: 0.35; }
-        .drag-handle { cursor: grab; }
-        .drag-handle:active { cursor: grabbing; }
+        body {
+            font-family: 'IBM Plex Sans Thai', 'IBM Plex Sans', sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+        }
+
+        /* Glassmorphism Sidebar */
+        .glass-sidebar {
+            background: linear-gradient(180deg,
+                rgba(255, 255, 255, 0.98) 0%,
+                rgba(248, 250, 252, 0.95) 100%);
+            backdrop-filter: blur(20px);
+            border-right: 1px solid rgba(226, 232, 240, 0.8);
+            box-shadow: 4px 0 24px rgba(0, 0, 0, 0.12);
+        }
+
+        /* Nav Items with Liquid Glass Effect */
+        .nav-item {
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .nav-item::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(90deg,
+                transparent,
+                rgba(255, 255, 255, 0.1),
+                transparent);
+            transform: translateX(-100%);
+            transition: transform 0.6s ease;
+        }
+
+        .nav-item:hover::before {
+            transform: translateX(100%);
+        }
+
+        .nav-item.active {
+            background: linear-gradient(135deg,
+                rgba(59, 130, 246, 0.2) 0%,
+                rgba(99, 102, 241, 0.15) 100%);
+            color: #fff;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                0 4px 12px rgba(59, 130, 246, 0.2);
+        }
+
+        .nav-item:not(.active) {
+            color: #94a3b8;
+            border: 1px solid transparent;
+        }
+
+        .nav-item:not(.active):hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: #e2e8f0;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transform: translateX(4px);
+        }
+
+        /* Premium Card Styles */
+        .premium-card {
+            background: linear-gradient(135deg,
+                rgba(255, 255, 255, 0.9) 0%,
+                rgba(255, 255, 255, 0.7) 100%);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            box-shadow:
+                0 20px 40px -15px rgba(0, 0, 0, 0.08),
+                inset 0 1px 0 rgba(255, 255, 255, 0.8);
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .premium-card:hover {
+            transform: translateY(-2px);
+            box-shadow:
+                0 24px 48px -12px rgba(0, 0, 0, 0.12),
+                inset 0 1px 0 rgba(255, 255, 255, 1);
+        }
+
+        /* Gradient Button */
+        .btn-gradient {
+            background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+            box-shadow:
+                0 4px 12px rgba(59, 130, 246, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .btn-gradient:hover {
+            transform: translateY(-1px);
+            box-shadow:
+                0 8px 20px rgba(59, 130, 246, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.3);
+        }
+
+        .btn-gradient:active {
+            transform: translateY(0px);
+        }
+
+        /* Input Focus Glow */
+        .input-glow:focus {
+            border-color: #3b82f6;
+            box-shadow:
+                0 0 0 4px rgba(59, 130, 246, 0.1),
+                0 1px 2px rgba(0, 0, 0, 0.05);
+            outline: none;
+        }
+
+        /* Table Hover Effect */
+        .table-row {
+            transition: all 0.2s ease;
+            border-bottom: 1px solid rgba(226, 232, 240, 0.6);
+        }
+
+        .table-row:hover {
+            background: linear-gradient(90deg,
+                rgba(59, 130, 246, 0.03) 0%,
+                rgba(99, 102, 241, 0.02) 100%);
+            transform: scale(1.002);
+        }
+
+        /* Shimmer Loading Effect */
+        .shimmer {
+            background: linear-gradient(
+                90deg,
+                rgba(255, 255, 255, 0) 0%,
+                rgba(255, 255, 255, 0.4) 50%,
+                rgba(255, 255, 255, 0) 100%
+            );
+            background-size: 200% 100%;
+            animation: shimmer 2s infinite;
+        }
+
+        /* Floating Animation */
+        .float {
+            animation: float 3s ease-in-out infinite;
+        }
+
+        /* Attachment Drag Effects */
+        .att-drag-over {
+            outline: 2px dashed #3b82f6;
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%) !important;
+            transform: scale(1.02);
+        }
+
+        .att-row-dragging {
+            opacity: 0.4;
+            transform: rotate(2deg);
+        }
+
+        .drag-handle {
+            cursor: grab;
+            transition: all 0.2s ease;
+        }
+
+        .drag-handle:hover {
+            color: #3b82f6;
+            transform: scale(1.1);
+        }
+
+        .drag-handle:active {
+            cursor: grabbing;
+            transform: scale(0.95);
+        }
+
+        /* Status Badge Pulse */
+        .status-badge {
+            animation: pulse-slow 4s infinite;
+        }
+
+        /* Gradient Background */
+        .gradient-bg {
+            background: linear-gradient(
+                -45deg,
+                #f8fafc,
+                #e2e8f0,
+                #cbd5e1,
+                #f1f5f9
+            );
+            background-size: 400% 400%;
+            animation: gradient 15s ease infinite;
+        }
     </style>
 </head>
-<body class="bg-slate-100 min-h-screen text-slate-800">
+<body class="gradient-bg min-h-screen text-slate-800">
 
 <div class="flex h-screen overflow-hidden">
 
     <!-- ── Sidebar ─────────────────────────────────────── -->
-    <aside class="w-56 bg-slate-900 flex flex-col flex-shrink-0 h-full overflow-y-auto">
-        <div class="px-5 pt-6 pb-5 border-b border-slate-700/60">
-            <div class="text-white font-black text-lg tracking-tight">Prompt-Berk</div>
-            <div class="text-slate-400 text-xs mt-0.5 font-medium">ตั้งค่าระบบ</div>
+    <aside class="w-64 glass-sidebar flex flex-col flex-shrink-0 h-full overflow-y-auto">
+        <div class="px-6 pt-8 pb-4 border-b border-white/10">
+            <div class="text-white font-black text-2xl tracking-tighter leading-none font-display">Prompt-Berk</div>
+            <div class="text-slate-400 text-sm mt-2 font-medium tracking-wide">ตั้งค่าระบบ</div>
+            <div class="mt-4 h-1 w-12 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full"></div>
+
+            <!-- ปุ่มกลับหน้าหลัก -->
+            <a href="index.html"
+                class="mt-4 flex items-center gap-2 text-slate-400 hover:text-blue-400 text-sm font-semibold transition-all hover:translate-x-1 py-2 px-3 rounded-lg hover:bg-white/5">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                </svg>
+                กลับหน้าหลัก
+            </a>
         </div>
 
-        <nav class="flex-1 py-4 px-3 space-y-0.5">
+        <nav class="flex-1 py-6 px-4 space-y-2">
+            <button onclick="showPanel('dashboard')" id="nav-dashboard"
+                class="nav-item active w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-bold text-left tracking-tight">
+                <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                </svg>
+                Dashboard
+            </button>
             <button onclick="showPanel('categories')" id="nav-categories"
-                class="nav-item active w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold text-left">
+                class="nav-item w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-bold text-left tracking-tight">
                 <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
                 </svg>
                 หมวดหมู่งบประมาณ
             </button>
+            <button onclick="showPanel('log')" id="nav-log"
+                class="nav-item w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-bold text-left tracking-tight">
+                <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                บันทึกรายการทั้งระบบ
+            </button>
+            <button onclick="showPanel('places')" id="nav-places"
+                class="nav-item w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-bold text-left tracking-tight">
+                <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+                สมุดสถานที่
+            </button>
             <button onclick="showPanel('users')" id="nav-users"
-                class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold text-left">
-                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                class="nav-item w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-bold text-left tracking-tight">
+                <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round"
                         d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
                 </svg>
                 จัดการ Users
             </button>
             <button onclick="showPanel('settings')" id="nav-settings"
-                class="nav-item w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold text-left">
+                class="nav-item w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-bold text-left tracking-tight">
                 <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
@@ -56,37 +299,165 @@
                 ตั้งค่าระบบ
             </button>
         </nav>
-
-        <div class="p-4 border-t border-slate-700/60">
-            <a href="index.html"
-                class="flex items-center gap-2 text-slate-400 hover:text-slate-200 text-sm font-medium transition-colors py-1">
-                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
-                </svg>
-                กลับหน้าหลัก
-            </a>
-        </div>
     </aside>
 
     <!-- ── Main content ────────────────────────────────── -->
-    <main class="flex-1 overflow-y-auto bg-slate-100">
+    <main class="flex-1 overflow-y-auto">
+
+        <!-- Panel: Dashboard -->
+        <div id="panel-dashboard">
+            <div class="px-8 py-6 border-b border-white/40 backdrop-blur-xl bg-white/70 sticky top-0 z-10 shadow-sm">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/30 float">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="text-2xl font-black text-slate-800 tracking-tighter leading-none font-display">Dashboard</h1>
+                        <p class="text-slate-500 text-sm mt-1 font-medium">ภาพรวมระบบ สถิติ และข้อมูลสำคัญ</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-8 space-y-6">
+                <!-- Stats Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Total Users -->
+                    <div class="premium-card rounded-3xl p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-slate-500 font-semibold mb-1">ผู้ใช้ทั้งหมด</p>
+                                <h3 class="text-4xl font-black text-blue-600" id="dashTotalUsers">0</h3>
+                            </div>
+                            <div class="w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center">
+                                <svg class="w-7 h-7 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Total Expenses -->
+                    <div class="premium-card rounded-3xl p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-slate-500 font-semibold mb-1">รายการเบิกทั้งหมด</p>
+                                <h3 class="text-4xl font-black text-green-600" id="dashTotalExpenses">0</h3>
+                            </div>
+                            <div class="w-14 h-14 bg-green-100 rounded-2xl flex items-center justify-center">
+                                <svg class="w-7 h-7 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Total Amount -->
+                    <div class="premium-card rounded-3xl p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-slate-500 font-semibold mb-1">ยอดเงินรวม</p>
+                                <h3 class="text-4xl font-black text-amber-600" id="dashTotalAmount">0</h3>
+                                <p class="text-xs text-slate-400 mt-1">บาท</p>
+                            </div>
+                            <div class="w-14 h-14 bg-amber-100 rounded-2xl flex items-center justify-center">
+                                <svg class="w-7 h-7 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- แถวตัวเลขรอง -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="premium-card rounded-2xl p-4">
+                        <p class="text-xs text-slate-500 font-semibold">เฉลี่ยต่อใบ</p>
+                        <p class="text-2xl font-black text-slate-800 tabular-nums" id="dashAvg">0</p>
+                        <p class="text-[11px] text-slate-400">บาท</p>
+                    </div>
+                    <div class="premium-card rounded-2xl p-4">
+                        <p class="text-xs text-slate-500 font-semibold">ระยะทางรวม</p>
+                        <p class="text-2xl font-black text-slate-800 tabular-nums" id="dashKm">0</p>
+                        <p class="text-[11px] text-slate-400">กิโลเมตร</p>
+                    </div>
+                    <div class="premium-card rounded-2xl p-4">
+                        <p class="text-xs text-slate-500 font-semibold">โปรไฟล์ในระบบ</p>
+                        <p class="text-2xl font-black text-slate-800 tabular-nums" id="dashProfiles">0</p>
+                        <p class="text-[11px] text-slate-400">คน</p>
+                    </div>
+                    <div class="premium-card rounded-2xl p-4">
+                        <p class="text-xs text-slate-500 font-semibold">เดือนที่เบิกสูงสุด</p>
+                        <p class="text-2xl font-black text-blue-600" id="dashPeak">—</p>
+                        <p class="text-[11px] text-slate-400" id="dashPeakAmt">&nbsp;</p>
+                    </div>
+                </div>
+
+                <!-- 1. ตามหน่วยงาน + 3. ตามประเภทค่าใช้จ่าย -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="premium-card rounded-3xl p-6">
+                        <h3 class="font-black text-slate-800 mb-1">ตามหน่วยงาน</h3>
+                        <p class="text-xs text-slate-400 mb-4">แต่ละกลุ่มงานเบิกไปเท่าไร กี่ครั้ง เฉลี่ยต่อครั้ง</p>
+                        <div id="dashAffil" class="space-y-3"></div>
+                    </div>
+                    <div class="premium-card rounded-3xl p-6">
+                        <h3 class="font-black text-slate-800 mb-1">ตามประเภทค่าใช้จ่าย</h3>
+                        <p class="text-xs text-slate-400 mb-4">สัดส่วนค่าน้ำมัน ที่พัก แท็กซี่ เครื่องบิน</p>
+                        <div id="dashCostBar" class="flex h-4 rounded-full overflow-hidden mb-4 bg-slate-100"></div>
+                        <div id="dashCost" class="space-y-2"></div>
+                    </div>
+                </div>
+
+                <!-- 2. ตามเวลา -->
+                <div class="premium-card rounded-3xl p-6">
+                    <h3 class="font-black text-slate-800 mb-1">ยอดเบิกรายเดือน</h3>
+                    <p class="text-xs text-slate-400 mb-5">แนวโน้มขึ้นลงและเดือนที่พีค</p>
+                    <div id="dashMonth" class="flex items-end gap-3 h-52 overflow-x-auto pb-1"></div>
+                </div>
+
+                <!-- 4. ตามปลายทาง + 5. ตามคน -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="premium-card rounded-3xl p-6">
+                        <h3 class="font-black text-slate-800 mb-1">ตามจังหวัดปลายทาง</h3>
+                        <p class="text-xs text-slate-400 mb-4">จังหวัดไหนไปบ่อยสุด ระยะทางรวมเท่าไร</p>
+                        <div class="overflow-x-auto"><table class="w-full text-sm" id="dashProvTable"></table></div>
+                    </div>
+                    <div class="premium-card rounded-3xl p-6">
+                        <h3 class="font-black text-slate-800 mb-1">ตามผู้เบิก</h3>
+                        <p class="text-xs text-slate-400 mb-4">10 อันดับแรก และผู้ที่ยังไม่เคยเบิก</p>
+                        <div class="overflow-x-auto"><table class="w-full text-sm" id="dashPersonTable"></table></div>
+                        <div id="dashNever" class="mt-4 text-xs"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <!-- Panel: Categories -->
         <div id="panel-categories">
-            <div class="px-6 py-4 border-b border-slate-200 bg-white sticky top-0 z-10">
-                <h1 class="text-lg font-bold text-slate-800">หมวดหมู่งบประมาณ</h1>
-                <p class="text-slate-500 text-xs mt-0.5">สร้างและแก้ไขหมวดหมู่ กำหนดสูตรคำนวณ และเอกสารแนบที่จำเป็น</p>
+            <div class="px-8 py-6 border-b border-white/40 backdrop-blur-xl bg-white/70 sticky top-0 z-10 shadow-sm">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/30 float">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="text-2xl font-black text-slate-800 tracking-tighter leading-none font-display">หมวดหมู่งบประมาณ</h1>
+                        <p class="text-slate-500 text-sm mt-1 font-medium">สร้างและแก้ไขหมวดหมู่ กำหนดสูตรคำนวณ และเอกสารแนบที่จำเป็น</p>
+                    </div>
+                </div>
             </div>
 
-            <div class="p-6 grid grid-cols-1 xl:grid-cols-5 gap-5">
+            <div class="p-8 grid grid-cols-1 xl:grid-cols-5 gap-6">
 
                 <!-- Form column (xl: 2 cols) -->
-                <div class="xl:col-span-2 space-y-4">
+                <div class="xl:col-span-2 space-y-5">
 
                     <!-- Category fields -->
-                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-                        <div class="flex items-center justify-between mb-4">
-                            <h2 id="formPanelTitle" class="font-bold text-slate-700">เพิ่มหมวดหมู่ใหม่</h2>
+                    <div class="premium-card rounded-3xl p-6">
+                        <div class="flex items-center justify-between mb-5">
+                            <h2 id="formPanelTitle" class="text-xl font-black text-slate-800 tracking-tight font-display">เพิ่มหมวดหมู่ใหม่</h2>
                         </div>
 
                         <div id="editModeBanner"
@@ -98,27 +469,32 @@
                             </button>
                         </div>
 
-                        <div class="space-y-3">
+                        <div class="space-y-4">
                             <div>
-                                <label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wide">รหัสหมวดหมู่ (ID)</label>
+                                <label class="block text-xs font-extrabold text-slate-600 mb-2 uppercase tracking-widest">รหัสหมวดหมู่ (ID)</label>
                                 <input type="text" id="catId" placeholder="เช่น TRAVEL, FOOD_01"
-                                    class="w-full border border-slate-200 px-3 py-2 rounded-lg text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none uppercase font-mono transition">
+                                    class="input-glow w-full border-2 border-slate-200 px-4 py-3 rounded-xl text-sm outline-none uppercase font-mono transition-all duration-300 bg-white/80 hover:bg-white hover:border-slate-300">
                             </div>
                             <div>
-                                <label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wide">ชื่อหมวดหมู่</label>
+                                <label class="block text-xs font-extrabold text-slate-600 mb-2 uppercase tracking-widest">ชื่อหมวดหมู่</label>
                                 <input type="text" id="catName" placeholder="เช่น ค่าเดินทางไปปฏิบัติงาน"
-                                    class="w-full border border-slate-200 px-3 py-2 rounded-lg text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition">
+                                    class="input-glow w-full border-2 border-slate-200 px-4 py-3 rounded-xl text-sm outline-none transition-all duration-300 bg-white/80 hover:bg-white hover:border-slate-300">
                             </div>
                             <div>
-                                <label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wide">ตัวแปรที่ใช้ (คั่นด้วยลูกน้ำ)</label>
-                                <input type="text" id="catVars" placeholder="เช่น จำนวนคน, เรทราคา"
-                                    class="w-full border border-slate-200 px-3 py-2 rounded-lg text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition">
+                                <label class="block text-xs font-extrabold text-slate-600 mb-2 uppercase tracking-widest">ตัวแปรที่ใช้ (คั่นด้วยลูกน้ำ)</label>
+                                <input type="text" id="catVars" placeholder="เช่น จำนวนคน, เรทราคา" oninput="onTplCheckChange()"
+                                    class="input-glow w-full border-2 border-slate-200 px-4 py-3 rounded-xl text-sm outline-none transition-all duration-300 bg-white/80 hover:bg-white hover:border-slate-300">
                             </div>
                             <div>
-                                <label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wide">สมการคำนวณ (Formula)</label>
-                                <textarea id="catFormula" rows="2" placeholder="เช่น จำนวนคน * เรทราคา"
-                                    class="w-full border border-slate-200 px-3 py-2 rounded-lg text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none font-mono transition resize-none"></textarea>
-                                <p class="text-[10px] text-rose-500 mt-0.5">ต้องใช้ชื่อตัวแปรให้ตรงกับช่องด้านบน</p>
+                                <label class="block text-xs font-extrabold text-slate-600 mb-2 uppercase tracking-widest">สมการคำนวณ (Formula)</label>
+                                <textarea id="catFormula" rows="3" placeholder="เช่น จำนวนคน * เรทราคา"
+                                    class="input-glow w-full border-2 border-slate-200 px-4 py-3 rounded-xl text-sm outline-none font-mono transition-all duration-300 resize-none bg-white/80 hover:bg-white hover:border-slate-300"></textarea>
+                                <p class="text-xs text-rose-600 mt-2 font-semibold flex items-center gap-1.5">
+                                    <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                                    </svg>
+                                    ต้องใช้ชื่อตัวแปรให้ตรงกับช่องด้านบน
+                                </p>
                             </div>
                             <div>
                                 <label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wide">
@@ -158,6 +534,8 @@
                                     </label>
                                 </div>
                                 <p class="text-[10px] text-slate-400 mt-1">เลือกได้หลายรายการ — ฟอร์มเบิกจะปรับช่องกรอกตามนี้</p>
+                                <!-- ตัวอย่างว่าติ๊กแบบนี้แล้วผู้ใช้ต้องกรอกอะไร + เตือนถ้าตั้งค่าขัดกัน -->
+                                <div id="tplPreview" class="mt-2 p-3 rounded-xl bg-blue-50/60 border border-blue-100"></div>
                             </div>
                             <div>
                                 <label class="block text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wide">วงเงิน Taxi สูงสุดต่อเที่ยว</label>
@@ -208,70 +586,75 @@
                     </div>
 
                     <!-- Attachment order & rules -->
-                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-                        <div class="flex items-center justify-between mb-1">
-                            <h3 class="font-bold text-slate-700 text-sm">เอกสารแนบ</h3>
-                            <span class="text-[10px] text-slate-400 flex items-center gap-1">
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"/>
+                    <div class="premium-card rounded-3xl p-6">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-lg font-black text-slate-800 tracking-tight font-display">เอกสารแนบ</h3>
+                            <span class="text-xs text-slate-500 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 8h16M4 16h16"/>
                                 </svg>
                                 ลากเพื่อเรียงลำดับ
                             </span>
                         </div>
-                        <p class="text-[11px] text-slate-500 mb-3">ติ๊ก <b>แสดง</b> เพื่อให้มีช่องแนบ &bull; ติ๊ก <b>บังคับ</b> เมื่อต้องการให้แนบก่อนบันทึก</p>
-                        <div class="rounded-xl border border-slate-200 overflow-hidden">
-                            <table class="w-full text-xs">
-                                <thead class="bg-slate-50 border-b border-slate-200">
-                                    <tr class="text-[11px] uppercase text-slate-400 font-bold">
-                                        <th class="px-3 py-2 text-left">ประเภท / ชื่อ</th>
-                                        <th class="px-2 py-2 text-center w-14">แสดง</th>
-                                        <th class="px-2 py-2 text-center w-14">บังคับ</th>
-                                        <th class="px-2 py-2 text-center w-20">จัดการ</th>
+                        <p class="text-sm text-slate-600 mb-4 font-medium">ติ๊ก <b class="text-slate-800">แสดง</b> เพื่อให้มีช่องแนบ &bull; ติ๊ก <b class="text-slate-800">บังคับ</b> เมื่อต้องการให้แนบก่อนบันทึก</p>
+                        <div class="rounded-2xl border-2 border-slate-200 overflow-hidden bg-white/60">
+                            <table class="w-full text-sm">
+                                <thead class="bg-gradient-to-r from-slate-50 to-slate-100/50 border-b-2 border-slate-200">
+                                    <tr class="text-xs uppercase text-slate-500 font-extrabold tracking-wider">
+                                        <th class="px-4 py-3 text-left">ประเภท / ชื่อ</th>
+                                        <th class="px-3 py-3 text-center w-16">แสดง</th>
+                                        <th class="px-3 py-3 text-center w-16">บังคับ</th>
+                                        <th class="px-3 py-3 text-center w-24">จัดการ</th>
                                     </tr>
                                 </thead>
-                                <tbody id="attachmentTableBody" class="divide-y divide-slate-100">
+                                <tbody id="attachmentTableBody" class="divide-y divide-slate-100/60">
                                     <!-- rendered by renderAttachmentRows() -->
                                 </tbody>
                             </table>
                         </div>
                         <button type="button" onclick="addCustomAttRow()"
-                            class="mt-2 w-full flex items-center justify-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-800 border border-dashed border-blue-200 hover:border-blue-400 py-2 rounded-xl transition-colors">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                            class="mt-3 w-full flex items-center justify-center gap-2 text-sm font-bold text-blue-600 hover:text-blue-700 border-2 border-dashed border-blue-200 hover:border-blue-400 py-3 rounded-2xl transition-all duration-300 bg-blue-50/30 hover:bg-blue-50">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
                             เพิ่มประเภทเอกสารแนบ
                         </button>
                     </div>
 
                     <button type="button" id="btnSaveCategory" onclick="saveCategory()"
-                        class="w-full bg-slate-800 text-white font-bold py-2.5 rounded-xl hover:bg-slate-900 transition-colors shadow text-sm">
+                        class="btn-gradient w-full text-white font-black py-4 rounded-2xl text-base tracking-tight">
                         บันทึกหมวดหมู่
                     </button>
                 </div>
 
                 <!-- Table column (xl: 3 cols) -->
                 <div class="xl:col-span-3">
-                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                        <div class="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
-                            <h2 class="font-bold text-slate-700 text-sm">หมวดหมู่ที่ใช้งานอยู่</h2>
+                    <div class="premium-card rounded-3xl overflow-hidden">
+                        <div class="px-6 py-5 border-b border-slate-200/60 flex items-center justify-between backdrop-blur-sm">
+                            <h2 class="text-lg font-black text-slate-800 tracking-tight font-display">หมวดหมู่ที่ใช้งานอยู่</h2>
                             <button onclick="loadDemoData()"
-                                class="text-[11px] font-bold px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors">
+                                class="text-xs font-bold px-4 py-2 rounded-xl bg-gradient-to-r from-slate-100 to-slate-50 hover:from-slate-200 hover:to-slate-100 text-slate-700 transition-all duration-300 border border-slate-200 shadow-sm hover:shadow">
                                 โหลดข้อมูลตัวอย่าง
                             </button>
                         </div>
                         <div class="overflow-x-auto">
                             <table class="w-full text-left">
-                                <thead class="text-[11px] uppercase text-slate-400 bg-slate-50 border-b border-slate-100">
+                                <thead class="text-xs uppercase text-slate-500 bg-gradient-to-r from-slate-50 to-slate-100/50 border-b-2 border-slate-200">
                                     <tr>
-                                        <th class="px-4 py-2.5 font-bold">รหัส / ชื่อ</th>
-                                        <th class="px-4 py-2.5 font-bold">ตัวแปร &amp; สมการ</th>
-                                        <th class="px-4 py-2.5 font-bold">ช่องแนบ</th>
-                                        <th class="px-4 py-2.5 font-bold text-center w-20">จัดการ</th>
+                                        <th class="px-6 py-4 font-extrabold tracking-wider">รหัส / ชื่อ</th>
+                                        <th class="px-6 py-4 font-extrabold tracking-wider">ตัวแปร &amp; สมการ</th>
+                                        <th class="px-6 py-4 font-extrabold tracking-wider">ช่องแนบ</th>
+                                        <th class="px-6 py-4 font-extrabold tracking-wider text-center w-24">จัดการ</th>
                                     </tr>
                                 </thead>
-                                <tbody id="categoryTableBody" class="divide-y divide-slate-100 text-sm"></tbody>
+                                <tbody id="categoryTableBody" class="divide-y divide-slate-100/60 text-sm"></tbody>
                             </table>
                         </div>
-                        <div class="px-5 py-3 bg-slate-50 border-t border-slate-100 text-[11px] text-slate-500">
-                            ข้อมูลถูกบันทึกบนเซิร์ฟเวอร์ (SQLite) — ทุกคนที่เข้าใช้จะเห็นหมวดหมู่เดียวกัน
+                        <div class="px-6 py-4 bg-gradient-to-r from-slate-50/80 to-white/40 border-t border-slate-200/60 backdrop-blur-sm">
+                            <div class="flex items-center gap-2 text-xs text-slate-600">
+                                <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7"/>
+                                </svg>
+                                <span class="font-medium">ข้อมูลถูกบันทึกบนเซิร์ฟเวอร์ (SQLite) — ทุกคนที่เข้าใช้จะเห็นหมวดหมู่เดียวกัน</span>
+                            </div>
                         </div>
                     </div>
 
@@ -280,13 +663,161 @@
         </div>
 
         <!-- Panel: Users -->
-        <div id="panel-users" style="display:none">
-            <div class="px-6 py-4 border-b border-slate-200 bg-white sticky top-0 z-10">
-                <h1 class="text-lg font-bold text-slate-800">จัดการ Users</h1>
-                <p class="text-slate-500 text-xs mt-0.5">เปลี่ยน Role, Reset รหัสผ่าน, ลบ User</p>
+        <!-- ── บันทึกรายการทั้งระบบ (อ่านอย่างเดียว) ─────────── -->
+        <div id="panel-log" style="display:none">
+            <div class="mb-6">
+                <h1 class="text-2xl font-extrabold text-slate-800 tracking-tight">บันทึกรายการทั้งระบบ</h1>
+                <p class="text-sm text-slate-500 mt-1">
+                    ทุกใบเบิกของทุกคน เรียงจากใหม่ไปเก่า — <b>ดูอย่างเดียว แก้ไขหรือลบจากหน้านี้ไม่ได้</b>
+                </p>
             </div>
-            <div class="p-6">
-                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+
+            <div class="bg-white rounded-2xl border border-slate-200 p-4 mb-4">
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
+                    <div class="md:col-span-2">
+                        <label class="block text-[11px] font-bold text-slate-500 mb-1">ค้นหา</label>
+                        <input id="logQ" type="text" placeholder="ชื่อผู้เดินทาง / ผู้บันทึก / จังหวัด / เลขที่รายการ"
+                            class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-500 mb-1">ผู้บันทึก</label>
+                        <select id="logUser" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500">
+                            <option value="">ทุกคน</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-500 mb-1">จังหวัดปลายทาง</label>
+                        <select id="logProv" class="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500">
+                            <option value="">ทุกจังหวัด</option>
+                        </select>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-500 mb-1">ตั้งแต่</label>
+                            <input id="logFrom" type="date" class="w-full border border-slate-200 rounded-lg px-2 py-2 text-sm outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-500 mb-1">ถึง</label>
+                            <input id="logTo" type="date" class="w-full border border-slate-200 rounded-lg px-2 py-2 text-sm outline-none focus:border-blue-500">
+                        </div>
+                    </div>
+                </div>
+                <div class="flex flex-wrap items-center gap-3 mt-3 pt-3 border-t border-slate-100">
+                    <label class="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                        <input id="logFlagged" type="checkbox" class="rounded">
+                        เฉพาะรายการที่ต้องตรวจสอบ
+                    </label>
+                    <button onclick="loadLog(1)" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-bold hover:bg-blue-700">
+                        ค้นหา
+                    </button>
+                    <button onclick="resetLogFilter()" class="px-4 py-2 rounded-lg border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50">
+                        ล้างตัวกรอง
+                    </button>
+                    <div id="logSummary" class="text-sm text-slate-500 ml-auto"></div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-slate-50 border-b border-slate-200">
+                            <tr class="text-left text-[11px] font-bold text-slate-500 uppercase tracking-wide">
+                                <th class="px-4 py-3">เลขที่</th>
+                                <th class="px-4 py-3">วันที่บันทึก</th>
+                                <th class="px-4 py-3">ผู้บันทึก</th>
+                                <th class="px-4 py-3">ผู้เดินทาง</th>
+                                <th class="px-4 py-3">ปลายทาง</th>
+                                <th class="px-4 py-3 text-right">ระยะทาง</th>
+                                <th class="px-4 py-3 text-right">ยอดเงิน</th>
+                                <th class="px-4 py-3"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="logBody"></tbody>
+                    </table>
+                </div>
+                <div id="logPager" class="flex items-center justify-between gap-3 px-4 py-3 border-t border-slate-100"></div>
+            </div>
+        </div>
+
+        <!-- หน้าต่างดูรายละเอียดรายการ -->
+        <div id="logDetail" class="fixed inset-0 bg-black/40 z-50 items-center justify-center p-4" style="display:none">
+            <div class="bg-white rounded-2xl w-full max-w-3xl max-h-[85vh] flex flex-col">
+                <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+                    <h3 id="logDetailTitle" class="font-extrabold text-slate-800">รายละเอียดรายการ</h3>
+                    <button onclick="closeLogDetail()" class="text-slate-400 hover:text-slate-700 text-2xl leading-none">&times;</button>
+                </div>
+                <div id="logDetailBody" class="p-5 overflow-y-auto text-sm"></div>
+                <div class="px-5 py-3 border-t border-slate-100 flex items-center gap-2">
+                    <a id="logDetailPdf" href="#" target="_blank"
+                        class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-bold hover:bg-blue-700">
+                        เปิดดู / ออก PDF
+                    </a>
+                    <button onclick="closeLogDetail()"
+                        class="px-4 py-2 rounded-lg border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50">ปิด</button>
+                    <span class="text-xs text-slate-400 ml-auto">หน้านี้ดูอย่างเดียว ไม่มีปุ่มแก้ไขหรือลบ</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── สมุดสถานที่ ────────────────────────────────── -->
+        <div id="panel-places" style="display:none">
+            <div class="mb-6">
+                <h1 class="text-2xl font-extrabold text-slate-800 tracking-tight">สมุดสถานที่</h1>
+                <p class="text-sm text-slate-500 mt-1">
+                    ระบบจำสถานที่ที่มีคนเลือกใช้จริงไว้เอง ผู้ใช้ไม่ต้องทำอะไร —
+                    ยิ่งใช้บ่อยยิ่งค้นเจอง่ายขึ้น <b>แม้พิมพ์ผิด</b>
+                </p>
+            </div>
+
+            <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4 text-sm text-amber-900">
+                รายการที่ขึ้นต้นว่า <b>"เริ่มต้นระบบ"</b> ดึงมาจากผลค้นหาเดิมตอนตั้งระบบ
+                จึงมีชื่อถนนและซอยที่มาจากการค้นที่อยู่บ้านปนอยู่ ไม่ใช่จุดหมายที่ใครจะค้นหา —
+                ลบทิ้งได้เลย รายการแนะนำจะสะอาดขึ้น
+            </div>
+
+            <div class="bg-white rounded-2xl border border-slate-200 p-4 mb-4 flex flex-wrap items-center gap-3">
+                <input id="placeQ" type="text" placeholder="ค้นหาชื่อสถานที่..."
+                    class="flex-1 min-w-[220px] border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500">
+                <button onclick="loadPlaces()" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-bold hover:bg-blue-700">ค้นหา</button>
+                <button onclick="document.getElementById('placeQ').value=''; loadPlaces()"
+                    class="px-4 py-2 rounded-lg border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50">ล้าง</button>
+                <div id="placeSummary" class="text-sm text-slate-500 ml-auto"></div>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-slate-50 border-b border-slate-200">
+                            <tr class="text-left text-[11px] font-bold text-slate-500 uppercase tracking-wide">
+                                <th class="px-4 py-3">ชื่อสถานที่</th>
+                                <th class="px-4 py-3">ที่อยู่</th>
+                                <th class="px-4 py-3 text-right">ใช้ไปแล้ว</th>
+                                <th class="px-4 py-3">ที่มา</th>
+                                <th class="px-4 py-3"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="placeBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="panel-users" style="display:none">
+            <div class="px-8 py-6 border-b border-white/40 backdrop-blur-xl bg-white/70 sticky top-0 z-10 shadow-sm">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/30 float">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="text-2xl font-black text-slate-800 tracking-tighter leading-none font-display">จัดการ Users</h1>
+                        <p class="text-slate-500 text-sm mt-1 font-medium">เปลี่ยน Role, Reset รหัสผ่าน, ลบ User</p>
+                    </div>
+                </div>
+            </div>
+            <div class="p-8">
+                <div class="premium-card rounded-3xl overflow-hidden">
                     <div id="users-loading" class="p-8 text-center text-slate-400 text-sm">กำลังโหลด...</div>
                     <table class="w-full text-sm hidden" id="users-table">
                         <thead class="bg-slate-50 border-b border-slate-200">
@@ -303,7 +834,9 @@
             </div>
 
             <!-- Reset password modal -->
-            <div id="reset-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:center;justify-content:center;">
+            <!-- display ต้องประกาศครั้งเดียว เดิมเขียน none แล้วตามด้วย flex ตัวหลังชนะ modal เลยเด้งตลอด
+                 การจัดกึ่งกลางย้ายไปทำตอนเปิด (openResetModal ตั้งเป็น flex) -->
+            <div id="reset-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center;">
                 <div style="background:#fff;border-radius:16px;padding:28px 32px;width:380px;max-width:90vw;box-shadow:0 8px 40px rgba(0,0,0,.25);">
                     <h3 style="font-weight:700;font-size:1rem;margin-bottom:16px;">Reset รหัสผ่าน</h3>
                     <p id="reset-modal-email" style="color:#64748b;font-size:.85rem;margin-bottom:14px;"></p>
@@ -321,15 +854,25 @@
 
         <!-- Panel: Settings -->
         <div id="panel-settings" style="display:none">
-            <div class="px-6 py-4 border-b border-slate-200 bg-white sticky top-0 z-10">
-                <h1 class="text-lg font-bold text-slate-800">ตั้งค่าระบบ</h1>
-                <p class="text-slate-500 text-xs mt-0.5">กำหนดอัตราค่าใช้จ่ายและวงเงินสูงสุดที่ใช้ทั้งระบบ</p>
+            <div class="px-8 py-6 border-b border-white/40 backdrop-blur-xl bg-white/70 sticky top-0 z-10 shadow-sm">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/30 float">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="text-2xl font-black text-slate-800 tracking-tighter leading-none font-display">ตั้งค่าระบบ</h1>
+                        <p class="text-slate-500 text-sm mt-1 font-medium">กำหนดอัตราค่าใช้จ่ายและวงเงินสูงสุดที่ใช้ทั้งระบบ</p>
+                    </div>
+                </div>
             </div>
 
-            <div class="p-6">
-                <div class="max-w-3xl">
+            <div class="p-8">
+                <div class="max-w-4xl mx-auto">
                     <!-- Settings Form -->
-                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                    <div class="premium-card rounded-3xl p-8">
                         <h3 class="text-base font-bold text-slate-700 mb-5 flex items-center gap-2">
                             <span class="bg-blue-600 text-white w-7 h-7 rounded-lg inline-flex items-center justify-center text-sm">⚙️</span>
                             อัตราค่าใช้จ่ายมาตรฐาน
@@ -347,10 +890,10 @@
                                     <label class="block text-sm font-bold text-slate-700">⛽ ค่าน้ำมันรถยนต์</label>
                                     <p class="text-xs text-slate-500 mt-1">อัตราค่าน้ำมันต่อกิโลเมตร</p>
                                 </div>
-                                <div class="flex items-center gap-2">
+                                <div class="flex items-center gap-3">
                                     <input type="number" id="setting-fuelRate" step="0.01" min="0"
-                                        class="w-full border-2 border-slate-300 p-2.5 rounded-lg text-sm font-bold outline-none focus:border-blue-500">
-                                    <span class="text-sm text-slate-600 whitespace-nowrap">บาท/กม.</span>
+                                        class="input-glow w-full border-2 border-slate-200 px-4 py-3 rounded-xl text-base font-bold outline-none transition-all duration-300 bg-white/80 hover:bg-white hover:border-slate-300">
+                                    <span class="text-base text-slate-700 whitespace-nowrap font-semibold">บาท/กม.</span>
                                 </div>
                             </div>
 
@@ -360,36 +903,46 @@
                                     <label class="block text-sm font-bold text-slate-700">🚕 ค่าแท็กซี่สูงสุด</label>
                                     <p class="text-xs text-slate-500 mt-1">วงเงินสูงสุดต่อเที่ยว</p>
                                 </div>
-                                <div class="flex items-center gap-2">
+                                <div class="flex items-center gap-3">
                                     <input type="number" id="setting-taxiMaxPerTrip" step="1" min="0"
-                                        class="w-full border-2 border-slate-300 p-2.5 rounded-lg text-sm font-bold outline-none focus:border-blue-500">
-                                    <span class="text-sm text-slate-600 whitespace-nowrap">บาท/เที่ยว</span>
+                                        class="input-glow w-full border-2 border-slate-200 px-4 py-3 rounded-xl text-base font-bold outline-none transition-all duration-300 bg-white/80 hover:bg-white hover:border-slate-300">
+                                    <span class="text-base text-slate-700 whitespace-nowrap font-semibold">บาท/เที่ยว</span>
                                 </div>
                             </div>
 
                             <!-- Hotel Rate Single -->
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center p-4 bg-slate-50 rounded-lg border border-slate-200">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center p-5 bg-gradient-to-r from-slate-50 to-white rounded-2xl border-2 border-slate-200 shadow-sm">
                                 <div>
-                                    <label class="block text-sm font-bold text-slate-700">🏨 ค่าที่พัก (พักเดี่ยว)</label>
-                                    <p class="text-xs text-slate-500 mt-1">อัตราค่าที่พักสูงสุด</p>
+                                    <label class="block text-base font-bold text-slate-700 flex items-center gap-2">
+                                        <svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                                        </svg>
+                                        ค่าที่พัก (พักเดี่ยว)
+                                    </label>
+                                    <p class="text-sm text-slate-500 mt-1.5 font-medium">อัตราค่าที่พักสูงสุด</p>
                                 </div>
-                                <div class="flex items-center gap-2">
+                                <div class="flex items-center gap-3">
                                     <input type="number" id="setting-hotelRateSingle" step="1" min="0"
-                                        class="w-full border-2 border-slate-300 p-2.5 rounded-lg text-sm font-bold outline-none focus:border-blue-500">
-                                    <span class="text-sm text-slate-600 whitespace-nowrap">บาท/คืน</span>
+                                        class="input-glow w-full border-2 border-slate-200 px-4 py-3 rounded-xl text-base font-bold outline-none transition-all duration-300 bg-white/80 hover:bg-white hover:border-slate-300">
+                                    <span class="text-base text-slate-700 whitespace-nowrap font-semibold">บาท/คืน</span>
                                 </div>
                             </div>
 
                             <!-- Hotel Rate Double -->
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center p-4 bg-slate-50 rounded-lg border border-slate-200">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center p-5 bg-gradient-to-r from-slate-50 to-white rounded-2xl border-2 border-slate-200 shadow-sm">
                                 <div>
-                                    <label class="block text-sm font-bold text-slate-700">🏨 ค่าที่พัก (พักคู่)</label>
-                                    <p class="text-xs text-slate-500 mt-1">อัตราค่าที่พักสูงสุด</p>
+                                    <label class="block text-base font-bold text-slate-700 flex items-center gap-2">
+                                        <svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                                        </svg>
+                                        ค่าที่พัก (พักคู่)
+                                    </label>
+                                    <p class="text-sm text-slate-500 mt-1.5 font-medium">อัตราค่าที่พักสูงสุด</p>
                                 </div>
-                                <div class="flex items-center gap-2">
+                                <div class="flex items-center gap-3">
                                     <input type="number" id="setting-hotelRateDouble" step="1" min="0"
-                                        class="w-full border-2 border-slate-300 p-2.5 rounded-lg text-sm font-bold outline-none focus:border-blue-500">
-                                    <span class="text-sm text-slate-600 whitespace-nowrap">บาท/คืน</span>
+                                        class="input-glow w-full border-2 border-slate-200 px-4 py-3 rounded-xl text-base font-bold outline-none transition-all duration-300 bg-white/80 hover:bg-white hover:border-slate-300">
+                                    <span class="text-base text-slate-700 whitespace-nowrap font-semibold">บาท/คืน</span>
                                 </div>
                             </div>
 
@@ -408,15 +961,36 @@
                                 <div id="positionListContainer" class="space-y-2 mt-3"></div>
                             </div>
 
+                            <!-- Affiliation List -->
+                            <div class="p-4 bg-slate-50 rounded-lg border border-slate-200 mt-4">
+                                <div class="flex justify-between items-center mb-3">
+                                    <div>
+                                        <label class="block text-sm font-bold text-slate-700">🏢 รายการสังกัด/กลุ่มงาน</label>
+                                        <p class="text-xs text-slate-500 mt-1">กำหนดสังกัดที่แสดงใน Dropdown (ใช้ในโปรไฟล์)</p>
+                                    </div>
+                                    <button type="button" onclick="addAffiliation()"
+                                        class="text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700 font-medium">
+                                        + เพิ่มสังกัด
+                                    </button>
+                                </div>
+                                <div id="affiliationListContainer" class="space-y-2 mt-3"></div>
+                            </div>
+
                             <!-- Action Buttons -->
-                            <div class="flex items-center gap-3 pt-4 border-t">
+                            <div class="flex items-center gap-4 pt-6 border-t-2 border-slate-200">
                                 <button onclick="saveSettings()"
-                                    class="bg-blue-600 text-white px-6 py-2.5 rounded-lg font-bold text-sm hover:bg-blue-700 transition-colors">
-                                    💾 บันทึกการตั้งค่า
+                                    class="btn-gradient px-8 py-4 rounded-2xl font-black text-base tracking-tight text-white flex items-center gap-2">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
+                                    </svg>
+                                    บันทึกการตั้งค่า
                                 </button>
                                 <button onclick="loadSettings()"
-                                    class="bg-slate-200 text-slate-700 px-4 py-2.5 rounded-lg font-medium text-sm hover:bg-slate-300 transition-colors">
-                                    🔄 โหลดใหม่
+                                    class="bg-gradient-to-r from-slate-100 to-slate-50 hover:from-slate-200 hover:to-slate-100 text-slate-700 px-6 py-4 rounded-2xl font-bold text-base tracking-tight transition-all duration-300 border-2 border-slate-200 shadow-sm hover:shadow flex items-center gap-2">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                    </svg>
+                                    โหลดใหม่
                                 </button>
                             </div>
                         </div>
@@ -483,15 +1057,111 @@
         });
     }
 
+    /* ══════════ เอกสารที่ติ๊ก กำหนดว่าผู้ใช้ต้องกรอกอะไร ══════════
+       อ้างอิงจากโค้ดที่สร้างเอกสารจริงใน history.html ว่าแต่ละใบใช้ข้อมูลช่องไหน
+         REPORT (FM-SAM-001-04 ใบรายงานการเดินทาง)
+             ใช้ : วัน-เวลาเดินทาง · ออกจากที่พัก/ที่ทำงาน · จังหวัดปลายทาง
+                   ค่าที่พัก · ค่าตั๋วเครื่องบิน · ค่าทางด่วน · ค่าอื่นๆ
+             ไม่ใช้: แผนที่ · ระยะทาง · ประเภทรถ · ค่า Taxi · ที่อยู่ผู้เดินทาง
+         TRANSPORT_RECEIPT (FM-SAM-095-00 ใบรับรองค่าพาหนะ)
+             ใช้ : จุดเริ่มต้น-ปลายทาง · ระยะทาง · ประเภทรถ · ค่า Taxi
+                   ที่อยู่ผู้เดินทาง · ชื่อกิจกรรม · ค่าทางด่วน · ค่าอื่นๆ
+             ไม่ใช้: วัน-เวลา · ค่าที่พัก · ค่าตั๋วเครื่องบิน                     */
+
+    const TPL_FIELDS = {
+        REPORT: {
+            name: 'ใบรายงานการเดินทาง',
+            fields: ['วันและเวลาเดินทาง', 'ออกจากที่พัก/ที่ทำงาน', 'จังหวัดปลายทาง',
+                     'ค่าที่พัก', 'ค่าตั๋วเครื่องบิน', 'ค่าทางด่วน', 'ค่าอื่นๆ'],
+            needsMap: false
+        },
+        TRANSPORT_RECEIPT: {
+            name: 'ใบรับรองค่าพาหนะ',
+            fields: ['จุดเริ่มต้นและปลายทาง', 'แผนที่และระยะทาง', 'ประเภทรถ',
+                     'ค่า Taxi', 'ที่อยู่ผู้เดินทาง', 'ชื่อกิจกรรม', 'ค่าทางด่วน', 'ค่าอื่นๆ'],
+            needsMap: true
+        },
+        GENERAL_RECEIPT: {
+            name: 'ใบรับรองทั่วไป',
+            fields: ['ตารางรายการค่าใช้จ่าย'],
+            needsMap: false
+        },
+        NORMAL: {
+            name: 'บันทึกข้อความ',
+            fields: ['รายละเอียดกิจกรรม', 'ช่องคำนวณตามสูตร'],
+            needsMap: false
+        }
+    };
+
     function onTplCheckChange() {
         const templates = getPdfTemplatesFromForm();
-        if (templates.some(t => TRAVEL_TEMPLATE_IDS.includes(t))) {
-            const locationRow = document.querySelector('[data-att="LOCATION"]');
-            if (locationRow) {
-                const showCb = locationRow.querySelector('.att-show');
+        const needsMap = templates.some(t => TPL_FIELDS[t] && TPL_FIELDS[t].needsMap);
+
+        // 1) ภาพแผนที่ใช้เฉพาะ "ใบรับรองค่าพาหนะ" — ถ้าไม่ได้ติ๊กใบนั้น ห้ามเปิดช่องนี้
+        const locRow = document.querySelector('[data-att="LOCATION"]');
+        if (locRow) {
+            const showCb = locRow.querySelector('.att-show');
+            const reqCb  = locRow.querySelector('.att-req');
+            if (needsMap) {
+                showCb.disabled = false;
+                locRow.classList.remove('opacity-40');
+                locRow.title = '';
                 if (!showCb.checked) { showCb.checked = true; showCb.dispatchEvent(new Event('change')); }
+            } else {
+                // ปิดและล็อกไว้ พร้อมบอกเหตุผล ไม่ใช่ปิดเงียบๆ
+                if (showCb.checked) { showCb.checked = false; showCb.dispatchEvent(new Event('change')); }
+                if (reqCb) { reqCb.checked = false; reqCb.disabled = true; }
+                showCb.disabled = true;
+                locRow.classList.add('opacity-40');
+                locRow.title = 'ภาพแผนที่ใช้เฉพาะ "ใบรับรองค่าพาหนะ" — เอกสารที่เลือกไว้ไม่ได้ใช้แผนที่';
             }
         }
+
+        renderTplPreview(templates, needsMap);
+    }
+
+    /* 2) แสดงตัวอย่างว่าติ๊กแบบนี้ ผู้ใช้จะต้องกรอกอะไรบ้าง
+       3) เตือนถ้าตั้งค่าขัดกัน                                    */
+    function renderTplPreview(templates, needsMap) {
+        const box = document.getElementById('tplPreview');
+        if (!box) return;
+
+        if (!templates.length) {
+            box.innerHTML = '<div class="text-[11px] text-slate-400">ยังไม่ได้เลือกเอกสาร — ผู้ใช้จะเห็นเฉพาะช่องพื้นฐาน</div>';
+            return;
+        }
+
+        // รวมช่องจากทุกเอกสารที่ติ๊ก ตัดตัวซ้ำ
+        const all = [];
+        templates.forEach(t => (TPL_FIELDS[t] ? TPL_FIELDS[t].fields : []).forEach(f => {
+            if (all.indexOf(f) < 0) all.push(f);
+        }));
+
+        // ตรวจความขัดแย้ง
+        const warns = [];
+        const locRow = document.querySelector('[data-att="LOCATION"]');
+        if (!needsMap && locRow && locRow.querySelector('.att-show').checked) {
+            warns.push('เอกสารที่เลือกไม่ได้ใช้แผนที่ แต่ยังเปิดช่อง "ภาพแผนที่" อยู่');
+        }
+        // อ่านจากช่องตัวแปรจริงในฟอร์ม ไม่ใช่ตัวแปรที่เดาขึ้นมา
+        const varsStr = (document.getElementById('catVars')?.value || '').trim();
+        const hasFormula = varsStr.split(',').map(v => v.trim()).filter(Boolean).length > 0;
+        if (hasFormula && !templates.includes('NORMAL')) {
+            warns.push('ตั้งตัวแปรสูตรคำนวณไว้ แต่เอกสารที่เลือกไม่ได้ใช้สูตร (ใช้เฉพาะ "บันทึกข้อความ")');
+        }
+
+        box.innerHTML =
+            '<div class="text-[11px] font-bold text-slate-600 mb-1.5">ผู้ใช้จะต้องกรอกช่องเหล่านี้</div>' +
+            '<div class="flex flex-wrap gap-1.5">' +
+            all.map(f => '<span class="text-[10px] bg-white border border-blue-200 text-blue-800 px-2 py-0.5 rounded-full">' +
+                          _esc(f) + '</span>').join('') +
+            '</div>' +
+            (warns.length
+                ? '<div class="mt-2 pt-2 border-t border-amber-200">' +
+                  warns.map(w => '<div class="text-[10px] text-amber-800 flex items-start gap-1.5">' +
+                                 '<span>&#9888;</span><span>' + _esc(w) + '</span></div>').join('') +
+                  '</div>'
+                : '');
     }
 
     let categories = [];
@@ -713,6 +1383,7 @@
         document.getElementById('catId').value          = cat.id || '';
         document.getElementById('catName').value        = cat.name || '';
         document.getElementById('catVars').value        = (cat.activeVariables || []).join(', ');
+        setTimeout(onTplCheckChange, 0);   // อัปเดตแผงตัวอย่างให้ตรงกับหมวดที่เปิด
         document.getElementById('catFormula').value     = cat.formulaString || '';
 
         // Fuel rate
@@ -819,7 +1490,7 @@
             const reqBadges = formatAttachmentCell(cat);
             const safeId    = cat.id.replace(/'/g, "\\'");
             tbody.innerHTML += `
-                <tr class="hover:bg-slate-50 transition-colors">
+                <tr class="table-row">
                     <td class="px-4 py-3">
                         <div class="font-mono text-[11px] text-slate-400">${cat.id}</div>
                         <div class="font-semibold text-slate-800 text-sm">${cat.name}</div>
@@ -1003,7 +1674,27 @@
         alert('โหลดข้อมูลตัวอย่างเรียบร้อยแล้ว');
     }
 
-    const PANELS = ['categories', 'users', 'settings'];
+
+    /** อ่านเหตุผลจริงจากเซิร์ฟเวอร์ แล้วเขียนเป็นข้อความที่บอกได้ว่าทำอะไรต่อ */
+    async function explainError(res, action) {
+        let msg = '';
+        try { msg = (await res.json()).error || ''; } catch (_) {}
+        const me = window.__currentUser;
+        const who = me ? (me.email + ' (สิทธิ์: ' + me.role + ')') : 'ไม่ทราบบัญชี';
+        if (res.status === 403)
+            return action + 'ไม่ได้ — ไม่มีสิทธิ์\n\nบัญชีของคุณ: ' + who +
+                   '\nข้อความจากระบบ: ' + (msg || '-') +
+                   '\n\nทางแก้: ขอให้ผู้ดูแลระบบดำเนินการแทน';
+        if (res.status === 404)
+            return action + 'ไม่ได้ — ไม่พบรายการนี้แล้ว\n\nอาจมีคนอื่นลบไปก่อน กรุณารีเฟรชหน้า';
+        if (res.status === 400)
+            return action + 'ไม่ได้ — ข้อมูลไม่ถูกต้อง\n\nข้อความจากระบบ: ' + (msg || '-');
+        if (res.status === 401)
+            return 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่';
+        return action + 'ไม่สำเร็จ (HTTP ' + res.status + ')\n\nข้อความจากระบบ: ' + (msg || '-');
+    }
+
+    const PANELS = ['dashboard', 'categories', 'log', 'places', 'users', 'settings'];
     function showPanel(name) {
         PANELS.forEach(p => {
             const panel = document.getElementById('panel-' + p);
@@ -1011,8 +1702,182 @@
             if (panel) panel.style.display = p === name ? '' : 'none';
             if (nav) nav.classList.toggle('active', p === name);
         });
+        if (name === 'dashboard') loadDashboard();
+        if (name === 'categories') renderCategories();
+        if (name === 'log') loadLog(1);
+        if (name === 'places') loadPlaces();
         if (name === 'users') loadUsers();
         if (name === 'settings') loadSettings();
+    }
+
+    // ── Dashboard ──────────────────────────────────────────
+    // ดึงสถิติที่คำนวณจากฝั่งเซิร์ฟเวอร์ (GET /stats) ครอบคลุม 5 มุมมอง
+
+    const _n  = v => Number(v || 0).toLocaleString('th-TH');
+    const _b  = v => Number(v || 0).toLocaleString('th-TH', { maximumFractionDigits: 0 });
+    const _esc = s => String(s == null ? '' : s).replace(/[&<>"']/g,
+        c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+    const _monthTh = ym => {
+        const M = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+        const p = String(ym || '').split('-');
+        if (p.length < 2) return ym || '—';
+        return M[parseInt(p[1], 10) - 1] + ' ' + (parseInt(p[0], 10) + 543).toString().slice(-2);
+    };
+    const COST_COLOR = { fuel:'#3B82F6', hotel:'#8B5CF6', taxi:'#F59E0B',
+                         air:'#10B981', toll:'#EF4444', other:'#94A3B8' };
+
+    async function loadDashboard() {
+        const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+        try {
+            const res = await fetch('/stats');
+            if (!res.ok) {
+                setTxt('dashPeak', 'โหลดไม่ได้');
+                const box = document.getElementById('dashAffil');
+                if (box) box.innerHTML = '<p class="text-sm text-rose-600">' +
+                    _esc(await explainError(res, 'โหลดสถิติ')).replace(/\n/g, '<br>') + '</p>';
+                return;
+            }
+            const d = await res.json();
+            const s = d.summary;
+
+            setTxt('dashTotalUsers',    _n(s.users));
+            setTxt('dashTotalExpenses', _n(s.expenses));
+            setTxt('dashTotalAmount',   _b(s.totalAmount));
+            setTxt('dashAvg',           _b(s.avgAmount));
+            setTxt('dashKm',            _n(s.totalKm));
+            setTxt('dashProfiles',      _n(s.profiles));
+
+            const peak = (d.byMonth || []).find(m => m.name === d.peakMonth);
+            setTxt('dashPeak',    d.peakMonth ? _monthTh(d.peakMonth) : '—');
+            setTxt('dashPeakAmt', peak ? _b(peak.total) + ' บาท' : '');
+
+            renderAffiliationStats(d.byAffiliation || []);
+            renderCostStats(d.byCostType || []);
+            renderMonthStats(d.byMonth || [], d.peakMonth);
+            renderProvinceStats(d.byProvince || []);
+            renderPersonStats(d.byPerson || { top: [], neverList: [], neverClaimed: 0 });
+        } catch (err) {
+            console.error('โหลด dashboard ไม่สำเร็จ:', err);
+            const box = document.getElementById('dashAffil');
+            if (box) box.innerHTML = '<p class="text-sm text-rose-600">เชื่อมต่อเซิร์ฟเวอร์ไม่ได้: ' +
+                _esc(err.message || '') + '</p>';
+        }
+    }
+
+    function _empty(msg) {
+        return '<p class="text-sm text-slate-400 py-6 text-center">' + _esc(msg) + '</p>';
+    }
+
+    /** 1. ตามหน่วยงาน — แถบเทียบสัดส่วน */
+    function renderAffiliationStats(list) {
+        const box = document.getElementById('dashAffil');
+        if (!box) return;
+        if (!list.length) return void (box.innerHTML = _empty('ยังไม่มีข้อมูลการเบิก'));
+        const max = Math.max(...list.map(x => x.total)) || 1;
+        box.innerHTML = list.slice(0, 8).map(x => `
+            <div>
+                <div class="flex justify-between items-baseline mb-1 gap-2">
+                    <span class="text-sm font-semibold text-slate-700 truncate">${_esc(x.name)}</span>
+                    <span class="text-sm font-bold text-slate-800 tabular-nums whitespace-nowrap">${_b(x.total)}</span>
+                </div>
+                <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div class="h-full bg-blue-500 rounded-full" style="width:${(x.total / max * 100).toFixed(1)}%"></div>
+                </div>
+                <p class="text-[11px] text-slate-400 mt-1">${_n(x.count)} ครั้ง · เฉลี่ย ${_b(x.avg)} บาท/ครั้ง</p>
+            </div>`).join('');
+    }
+
+    /** 3. ตามประเภทค่าใช้จ่าย — แถบรวมสัดส่วน + รายการ */
+    function renderCostStats(list) {
+        const bar = document.getElementById('dashCostBar');
+        const box = document.getElementById('dashCost');
+        if (!box) return;
+        const shown = list.filter(x => x.total > 0);
+        if (!shown.length) {
+            if (bar) bar.innerHTML = '';
+            box.innerHTML = _empty('ยังไม่มีข้อมูลค่าใช้จ่าย');
+            return;
+        }
+        if (bar) bar.innerHTML = shown.map(x =>
+            `<div style="width:${x.pct}%;background:${COST_COLOR[x.key] || '#94A3B8'}" title="${_esc(x.type)} ${x.pct}%"></div>`
+        ).join('');
+        box.innerHTML = shown.map(x => `
+            <div class="flex items-center gap-2 text-sm">
+                <span class="w-3 h-3 rounded-sm flex-none" style="background:${COST_COLOR[x.key] || '#94A3B8'}"></span>
+                <span class="flex-1 text-slate-700">${_esc(x.type)}</span>
+                <span class="font-bold text-slate-800 tabular-nums">${_b(x.total)}</span>
+                <span class="text-slate-400 tabular-nums w-14 text-right">${x.pct}%</span>
+            </div>`).join('');
+    }
+
+    /** 2. ตามเวลา — กราฟแท่งรายเดือน */
+    function renderMonthStats(list, peakName) {
+        const box = document.getElementById('dashMonth');
+        if (!box) return;
+        if (!list.length) return void (box.innerHTML = _empty('ยังไม่มีข้อมูลรายเดือน'));
+        const max = Math.max(...list.map(x => x.total)) || 1;
+        box.innerHTML = list.map(x => {
+            const h = Math.max(4, (x.total / max) * 100);
+            const isPeak = x.name === peakName;
+            return `
+            <div class="flex-1 min-w-[54px] flex flex-col items-center justify-end h-full gap-1"
+                 title="${_esc(_monthTh(x.name))} · ${_n(x.count)} ใบ · ${_b(x.total)} บาท">
+                <span class="text-[11px] font-bold tabular-nums ${isPeak ? 'text-blue-600' : 'text-slate-500'}">${_b(x.total)}</span>
+                <div class="w-full rounded-t-lg ${isPeak ? 'bg-blue-600' : 'bg-blue-300'}" style="height:${h}%"></div>
+                <span class="text-[11px] ${isPeak ? 'text-blue-700 font-bold' : 'text-slate-500'}">${_esc(_monthTh(x.name))}</span>
+                <span class="text-[10px] text-slate-400">${_n(x.count)} ใบ</span>
+            </div>`;
+        }).join('');
+    }
+
+    /** 4. ตามปลายทาง */
+    function renderProvinceStats(list) {
+        const t = document.getElementById('dashProvTable');
+        if (!t) return;
+        if (!list.length) return void (t.innerHTML = '<tr><td>' + _empty('ยังไม่มีข้อมูลปลายทาง') + '</td></tr>');
+        t.innerHTML = `
+            <thead><tr class="text-[11px] uppercase tracking-wide text-slate-400 border-b border-slate-100">
+                <th class="text-left py-2 font-semibold">จังหวัด</th>
+                <th class="text-right py-2 font-semibold">ครั้ง</th>
+                <th class="text-right py-2 font-semibold">ระยะทาง</th>
+                <th class="text-right py-2 font-semibold">ยอดเบิก</th>
+            </tr></thead>
+            <tbody>${list.slice(0, 8).map(x => `
+                <tr class="border-b border-slate-50 last:border-0">
+                    <td class="py-2 text-slate-700">${_esc(x.name)}</td>
+                    <td class="py-2 text-right tabular-nums text-slate-600">${_n(x.count)}</td>
+                    <td class="py-2 text-right tabular-nums text-slate-600">${_n(x.km)} กม.</td>
+                    <td class="py-2 text-right tabular-nums font-bold text-slate-800">${_b(x.total)}</td>
+                </tr>`).join('')}</tbody>`;
+    }
+
+    /** 5. ตามคน */
+    function renderPersonStats(p) {
+        const t = document.getElementById('dashPersonTable');
+        const n = document.getElementById('dashNever');
+        if (!t) return;
+        const top = p.top || [];
+        t.innerHTML = !top.length
+            ? '<tr><td>' + _empty('ยังไม่มีใครยื่นเบิก') + '</td></tr>'
+            : `<thead><tr class="text-[11px] uppercase tracking-wide text-slate-400 border-b border-slate-100">
+                   <th class="text-left py-2 font-semibold">ผู้เบิก</th>
+                   <th class="text-right py-2 font-semibold">ครั้ง</th>
+                   <th class="text-right py-2 font-semibold">ยอดรวม</th>
+               </tr></thead>
+               <tbody>${top.map((x, i) => `
+                   <tr class="border-b border-slate-50 last:border-0">
+                       <td class="py-2 text-slate-700"><span class="text-slate-300 mr-2 tabular-nums">${i + 1}</span>${_esc(x.name)}</td>
+                       <td class="py-2 text-right tabular-nums text-slate-600">${_n(x.count)}</td>
+                       <td class="py-2 text-right tabular-nums font-bold text-slate-800">${_b(x.total)}</td>
+                   </tr>`).join('')}</tbody>`;
+        if (n) {
+            n.innerHTML = !p.neverClaimed ? ''
+                : `<div class="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                     <span class="font-bold text-slate-700">ยังไม่เคยเบิก ${_n(p.neverClaimed)} คน</span>
+                     <p class="text-slate-500 mt-1 leading-relaxed">${(p.neverList || []).map(_esc).join(' · ')}${
+                       p.neverClaimed > (p.neverList || []).length ? ' และอีก ' + _n(p.neverClaimed - p.neverList.length) + ' คน' : ''}</p>
+                   </div>`;
+        }
     }
 
     // ── User Management ────────────────────────────────────
@@ -1046,7 +1911,7 @@
             const currentUserId = window.__currentUser?.id;
             const isSelf = u.id === currentUserId;
             tbody.innerHTML += `
-                <tr class="border-t border-slate-100 hover:bg-slate-50">
+                <tr class="table-row">
                     <td class="px-4 py-3">
                         <span class="font-medium text-slate-800">${u.email}</span>
                         ${isSelf ? '<span class="ml-2 text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-bold">คุณ</span>' : ''}
@@ -1080,9 +1945,9 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ role })
             });
-            if (!res.ok) throw new Error();
+            if (!res.ok) { alert(await explainError(res, 'เปลี่ยนสิทธิ์')); loadUsers(); return; }
         } catch (e) {
-            alert('เปลี่ยน role ไม่สำเร็จ');
+            alert('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้' + String.fromCharCode(10,10) + 'สาเหตุ: ' + (e.message || 'ไม่ทราบ'));
             loadUsers();
         }
     }
@@ -1110,11 +1975,11 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ newPassword })
             });
-            if (!res.ok) throw new Error();
-            alert('Reset รหัสผ่านสำเร็จ');
+            if (!res.ok) return alert(await explainError(res, 'ตั้งรหัสผ่านใหม่'));
+            alert('ตั้งรหัสผ่านใหม่สำเร็จ');
             closeResetModal();
         } catch (e) {
-            alert('เกิดข้อผิดพลาด กรุณาลองใหม่');
+            alert('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้' + String.fromCharCode(10,10) + 'สาเหตุ: ' + (e.message || 'ไม่ทราบ'));
         }
     }
 
@@ -1161,6 +2026,10 @@
             // Populate position list
             window.positionList = settings.positionList || [];
             renderPositions();
+
+            // Populate affiliation list
+            window.affiliationList = settings.affiliationList || [];
+            renderAffiliations();
 
             loading.classList.add('hidden');
             form.classList.remove('hidden');
@@ -1234,6 +2103,7 @@
         renderPositions();
 
         // Auto-save immediately
+        console.log('🔵 addPosition() → calling autoSavePositions()');
         await autoSavePositions();
     }
 
@@ -1259,13 +2129,97 @@
 
     // Auto-save positions to backend
     async function autoSavePositions() {
+        console.log('🔵 autoSavePositions() called');
+        console.log('📦 Current positionList:', window.positionList);
+
         try {
             const settings = {
                 fuelRate: parseFloat(document.getElementById('setting-fuelRate').value) || 4,
                 taxiMaxPerTrip: parseInt(document.getElementById('setting-taxiMaxPerTrip').value) || 300,
                 hotelRateSingle: parseInt(document.getElementById('setting-hotelRateSingle').value) || 1500,
                 hotelRateDouble: parseInt(document.getElementById('setting-hotelRateDouble').value) || 1000,
-                positionList: window.positionList || []
+                positionList: window.positionList || [],
+                affiliationList: window.affiliationList || []
+            };
+
+            console.log('📤 Sending to backend:', settings);
+
+            const res = await fetch('/settings', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(settings)
+            });
+
+            console.log('📥 Response status:', res.status);
+
+            if (!res.ok) {
+                const error = await res.text();
+                console.error('❌ Response error:', error);
+                throw new Error('Failed to save: ' + error);
+            }
+
+            const result = await res.json();
+            console.log('✅ Positions auto-saved successfully!', result);
+        } catch (err) {
+            console.error('❌ Auto-save failed:', err);
+            alert('❌ บันทึกไม่สำเร็จ: ' + err.message);
+        }
+    }
+
+    // ── Affiliation Management ─────────────────────────────
+    function renderAffiliations() {
+        const container = document.getElementById('affiliationListContainer');
+        if (!window.affiliationList || window.affiliationList.length === 0) {
+            container.innerHTML = '<p class="text-xs text-slate-400 italic">ยังไม่มีสังกัด — กดปุ่ม "+ เพิ่มสังกัด" ด้านบน</p>';
+            return;
+        }
+
+        container.innerHTML = window.affiliationList.map((aff, i) => `
+            <div class="flex items-center gap-2 p-2 bg-white rounded border border-slate-200">
+                <span class="text-xs text-slate-500 w-6">${i + 1}.</span>
+                <input type="text" value="${aff}"
+                    class="affiliation-input flex-1 border border-slate-200 px-3 py-1.5 rounded text-sm outline-none focus:border-green-400"
+                    onchange="updateAffiliation(${i}, this.value)">
+                <button type="button" onclick="removeAffiliation(${i})"
+                    class="text-red-500 hover:text-red-700 text-sm px-2">
+                    ✕
+                </button>
+            </div>
+        `).join('');
+    }
+
+    async function addAffiliation() {
+        if (!window.affiliationList) window.affiliationList = [];
+        window.affiliationList.push('สังกัดใหม่');
+        renderAffiliations();
+        await autoSaveAffiliations();
+    }
+
+    async function removeAffiliation(index) {
+        if (confirm('ต้องการลบสังกัดนี้?')) {
+            window.affiliationList.splice(index, 1);
+            renderAffiliations();
+            await autoSaveAffiliations();
+        }
+    }
+
+    window.updateAffiliation = async function(index, value) {
+        window.affiliationList[index] = value.trim();
+        clearTimeout(window._affiliationSaveTimeout);
+        window._affiliationSaveTimeout = setTimeout(async () => {
+            await autoSaveAffiliations();
+        }, 1000);
+    };
+
+    async function autoSaveAffiliations() {
+        try {
+            const settings = {
+                fuelRate: parseFloat(document.getElementById('setting-fuelRate').value) || 4,
+                taxiMaxPerTrip: parseInt(document.getElementById('setting-taxiMaxPerTrip').value) || 300,
+                hotelRateSingle: parseInt(document.getElementById('setting-hotelRateSingle').value) || 1500,
+                hotelRateDouble: parseInt(document.getElementById('setting-hotelRateDouble').value) || 1000,
+                positionList: window.positionList || [],
+                affiliationList: window.affiliationList || []
             };
 
             const res = await fetch('/settings', {
@@ -1275,17 +2229,269 @@
             });
 
             if (!res.ok) throw new Error('Failed to save');
-
-            // Show brief success indicator (optional)
-            console.log('✅ Positions auto-saved');
+            console.log('✅ Affiliations auto-saved successfully!');
         } catch (err) {
-            console.error('❌ Auto-save failed:', err);
+            console.error('❌ Auto-save affiliations failed:', err);
+            alert('❌ บันทึกไม่สำเร็จ: ' + err.message);
+        }
+    }
+
+    // ── บันทึกรายการทั้งระบบ ────────────────────────────────
+    // แอดมินไล่ดูใบเบิกของทุกคนได้ ไว้ช่วยตรวจสอบเวลาผู้ใช้ติดปัญหา
+    // อ่านอย่างเดียว — ไม่มีปุ่มแก้/ลบ ข้อมูลจะไม่ถูกเปลี่ยนโดยที่เจ้าของไม่รู้
+
+    let logFilterReady = false;
+
+    function logParams(page) {
+        const v = id => (document.getElementById(id)?.value || '').trim();
+        const p = new URLSearchParams({ page: String(page || 1), size: '50' });
+        if (v('logQ'))    p.set('q', v('logQ'));
+        if (v('logUser')) p.set('user', v('logUser'));
+        if (v('logProv')) p.set('prov', v('logProv'));
+        if (v('logFrom')) p.set('from', v('logFrom'));
+        if (v('logTo'))   p.set('to', v('logTo'));
+        if (document.getElementById('logFlagged')?.checked) p.set('flagged', '1');
+        return p;
+    }
+
+    async function loadLog(page) {
+        const body = document.getElementById('logBody');
+        if (!body) return;
+        body.innerHTML = '<tr><td colspan="8" class="px-4 py-10 text-center text-slate-400">กำลังโหลด...</td></tr>';
+        let d;
+        try {
+            const r = await fetch('/expense-log?' + logParams(page).toString());
+            if (!r.ok) {
+                const msg = r.status === 403 ? 'บัญชีนี้ไม่ใช่ผู้ดูแลระบบ จึงดูรายการของผู้อื่นไม่ได้'
+                          : r.status === 401 ? 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่'
+                          : 'โหลดข้อมูลไม่สำเร็จ (รหัส ' + r.status + ')';
+                body.innerHTML = `<tr><td colspan="8" class="px-4 py-10 text-center text-red-600">${_esc(msg)}</td></tr>`;
+                return;
+            }
+            d = await r.json();
+        } catch (e) {
+            body.innerHTML = '<tr><td colspan="8" class="px-4 py-10 text-center text-red-600">' +
+                'ติดต่อเซิร์ฟเวอร์ไม่ได้ ตรวจสอบการเชื่อมต่อแล้วลองใหม่</td></tr>';
+            return;
+        }
+
+        // เติมตัวเลือกในช่องกรองจากข้อมูลจริง ทำครั้งเดียวพอ ไม่งั้นค่าที่เลือกไว้จะหาย
+        if (!logFilterReady) {
+            const us = document.getElementById('logUser'), pv = document.getElementById('logProv');
+            (d.users || []).forEach(u => us.insertAdjacentHTML('beforeend',
+                `<option value="${u.id}">${_esc(u.name)}</option>`));
+            (d.provinces || []).forEach(p => pv.insertAdjacentHTML('beforeend',
+                `<option value="${_esc(p)}">${_esc(p)}</option>`));
+            document.getElementById('logQ').addEventListener('keydown',
+                e => { if (e.key === 'Enter') loadLog(1); });
+            logFilterReady = true;
+        }
+
+        document.getElementById('logSummary').innerHTML =
+            `พบ <b class="text-slate-800">${_n(d.total)}</b> รายการ · ` +
+            `รวม <b class="text-slate-800">${_b(d.sumAmount)}</b> บาท` +
+            (d.flaggedCount ? ` · <span class="text-amber-700">ต้องตรวจสอบ ${_n(d.flaggedCount)}</span>` : '');
+
+        if (!d.items.length) {
+            body.innerHTML = '<tr><td colspan="8" class="px-4 py-10 text-center text-slate-400">' +
+                'ไม่มีรายการที่ตรงกับเงื่อนไข</td></tr>';
+            document.getElementById('logPager').innerHTML = '';
+            return;
+        }
+
+        body.innerHTML = d.items.map(x => `
+            <tr class="border-b border-slate-50 hover:bg-slate-50/60">
+                <td class="px-4 py-3 font-mono text-xs text-slate-400">#${x.id}</td>
+                <td class="px-4 py-3 whitespace-nowrap text-slate-600">${_esc(_dateTh(x.createdAt))}</td>
+                <td class="px-4 py-3 text-slate-600">${_esc(x.byUser)}</td>
+                <td class="px-4 py-3">
+                    <div class="font-semibold text-slate-800">${_esc(x.traveler)}</div>
+                    ${x.affiliation ? `<div class="text-[11px] text-slate-400">${_esc(x.affiliation)}</div>` : ''}
+                </td>
+                <td class="px-4 py-3">
+                    <div class="text-slate-700">${_esc(x.toProv || '—')}</div>
+                    ${x.travelTo ? `<div class="text-[11px] text-slate-400 truncate max-w-[200px]">${_esc(x.travelTo)}</div>` : ''}
+                </td>
+                <td class="px-4 py-3 text-right tabular-nums text-slate-600">${x.km ? _n(Math.round(x.km)) + ' กม.' : '—'}</td>
+                <td class="px-4 py-3 text-right tabular-nums font-bold text-slate-800">${_b(x.amount)}</td>
+                <td class="px-4 py-3 whitespace-nowrap">
+                    ${x.flags.map(f => `<span class="inline-block text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 mr-1">${_esc(f)}</span>`).join('')}
+                    <button onclick="openLogDetail(${x.id})"
+                        class="text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline">ดู</button>
+                </td>
+            </tr>`).join('');
+
+        const btn = (label, target, on) => on
+            ? `<button onclick="loadLog(${target})" class="px-3 py-1.5 rounded-lg border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50">${label}</button>`
+            : `<span class="px-3 py-1.5 text-sm text-slate-300">${label}</span>`;
+        document.getElementById('logPager').innerHTML =
+            `<div class="text-xs text-slate-400">หน้า ${d.page} จาก ${d.pages}</div>
+             <div class="flex gap-2">
+                ${btn('ก่อนหน้า', d.page - 1, d.page > 1)}
+                ${btn('ถัดไป',   d.page + 1, d.page < d.pages)}
+             </div>`;
+    }
+
+    function resetLogFilter() {
+        ['logQ', 'logUser', 'logProv', 'logFrom', 'logTo'].forEach(id => {
+            const el = document.getElementById(id); if (el) el.value = '';
+        });
+        const f = document.getElementById('logFlagged'); if (f) f.checked = false;
+        loadLog(1);
+    }
+
+    const _dateTh = s => {
+        const d = new Date(s);
+        if (isNaN(d)) return String(s || '—').slice(0, 16);
+        return d.toLocaleDateString('th-TH', { day: '2-digit', month: 'short', year: '2-digit' }) +
+               ' ' + d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+    };
+
+    async function openLogDetail(id) {
+        const modal = document.getElementById('logDetail');
+        const bodyEl = document.getElementById('logDetailBody');
+        modal.style.display = 'flex';
+        document.getElementById('logDetailTitle').textContent = 'รายการเลขที่ #' + id;
+        document.getElementById('logDetailPdf').href = 'history.html?id=' + id;
+        bodyEl.innerHTML = '<div class="text-center text-slate-400 py-8">กำลังโหลด...</div>';
+
+        let o;
+        try {
+            const r = await fetch('/expense-log/' + id);
+            if (!r.ok) {
+                const j = await r.json().catch(() => ({}));
+                bodyEl.innerHTML = `<div class="text-red-600">${_esc(j.error || 'เปิดรายการไม่สำเร็จ (รหัส ' + r.status + ')')}</div>`;
+                return;
+            }
+            o = await r.json();
+        } catch (e) {
+            bodyEl.innerHTML = '<div class="text-red-600">ติดต่อเซิร์ฟเวอร์ไม่ได้ ลองใหม่อีกครั้ง</div>';
+            return;
+        }
+
+        const md = o.inputMetadata || {}, tv = md._travel || {};
+        const row = (k, v) => v == null || v === '' ? '' : `
+            <div class="flex gap-3 py-1.5 border-b border-slate-50">
+                <div class="w-40 shrink-0 text-slate-500">${_esc(k)}</div>
+                <div class="flex-1 text-slate-800 break-words">${_esc(String(v))}</div>
+            </div>`;
+        bodyEl.innerHTML = `
+            <div class="mb-4">
+                ${row('บันทึกโดย', o.ownerEmail || 'ไม่ทราบ')}
+                ${row('วันที่บันทึก', _dateTh(o.createdAt))}
+                ${row('ผู้เดินทาง', o.requestedBy)}
+                ${row('ตำแหน่ง', md._position)}
+                ${row('สังกัด', md._affiliation)}
+                ${row('หมวดหมู่งบประมาณ', md._budgetCategoryId)}
+                ${row('กิจกรรม', md._activityName)}
+            </div>
+            <div class="mb-4">
+                <div class="text-xs font-bold text-slate-400 uppercase mb-1">การเดินทาง</div>
+                ${row('จาก', tv.from)}
+                ${row('ถึง', tv.to)}
+                ${row('จังหวัดปลายทาง', tv.toProv)}
+                ${row('ระยะทางไป', tv.distOutbound ? tv.distOutbound + ' กม.' : '')}
+                ${row('ระยะทางกลับ', tv.distReturn ? tv.distReturn + ' กม.' : '')}
+                ${row('ที่มาของระยะทาง', tv.distanceSource === 'manual' ? 'ผู้ใช้กรอกเอง' : 'ระบบคำนวณจากแผนที่')}
+                ${row('เหตุผลที่กรอกเอง', tv.manualReason)}
+            </div>
+            <div>
+                <div class="text-xs font-bold text-slate-400 uppercase mb-1">ยอดเงิน</div>
+                ${row('รวมทั้งสิ้น', _b(o.amount) + ' บาท')}
+            </div>`;
+    }
+
+    function closeLogDetail() {
+        document.getElementById('logDetail').style.display = 'none';
+    }
+
+    // ── สมุดสถานที่ ─────────────────────────────────────────
+    // สมุดโตเองจากการใช้งาน จึงต้องมีที่ให้แอดมินกวาดขยะออก
+
+    const PLACE_SRC = {
+        seed:   { label: 'เริ่มต้นระบบ', cls: 'bg-slate-100 text-slate-600 border-slate-200' },
+        search: { label: 'ผู้ใช้เลือก',  cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+        longdo: { label: 'ผู้ใช้เลือก',  cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+        osm:    { label: 'ผู้ใช้เลือก',  cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+        saved:  { label: 'ผู้ใช้เลือก',  cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' }
+    };
+
+    async function loadPlaces() {
+        const body = document.getElementById('placeBody');
+        if (!body) return;
+        body.innerHTML = '<tr><td colspan="5" class="px-4 py-10 text-center text-slate-400">กำลังโหลด...</td></tr>';
+        const q = (document.getElementById('placeQ')?.value || '').trim();
+        let d;
+        try {
+            const r = await fetch('/places' + (q ? '?q=' + encodeURIComponent(q) : ''));
+            if (!r.ok) {
+                const msg = r.status === 403 ? 'บัญชีนี้ไม่ใช่ผู้ดูแลระบบ'
+                          : r.status === 401 ? 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่'
+                          : 'โหลดข้อมูลไม่สำเร็จ (รหัส ' + r.status + ')';
+                body.innerHTML = `<tr><td colspan="5" class="px-4 py-10 text-center text-red-600">${_esc(msg)}</td></tr>`;
+                return;
+            }
+            d = await r.json();
+        } catch (e) {
+            body.innerHTML = '<tr><td colspan="5" class="px-4 py-10 text-center text-red-600">' +
+                'ติดต่อเซิร์ฟเวอร์ไม่ได้ ลองใหม่อีกครั้ง</td></tr>';
+            return;
+        }
+
+        const seeded = (d.bySource || []).filter(x => x.source === 'seed')
+                        .reduce((s, x) => s + x.n, 0);
+        document.getElementById('placeSummary').innerHTML =
+            `ทั้งหมด <b class="text-slate-800">${_n(d.total)}</b> แห่ง` +
+            (seeded ? ` · จากการเริ่มต้นระบบ <b class="text-amber-700">${_n(seeded)}</b>` : '');
+
+        if (!d.items.length) {
+            body.innerHTML = '<tr><td colspan="5" class="px-4 py-10 text-center text-slate-400">' +
+                (q ? 'ไม่พบสถานที่ที่ตรงกับคำค้น' : 'ยังไม่มีสถานที่ในสมุด') + '</td></tr>';
+            return;
+        }
+
+        body.innerHTML = d.items.map(p => {
+            const s = PLACE_SRC[p.source] || { label: p.source || 'ไม่ทราบ', cls: 'bg-slate-100 text-slate-600 border-slate-200' };
+            return `
+            <tr class="border-b border-slate-50 hover:bg-slate-50/60">
+                <td class="px-4 py-3 font-semibold text-slate-800">${_esc(p.name)}</td>
+                <td class="px-4 py-3 text-slate-500 text-xs max-w-[320px] truncate">${_esc(p.address || '—')}</td>
+                <td class="px-4 py-3 text-right tabular-nums ${p.uses > 1 ? 'font-bold text-slate-800' : 'text-slate-400'}">${_n(p.uses)}</td>
+                <td class="px-4 py-3">
+                    <span class="text-[10px] px-1.5 py-0.5 rounded border ${s.cls}">${_esc(s.label)}</span>
+                </td>
+                <td class="px-4 py-3 text-right">
+                    <button onclick="deletePlace(${p.id}, this)"
+                        class="text-xs font-bold text-red-600 hover:text-red-800 hover:underline">ลบ</button>
+                </td>
+            </tr>`;
+        }).join('');
+    }
+
+    async function deletePlace(id, btn) {
+        const name = btn.closest('tr')?.querySelector('td')?.textContent?.trim() || '';
+        if (!confirm('ลบ "' + name + '" ออกจากสมุดสถานที่?\n\n' +
+                     'จะไม่ถูกเสนอเป็นตัวเลือกอีก แต่ยังค้นหาจากแผนที่ภายนอกได้ตามปกติ\n' +
+                     'ใบเบิกเดิมที่ใช้สถานที่นี้ไม่ได้รับผลกระทบ')) return;
+        btn.disabled = true;
+        try {
+            const r = await fetch('/places/' + id, { method: 'DELETE' });
+            if (!r.ok) {
+                const j = await r.json().catch(() => ({}));
+                alert('ลบไม่สำเร็จ: ' + (j.error || 'เซิร์ฟเวอร์ตอบรหัส ' + r.status));
+                btn.disabled = false;
+                return;
+            }
+            btn.closest('tr').remove();
+        } catch (e) {
+            alert('ลบไม่สำเร็จ: ติดต่อเซิร์ฟเวอร์ไม่ได้');
+            btn.disabled = false;
         }
     }
 
     // ── Init ───────────────────────────────────────────────
     renderAttachmentRows([...ATTACHMENT_IDS], {});
-    renderCategories();
+    showPanel('dashboard');
 </script>
 <script src="/auth-guard.js"></script>
 <script>initAuthGuard({ adminOnly: true });</script>

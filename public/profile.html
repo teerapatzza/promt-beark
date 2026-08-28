@@ -1,18 +1,52 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
+    <script src="api-fetch.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>จัดการโปรไฟล์ผู้เดินทาง — Prompt-Berk</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <!-- Choices.js for searchable dropdown -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
     <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+    <script src="thai-address.js"></script>
     <style>
-        body { font-family: 'Sarabun', sans-serif; }
+        body { font-family: 'IBM Plex Sans Thai', 'IBM Plex Sans', sans-serif; }
+
+        /* ── dropdown ต้องลอยเหนือทุกอย่างและเลื่อนดูได้เสมอ ──
+           Choices.js ตั้ง z-index มาแค่ 1 ส่วนแผนที่ Leaflet ใช้ 200-700
+           ถ้าไม่ยกขึ้น รายการจะจมอยู่ใต้แผนที่/หัวเว็บ และเลื่อนไม่ได้ */
+        .choices { position: relative; }
+        .choices.is-open,
+        .choices.is-focused { z-index: 9000; }
+
+        .choices__list--dropdown,
+        .choices__list[aria-expanded] {
+            z-index: 9001 !important;
+            position: absolute;
+        }
+
+        /* จำกัดความสูงแล้วให้เลื่อนในตัวเอง ไม่ทะลุจอ */
+        .choices__list--dropdown .choices__list,
+        .choices__list[aria-expanded] .choices__list {
+            max-height: 240px;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
+        }
+
+        /* แผนที่ต้องไม่ดัน z-index ออกมาทับ dropdown */
+        #profileMap { z-index: 0; }
+        .leaflet-container { z-index: 0; }
+        .leaflet-pane,
+        .leaflet-top,
+        .leaflet-bottom { z-index: 1; }
+
+        /* กล่องที่อยู่ต้องไม่ครอบตัด dropdown ที่ยื่นออกนอกกล่อง */
+        #profileForm, #profileForm > div { overflow: visible; }
     </style>
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-800">
@@ -59,18 +93,24 @@
                         <input type="text" id="pUser" placeholder="ระบุชื่อ-นามสกุล..."
                             class="w-full border border-slate-200 p-3 rounded-xl text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition">
                     </div>
+                    <!-- ตำแหน่ง/สังกัด: เลือกจากรายการก็ได้ พิมพ์เองก็ได้
+                         เพราะยังไม่มีใครรู้ครบทุกตำแหน่ง ถ้าล็อกให้เลือกอย่างเดียวคนจะทำงานไม่ได้
+                         ค่าที่พิมพ์ใหม่จะถูกเก็บเข้ารายการกลางอัตโนมัติ ให้คนถัดไปเลือกได้เลย -->
                     <div>
                         <label class="block text-xs font-bold text-slate-500 mb-1.5">ตำแหน่ง</label>
-                        <select id="pPosition"
+                        <input type="text" id="pPosition" list="positionOptions" autocomplete="off"
+                            placeholder="เลือกจากรายการ หรือพิมพ์ตำแหน่งใหม่..."
                             class="w-full border border-slate-200 p-3 rounded-xl text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition bg-white">
-                            <option value="">— เลือกตำแหน่ง —</option>
-                        </select>
-                        <p class="text-xs text-slate-400 mt-1">💡 Admin สามารถเพิ่มตำแหน่งได้ที่ตั้งค่าระบบ</p>
+                        <datalist id="positionOptions"></datalist>
+                        <p class="text-xs text-slate-400 mt-1">พิมพ์ตำแหน่งใหม่ได้ — ระบบจะเก็บเข้ารายการให้คนอื่นเลือกต่อ</p>
                     </div>
                     <div class="col-span-full md:col-span-1">
                         <label class="block text-xs font-bold text-slate-500 mb-1.5">สังกัด / กลุ่มงาน</label>
-                        <input type="text" id="pAffil" placeholder="ระบุสังกัด..."
-                            class="w-full border border-slate-200 p-3 rounded-xl text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition">
+                        <input type="text" id="pAffil" list="affilOptions" autocomplete="off"
+                            placeholder="เลือกจากรายการ หรือพิมพ์สังกัดใหม่..."
+                            class="w-full border border-slate-200 p-3 rounded-xl text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition bg-white">
+                        <datalist id="affilOptions"></datalist>
+                        <p class="text-xs text-slate-400 mt-1">พิมพ์สังกัดใหม่ได้ — ระบบจะเก็บเข้ารายการให้คนอื่นเลือกต่อ</p>
                     </div>
                 </div>
 
@@ -83,14 +123,45 @@
                         <label class="text-xs font-bold text-slate-700">ข้อมูลที่อยู่</label>
                     </div>
                     <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
-                        <input type="text" id="pAddrNo"   placeholder="เลขที่"        class="border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-blue-400 transition bg-white">
-                        <input type="text" id="pAddrSoi"  placeholder="ซอย"           class="border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-blue-400 transition bg-white">
-                        <input type="text" id="pAddrRoad" placeholder="ถนน"           class="border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-blue-400 transition bg-white">
-                        <input type="text" id="pAddrSub"  placeholder="ตำบล/แขวง"    class="border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-blue-400 transition bg-white">
-                        <input type="text" id="pAddrDist" placeholder="อำเภอ/เขต"    class="border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-blue-400 transition bg-white">
-                        <input type="text" id="pAddrProv" placeholder="จังหวัด"       class="border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-blue-400 transition bg-white">
-                        <input type="text" id="pAddrZip"  placeholder="รหัสไปรษณีย์" class="border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-blue-400 transition bg-white">
+                        <input type="text" id="pAddrNo"   placeholder="เลขที่" class="border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-blue-400 transition bg-white">
+                        <input type="text" id="pAddrSoi"  placeholder="ซอย"    class="border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-blue-400 transition bg-white">
+                        <input type="text" id="pAddrRoad" placeholder="ถนน"    class="border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-blue-400 transition bg-white">
                     </div>
+
+                    <!-- ข้อเสนอแยก ซอย/ถนน ออกจากช่องเลขที่ -->
+                    <div id="addrSplitSuggest" class="hidden mt-3 p-3 rounded-lg bg-sky-50 border border-sky-200 text-xs"></div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-500 mb-1">จังหวัด</label>
+                            <select id="pAddrProv" class="w-full border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-blue-400 transition bg-white">
+                                <option value="">— เลือกจังหวัด —</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label id="pAddrDistLabel" class="block text-[11px] font-bold text-slate-500 mb-1">อำเภอ</label>
+                            <select id="pAddrDist" disabled class="w-full border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-blue-400 transition bg-white">
+                                <option value="">— เลือกจังหวัดก่อน —</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label id="pAddrSubLabel" class="block text-[11px] font-bold text-slate-500 mb-1">ตำบล</label>
+                            <select id="pAddrSub" disabled class="w-full border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-blue-400 transition bg-white">
+                                <option value="">— เลือกอำเภอก่อน —</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-500 mb-1">รหัสไปรษณีย์ <span class="font-normal text-slate-400">(อัตโนมัติ)</span></label>
+                            <input type="text" id="pAddrZip" readonly placeholder="—"
+                                class="w-full border border-slate-200 p-2.5 rounded-lg text-sm outline-none bg-slate-100 text-slate-600 font-semibold cursor-not-allowed">
+                        </div>
+                    </div>
+
+                    <!-- แจ้งผลการแก้ชื่อ/รหัสอัตโนมัติ -->
+                    <div id="addrFixNotice" class="hidden mt-3 p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800"></div>
                 </div>
 
                 <!-- Map -->
@@ -363,8 +434,24 @@
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                         </button>
                     </div>`;
-                div.querySelector('.btn-edit').onclick = () => editProfile(p);
-                div.querySelector('.btn-del').onclick  = () => deleteProfile(p.id);
+                // โปรไฟล์ส่วนกลาง: ทุกคนแก้ได้ แต่ "ลบ" สงวนไว้ให้ admin เพราะย้อนกลับไม่ได้
+                const isAdmin = window.__currentUser && window.__currentUser.role === 'admin';
+                const bEdit = div.querySelector('.btn-edit');
+                const bDel  = div.querySelector('.btn-del');
+
+                bEdit.onclick = () => editProfile(p);
+
+                if (p.isGlobal && !isAdmin) {
+                    const why = 'โปรไฟล์ส่วนกลาง — ลบได้เฉพาะผู้ดูแลระบบ\n' +
+                                '(แก้ไขได้ตามปกติ เพราะการลบย้อนกลับไม่ได้)';
+                    bDel.disabled = true;
+                    bDel.title = why;
+                    bDel.classList.add('opacity-30', 'cursor-not-allowed');
+                    bDel.classList.remove('hover:text-rose-500', 'hover:bg-rose-50');
+                    bDel.onclick = (e) => { e.stopPropagation(); alert(why); };
+                } else {
+                    bDel.onclick = () => deleteProfile(p.id);
+                }
                 list.appendChild(div);
             });
         }
@@ -378,10 +465,8 @@
             document.getElementById('pAddrNo').value   = p.no   || '';
             document.getElementById('pAddrSoi').value  = p.soi  || '';
             document.getElementById('pAddrRoad').value = p.road || '';
-            document.getElementById('pAddrSub').value  = p.sub  || '';
-            document.getElementById('pAddrDist').value = p.dist || '';
-            document.getElementById('pAddrProv').value = p.prov || '';
-            document.getElementById('pAddrZip').value  = p.zip  || '';
+            applyAddressToDropdowns(p);
+            checkAddressSplit();
             if (p.lat && p.lng) { const ll = L.latLng(p.lat, p.lng); marker.setLatLng(ll); map.flyTo(ll, 15); }
             document.getElementById('formTitle').textContent = 'แก้ไขโปรไฟล์';
             document.getElementById('formIconBg').className  = 'w-7 h-7 bg-amber-500 rounded-lg flex items-center justify-center';
@@ -396,6 +481,13 @@
         function cancelEdit() {
             editingId = null;
             document.querySelectorAll('#profileForm input[type="text"]').forEach(inp => { inp.value = ''; });
+            // ล้าง dropdown ที่อยู่ด้วย ไม่งั้นค่าเดิมค้างไปโปรไฟล์ถัดไป
+            document.getElementById('addrFixNotice').classList.add('hidden');
+            dismissAddressSplit();
+            if (addrChoices.prov) { addrChoices.prov.setChoiceByValue(''); }
+            document.getElementById('pAddrProv').value = '';
+            onProvinceChange();
+            geoPrecision = 'manual'; geoSource = 'none';
             document.getElementById('formTitle').textContent = 'เพิ่มโปรไฟล์ใหม่';
             document.getElementById('formIconBg').className  = 'w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center';
             document.getElementById('formIcon').setAttribute('d', 'M12 4v16m8-8H4');
@@ -409,42 +501,96 @@
             const pName = document.getElementById('pName').value.trim();
             const pUser = document.getElementById('pUser').value.trim();
             if (!pName || !pUser) return alert('กรุณาระบุชื่อโปรไฟล์ และ ชื่อผู้เดินทาง');
-            const pos = marker.getLatLng();
+            const pos  = marker.getLatLng();
+            const addr = currentAddressFromDropdowns();
             const profileData = {
                 profileName: pName, fullName: pUser,
                 position:    document.getElementById('pPosition').value.trim(),
                 affiliation: document.getElementById('pAffil').value.trim(),
-                no: document.getElementById('pAddrNo').value, soi: document.getElementById('pAddrSoi').value,
-                road: document.getElementById('pAddrRoad').value, sub: document.getElementById('pAddrSub').value,
-                dist: document.getElementById('pAddrDist').value, prov: document.getElementById('pAddrProv').value,
-                zip: document.getElementById('pAddrZip').value, lat: pos.lat, lng: pos.lng,
+                no:   document.getElementById('pAddrNo').value,
+                soi:  document.getElementById('pAddrSoi').value,
+                road: document.getElementById('pAddrRoad').value,
+                // ── ชื่อไทย: รูปแบบเดิม production อ่านได้เหมือนเดิม ──
+                sub: addr.sub, dist: addr.dist, prov: addr.prov, zip: addr.zip,
+                lat: pos.lat, lng: pos.lng,
+                // ── เพิ่มใหม่: รหัสมาตรฐานกรมการปกครอง สำหรับเชื่อม API/ส่งออก ──
+                subdistrictCode: addr.subdistrictCode,
+                districtCode:    addr.districtCode,
+                provinceCode:    addr.provinceCode,
+                geo: { lat: pos.lat, lng: pos.lng, precision: geoPrecision, source: geoSource },
+                schemaVersion: 2
             };
             try {
                 const method = editingId ? 'PUT' : 'POST';
                 const url    = editingId ? `/profiles/${editingId}` : '/profiles';
                 const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(profileData) });
-                if (!res.ok) throw new Error();
+                if (!res.ok) return alert(await explainError(res, 'บันทึก'));
+                // เก็บตำแหน่ง/สังกัดที่พิมพ์ใหม่เข้ารายการกลาง ให้คนถัดไปเลือกได้
+                await rememberListValue('positionList',    profileData.position,    knownPositions);
+                await rememberListValue('affiliationList', profileData.affiliation, knownAffils);
+                fillDatalist('positionOptions', knownPositions);
+                fillDatalist('affilOptions', knownAffils);
                 cancelEdit();
-            } catch(e) { alert('บันทึกไม่สำเร็จ กรุณาลองใหม่'); }
+            } catch (e) {
+                alert('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้\n\nสาเหตุ: ' + (e.message || 'ไม่ทราบ') +
+                      '\n\nกรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่');
+            }
+        }
+
+        /** แปลงคำตอบที่ผิดพลาดจากเซิร์ฟเวอร์ เป็นข้อความที่บอกสาเหตุและทางแก้ */
+        async function explainError(res, action) {
+            let serverMsg = '';
+            try { serverMsg = (await res.json()).error || ''; } catch (_) {}
+
+            const me   = window.__currentUser;
+            const role = me ? me.role : '?';
+
+            if (res.status === 403) {
+                if (/global/i.test(serverMsg)) {
+                    return `${action}ไม่ได้ — โปรไฟล์นี้เป็น "โปรไฟล์ส่วนกลาง"\n\n` +
+                           `เหตุผล: โปรไฟล์ส่วนกลางใช้ร่วมกันทั้งองค์กร จึงแก้ไข/ลบได้เฉพาะผู้ดูแลระบบ (admin)\n` +
+                           `บัญชีของคุณ: ${me ? me.email : '-'} (สิทธิ์: ${role})\n\n` +
+                           `ทางแก้:\n` +
+                           `• ขอให้ผู้ดูแลระบบแก้ให้\n` +
+                           `• หรือกด "เพิ่มโปรไฟล์ใหม่" เพื่อสร้างโปรไฟล์ส่วนตัวที่คุณแก้เองได้`;
+                }
+                if (/approver/i.test(serverMsg)) {
+                    return `${action}ไม่ได้ — บัญชีสิทธิ์ "ผู้อนุมัติ" แก้ไขโปรไฟล์ไม่ได้\n\n` +
+                           `ทางแก้: ขอให้ผู้ดูแลระบบดำเนินการแทน`;
+                }
+                return `${action}ไม่ได้ — ไม่มีสิทธิ์ในโปรไฟล์นี้\n\n` +
+                       `บัญชีของคุณ: ${me ? me.email : '-'} (สิทธิ์: ${role})\n` +
+                       `ข้อความจากระบบ: ${serverMsg || '-'}`;
+            }
+            if (res.status === 404) {
+                return `${action}ไม่ได้ — ไม่พบโปรไฟล์นี้แล้ว\n\nอาจมีคนอื่นลบไปก่อนหน้า กรุณารีเฟรชหน้า`;
+            }
+            if (res.status === 400) {
+                return `${action}ไม่ได้ — ข้อมูลไม่ครบหรือไม่ถูกต้อง\n\nข้อความจากระบบ: ${serverMsg || '-'}`;
+            }
+            if (res.status === 401) {
+                return `เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่`;
+            }
+            return `${action}ไม่สำเร็จ (HTTP ${res.status})\n\nข้อความจากระบบ: ${serverMsg || '-'}`;
         }
 
         async function deleteProfile(id) {
             if (!confirm('ต้องการลบโปรไฟล์นี้ใช่หรือไม่?')) return;
-            if (editingId === id) cancelEdit();
             try {
-                await fetch(`/profiles/${id}`, { method: 'DELETE' });
+                const res = await fetch(`/profiles/${id}`, { method: 'DELETE' });
+                if (!res.ok) return alert(await explainError(res, 'ลบ'));
+                if (editingId === id) cancelEdit();
                 renderProfiles();
-            } catch(e) { alert('ลบไม่สำเร็จ'); }
+            } catch (e) {
+                alert('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้\n\nสาเหตุ: ' + (e.message || 'ไม่ทราบ'));
+            }
         }
 
         async function searchFromAddress() {
-            const no   = document.getElementById('pAddrNo').value.trim();
-            const soi  = document.getElementById('pAddrSoi').value.trim();
-            const sub  = document.getElementById('pAddrSub').value.trim();
-            const dist = document.getElementById('pAddrDist').value.trim();
-            const prov = document.getElementById('pAddrProv').value.trim();
-            const q = [no, soi, sub, dist, prov].filter(Boolean).join(' ');
-            if (!q) return alert('กรุณากรอกที่อยู่ก่อน');
+            const a = currentAddressFromDropdowns();
+            if (!a.provinceCode) return alert('กรุณาเลือกจังหวัดก่อน');
+            const q = ThaiAddress.geoQuery(a);
+            if (!q) return alert('กรุณาเลือกที่อยู่ก่อน');
             const input = document.getElementById('mapSearch');
             const box   = document.getElementById('searchSuggestions');
             input.value = q;
@@ -467,45 +613,356 @@
             }
         }
 
-        let positionChoices; // Global Choices instance
+        /* ════════════ ที่อยู่แบบ dropdown + รหัสมาตรฐาน + หาพิกัดอัตโนมัติ ════════════ */
+
+        let addrChoices = { prov: null, dist: null, sub: null };
+        let geoPrecision = 'manual';   // subdistrict | manual | none
+        let geoSource    = 'none';     // osm | longdo | user
+        let suppressGeocode = false;   // กันไม่ให้ยิงหาพิกัดตอนกำลังโหลดข้อมูลเดิม
+
+        function setChoices(key, el, placeholder) {
+            if (addrChoices[key]) { addrChoices[key].destroy(); addrChoices[key] = null; }
+            addrChoices[key] = new Choices(el, {
+                searchEnabled: true, shouldSort: false, itemSelectText: '',
+                searchPlaceholderValue: placeholder, noResultsText: 'ไม่พบข้อมูล'
+            });
+        }
+
+        function fillSelect(el, items, placeholder, valueKey, labelKey) {
+            el.innerHTML = '';
+            const o = document.createElement('option');
+            o.value = ''; o.textContent = placeholder;
+            el.appendChild(o);
+            items.forEach(it => {
+                const x = document.createElement('option');
+                x.value = it[valueKey]; x.textContent = it[labelKey];
+                if (it.zip) x.dataset.zip = it.zip;
+                el.appendChild(x);
+            });
+        }
+
+        /** เปลี่ยนคำเรียกหน่วยการปกครองตามจังหวัด (กรุงเทพ = เขต/แขวง) */
+        function updateAddrLabels(provinceCode) {
+            const L = provinceCode ? ThaiAddress.labels(provinceCode) : { district: 'อำเภอ', subdistrict: 'ตำบล' };
+            document.getElementById('pAddrDistLabel').textContent = L.district;
+            document.getElementById('pAddrSubLabel').textContent  = L.subdistrict;
+            return L;
+        }
+
+        function onProvinceChange() {
+            const pc = document.getElementById('pAddrProv').value;
+            const L  = updateAddrLabels(pc);
+            const dEl = document.getElementById('pAddrDist');
+            const sEl = document.getElementById('pAddrSub');
+
+            fillSelect(dEl, pc ? ThaiAddress.districts(pc) : [], pc ? '— เลือก' + L.district + ' —' : '— เลือกจังหวัดก่อน —', 'code', 'name');
+            dEl.disabled = !pc;
+            setChoices('dist', dEl, 'ค้นหา' + L.district + '...');
+
+            fillSelect(sEl, [], '— เลือก' + L.district + 'ก่อน —', 'code', 'name');
+            sEl.disabled = true;
+            setChoices('sub', sEl, 'ค้นหา' + L.subdistrict + '...');
+
+            document.getElementById('pAddrZip').value = '';
+            dEl.addEventListener('change', onDistrictChange);
+        }
+
+        function onDistrictChange() {
+            const pc = document.getElementById('pAddrProv').value;
+            const dc = document.getElementById('pAddrDist').value;
+            const L  = ThaiAddress.labels(pc);
+            const sEl = document.getElementById('pAddrSub');
+
+            fillSelect(sEl, dc ? ThaiAddress.subdistricts(dc) : [], dc ? '— เลือก' + L.subdistrict + ' —' : '— เลือก' + L.district + 'ก่อน —', 'code', 'name');
+            sEl.disabled = !dc;
+            setChoices('sub', sEl, 'ค้นหา' + L.subdistrict + '...');
+            document.getElementById('pAddrZip').value = '';
+            sEl.addEventListener('change', onSubdistrictChange);
+        }
+
+        function onSubdistrictChange() {
+            const sc = document.getElementById('pAddrSub').value;
+            document.getElementById('pAddrZip').value = sc ? ThaiAddress.zipOf(sc) : '';
+            if (sc && !suppressGeocode) geocodeCurrentAddress();
+        }
+
+        /** อ่านค่าที่เลือกอยู่ คืนทั้งชื่อไทยและรหัส */
+        function currentAddressFromDropdowns() {
+            const pEl = document.getElementById('pAddrProv');
+            const dEl = document.getElementById('pAddrDist');
+            const sEl = document.getElementById('pAddrSub');
+            const txt = el => (el.selectedIndex > 0 ? el.options[el.selectedIndex].textContent.trim() : '');
+            return {
+                prov: txt(pEl), dist: txt(dEl), sub: txt(sEl),
+                zip: document.getElementById('pAddrZip').value.trim(),
+                provinceCode:    pEl.value || null,
+                districtCode:    dEl.value || null,
+                subdistrictCode: sEl.value || null
+            };
+        }
+
+        /** โหลดที่อยู่เดิมเข้า dropdown — แปลงชื่อเก่าเป็นชื่อทางการให้อัตโนมัติ */
+        function applyAddressToDropdowns(p) {
+            const notice = document.getElementById('addrFixNotice');
+            notice.classList.add('hidden');
+            notice.innerHTML = '';
+            if (!ThaiAddress.ready()) return;
+
+            suppressGeocode = true;
+            const n = ThaiAddress.normalize({ prov: p.prov, dist: p.dist, sub: p.sub, zip: p.zip });
+
+            document.getElementById('pAddrProv').value = n.provinceCode || '';
+            setChoices('prov', document.getElementById('pAddrProv'), 'ค้นหาจังหวัด...');
+            onProvinceChange();
+            if (n.provinceCode) addrChoices.prov.setChoiceByValue(n.provinceCode);
+
+            if (n.districtCode) {
+                document.getElementById('pAddrDist').value = n.districtCode;
+                addrChoices.dist.setChoiceByValue(n.districtCode);
+                onDistrictChange();
+                if (n.subdistrictCode) {
+                    document.getElementById('pAddrSub').value = n.subdistrictCode;
+                    addrChoices.sub.setChoiceByValue(n.subdistrictCode);
+                }
+            }
+            document.getElementById('pAddrZip').value = n.zip || '';
+            suppressGeocode = false;
+
+            // แจ้งว่าระบบแก้อะไรให้ / อะไรที่ยังต้องเลือกเอง
+            const msg = [];
+            n.changes.forEach(c => {
+                const label = { prov: 'จังหวัด', dist: 'อำเภอ/เขต', sub: 'ตำบล/แขวง', zip: 'รหัสไปรษณีย์' }[c.field] || c.field;
+                msg.push('• <b>' + label + '</b> ปรับจาก “' + (c.from || '(ว่าง)') + '” เป็น “<b>' + c.to + '</b>” — ' + c.reason);
+            });
+            if (n.unresolved.length) {
+                const label = { prov: 'จังหวัด', dist: 'อำเภอ/เขต', sub: 'ตำบล/แขวง' };
+                const names = n.unresolved.map(f => label[f] || f).join(', ');
+                let extra = '';
+                if (n.subChoices) extra = ' (ตัวเลือก: ' + n.subChoices.join(' / ') + ')';
+                msg.push('• ⚠️ <b>' + names + '</b> เดิมคือ “' + (p[n.unresolved[0]] || '') + '” จับคู่กับข้อมูลทางการไม่ได้ <b>กรุณาเลือกเอง</b>' + extra);
+            }
+            if (msg.length) {
+                notice.innerHTML = '<div class="font-bold mb-1">ระบบปรับข้อมูลที่อยู่ให้ตรงกับทะเบียนราชการ</div>' + msg.join('<br>');
+                notice.classList.remove('hidden');
+            }
+        }
+
+        /* ── เสนอแยก ซอย/ถนน ที่ปนอยู่ในช่องเลขที่ (ต้องกดยืนยัน ไม่แยกเงียบๆ) ── */
+
+        let pendingSplit = null;
+
+        function checkAddressSplit() {
+            const box = document.getElementById('addrSplitSuggest');
+            box.classList.add('hidden'); box.innerHTML = '';
+            pendingSplit = null;
+
+            const no   = document.getElementById('pAddrNo').value.trim();
+            const soi  = document.getElementById('pAddrSoi').value.trim();
+            const road = document.getElementById('pAddrRoad').value.trim();
+            if (soi || road) return;              // มีข้อมูลอยู่แล้ว ไม่ยุ่ง
+
+            const r = ThaiAddress.splitAddressLine(no);
+            if (!r) return;
+
+            pendingSplit = r;
+            const cell = (label, v) =>
+                `<div><span class="text-slate-500">${label}</span><br><b>${v ? esc(v) : '—'}</b></div>`;
+            box.innerHTML = `
+                <div class="font-bold text-sky-800 mb-2">💡 ระบบพบว่าช่อง "เลขที่" มีซอย/ถนนปนอยู่ — แยกให้ไหม?</div>
+                <div class="grid grid-cols-3 gap-3 mb-3 text-sky-900">
+                    ${cell('เลขที่', r.no)}${cell('ซอย', r.soi)}${cell('ถนน', r.road)}
+                </div>
+                <div class="flex gap-2">
+                    <button type="button" onclick="applyAddressSplit()"
+                        class="bg-sky-600 hover:bg-sky-700 text-white font-bold px-3 py-1.5 rounded-lg">แยกตามนี้</button>
+                    <button type="button" onclick="dismissAddressSplit()"
+                        class="border border-slate-300 hover:bg-slate-50 px-3 py-1.5 rounded-lg">ไม่ต้อง</button>
+                </div>`;
+            box.classList.remove('hidden');
+        }
+
+        function esc(s) {
+            return String(s).replace(/[&<>"']/g, c =>
+                ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+
+        function applyAddressSplit() {
+            if (!pendingSplit) return;
+            document.getElementById('pAddrNo').value   = pendingSplit.no;
+            document.getElementById('pAddrSoi').value  = pendingSplit.soi;
+            document.getElementById('pAddrRoad').value = pendingSplit.road;
+            dismissAddressSplit();
+        }
+
+        function dismissAddressSplit() {
+            pendingSplit = null;
+            const box = document.getElementById('addrSplitSuggest');
+            box.classList.add('hidden'); box.innerHTML = '';
+        }
+
+        /**
+         * หาพิกัดแบบไล่ลำดับ — ละเอียดที่สุดก่อน ถ้าไม่เจอค่อยถอยลงมา
+         * วัดกับพิกัดจริงแล้ว: ระดับซอย ≈ 0.5 กม. / ระดับตำบล ≈ 1.5-3 กม.
+         */
+        const GEO_LEVELS = [
+            { key: 'soi',         label: 'ระดับซอย',   zoom: 16, accuracy: '±500 ม.' },
+            { key: 'road',        label: 'ระดับถนน',   zoom: 15, accuracy: '±500 ม.' },
+            { key: 'subdistrict', label: 'ระดับตำบล',  zoom: 14, accuracy: '±1-3 กม.' },
+            { key: 'district',    label: 'ระดับอำเภอ', zoom: 12, accuracy: '±5 กม.' }
+        ];
+
+        function buildGeoQueries(a) {
+            const Lb   = ThaiAddress.labels(a.provinceCode);
+            const tail = [a.sub ? Lb.subdistrict + a.sub : '', a.dist ? Lb.district + a.dist : '', a.prov]
+                            .filter(Boolean).join(' ');
+            const soi  = document.getElementById('pAddrSoi').value.trim();
+            const road = document.getElementById('pAddrRoad').value.trim();
+            return [
+                { key: 'soi',         q: soi  ? soi  + ' ' + tail : '' },
+                { key: 'road',        q: road ? road + ' ' + tail : '' },
+                { key: 'subdistrict', q: tail },
+                { key: 'district',    q: [a.dist ? Lb.district + a.dist : '', a.prov].filter(Boolean).join(' ') }
+            ];
+        }
+
+        async function geocodeCurrentAddress() {
+            const a = currentAddressFromDropdowns();
+            if (!a.provinceCode) return;
+
+            for (const cand of buildGeoQueries(a)) {
+                if (!cand.q) continue;
+                let hit = null;
+                try {
+                    const res = await fetch(`/map-search?q=${encodeURIComponent(cand.q)}`);
+                    hit = ((await res.json()).data || [])[0];
+                } catch (e) { continue; }
+                if (!hit || !hit.lat || !hit.lon) continue;
+
+                const lv = GEO_LEVELS.find(x => x.key === cand.key);
+                const ll = L.latLng(parseFloat(hit.lat), parseFloat(hit.lon));
+                marker.setLatLng(ll);
+                map.flyTo(ll, lv.zoom);
+                geoPrecision = cand.key;
+                geoSource    = 'auto';
+                marker.setTooltipContent('📍 ' + lv.label + ' ' + lv.accuracy + ' — ลากปรับให้ตรงบ้านได้');
+                marker.openTooltip();
+                showGeoBadge(lv, false);
+                return;
+            }
+            showGeoBadge(null, false);
+        }
+
+        /** ป้ายบอกความแม่นยำ ให้ผู้ใช้และผู้อนุมัติเห็นชัดว่าพิกัดนี้เชื่อได้แค่ไหน */
+        function showGeoBadge(lv, confirmed) {
+            let el = document.getElementById('geoBadge');
+            if (!el) {
+                el = document.createElement('div');
+                el.id = 'geoBadge';
+                el.className = 'mt-2 text-xs';
+                document.getElementById('profileMap').insertAdjacentElement('afterend', el);
+            }
+            if (confirmed) {
+                el.innerHTML = '<span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold">✓ ตำแหน่งยืนยันเอง — แม่นยำที่สุด</span>';
+            } else if (lv) {
+                const warn = (lv.key === 'subdistrict' || lv.key === 'district');
+                el.innerHTML = '<span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg ' +
+                    (warn ? 'bg-amber-50 border border-amber-200 text-amber-800' : 'bg-sky-50 border border-sky-200 text-sky-800') +
+                    ' font-bold">📍 ระบบหาให้ ' + lv.label + ' ' + lv.accuracy + '</span>' +
+                    (warn ? '<span class="text-slate-500 ml-2">แนะนำให้ลากหมุดไปที่บ้านจริงเพื่อความแม่นยำ</span>' : '');
+            } else {
+                el.innerHTML = '<span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 font-bold">⚠️ หาพิกัดอัตโนมัติไม่ได้ — กรุณาลากหมุดเอง</span>';
+            }
+        }
+
+        /* ── ตำแหน่ง / สังกัด: เลือกจากรายการหรือพิมพ์เองก็ได้ ──
+           ใช้ datalist ของเบราว์เซอร์ ซึ่งพิมพ์ไปกรองไปได้และไม่บังคับต้องเลือก
+           ค่าที่พิมพ์ใหม่จะถูกส่งเข้ารายการกลางตอนบันทึก ให้คนถัดไปเลือกได้ทันที */
+
+        function fillDatalist(id, items) {
+            const dl = document.getElementById(id);
+            if (!dl) return;
+            dl.innerHTML = '';
+            (items || []).forEach(v => {
+                const o = document.createElement('option');
+                o.value = v;
+                dl.appendChild(o);
+            });
+        }
+
+        let knownPositions = [], knownAffils = [];
+
+        async function loadAffiliations() {
+            try {
+                const res = await fetch('/settings');
+                if (!res.ok) return;
+                const s = await res.json();
+                knownAffils = s.affiliationList || [];
+                fillDatalist('affilOptions', knownAffils);
+            } catch (e) { console.warn('โหลดสังกัดไม่สำเร็จ', e); }
+        }
+
+        /** ถ้าผู้ใช้พิมพ์ค่าใหม่ที่ยังไม่มีในรายการ ให้เก็บเข้ารายการกลาง */
+        async function rememberListValue(key, value, known) {
+            const v = (value || '').trim().replace(/\s+/g, ' ');
+            if (!v) return;
+            if (known.some(x => String(x).trim() === v)) return;   // มีอยู่แล้ว
+            try {
+                const r = await fetch('/settings/list-append', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ key, value: v })
+                });
+                if (r.ok) known.push(v);
+            } catch (e) { /* เก็บไม่ได้ก็ไม่เป็นไร ค่ายังบันทึกในโปรไฟล์ปกติ */ }
+        }
+
+        async function initAddressDropdowns() {
+            await ThaiAddress.load('data/thailand-address.json');
+            const pEl = document.getElementById('pAddrProv');
+            fillSelect(pEl, ThaiAddress.provinces(), '— เลือกจังหวัด —', 'code', 'name');
+            setChoices('prov', pEl, 'ค้นหาจังหวัด...');
+            pEl.addEventListener('change', onProvinceChange);
+            onProvinceChange();
+        }
 
         async function loadPositions() {
             try {
                 const res = await fetch('/settings');
-                if (res.ok) {
-                    const settings = await res.json();
-                    const positions = settings.positionList || [];
-                    const select = document.getElementById('pPosition');
-                    select.innerHTML = '<option value="">— เลือกตำแหน่ง —</option>';
-                    positions.forEach(pos => {
-                        const option = document.createElement('option');
-                        option.value = pos;
-                        option.textContent = pos;
-                        select.appendChild(option);
-                    });
-
-                    // Initialize Choices.js for searchable dropdown
-                    if (positionChoices) positionChoices.destroy();
-                    positionChoices = new Choices('#pPosition', {
-                        searchEnabled: true,
-                        searchPlaceholderValue: 'ค้นหาตำแหน่ง...',
-                        noResultsText: 'ไม่พบตำแหน่ง',
-                        itemSelectText: 'กดเพื่อเลือก',
-                        removeItemButton: false,
-                        shouldSort: false
-                    });
-                }
+                if (!res.ok) return;
+                const settings = await res.json();
+                knownPositions = settings.positionList || [];
+                fillDatalist('positionOptions', knownPositions);
             } catch (err) {
-                console.warn('Could not load positions:', err);
+                console.warn('โหลดตำแหน่งไม่สำเร็จ:', err);
             }
         }
 
         initProfileMap();
         setupSearch();
         loadPositions();
-        renderProfiles();
+        loadAffiliations();
+        initAddressDropdowns().catch(e => {
+            console.error(e);
+            alert('โหลดข้อมูลจังหวัด/อำเภอ/ตำบลไม่สำเร็จ — ช่องที่อยู่จะใช้งานไม่ได้\n' + e.message);
+        });
+        // renderProfiles ต้องรอให้รู้ก่อนว่าใครล็อกอิน ไม่งั้นจะล็อกปุ่มของ admin ผิด
+        // (เรียกจากท้ายไฟล์หลัง initAuthGuard สำเร็จ)
+
+        // ลากหมุดเอง = ยืนยันตำแหน่งแม่นยำ บันทึกว่ามาจากคน ไม่ใช่ระบบเดา
+        marker.on('dragend', () => {
+            geoPrecision = 'exact';
+            geoSource    = 'user';
+            marker.setTooltipContent('📍 ตำแหน่งที่ยืนยันเอง');
+            showGeoBadge(null, true);
+        });
     </script>
     <script src="/auth-guard.js"></script>
-    <script>initAuthGuard();</script>
+    <script>
+        // รอให้ยืนยันตัวตนเสร็จก่อน แล้วค่อยวาดรายชื่อ
+        // เพราะการล็อกปุ่มแก้ไข/ลบ ต้องรู้ว่าผู้ใช้เป็น admin หรือไม่
+        initAuthGuard()
+            .then(() => renderProfiles())
+            .catch(() => { /* auth-guard พาไปหน้า login เองแล้ว */ });
+    </script>
 </body>
 </html>

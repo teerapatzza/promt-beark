@@ -6,6 +6,15 @@
 
 const TAXI_MAX_PER_TRIP = 300; // บาท/เที่ยว (ตั้งค่าได้จาก admin ในอนาคต)
 
+// ช่องระยะทางเป็นแบบอ่านอย่างเดียว ระบบคำนวณจากหมุดบนแผนที่
+// ถ้าค้นหาปลายทางไม่เจอ ระยะทางจะค้างที่ 0 แล้วบันทึกไม่ผ่าน
+// ผู้ใช้จะงงมากถ้าไม่บอกทางออก เพราะพิมพ์ใส่ช่องเองก็ไม่ได้
+const DIST_HINT =
+    '\n\n📍 ระยะทางมาจากหมุดบนแผนที่ กรอกในช่องเองไม่ได้' +
+    '\n💡 ถ้าค้นหาปลายทางไม่เจอ ให้เลือกอย่างใดอย่างหนึ่ง:' +
+    '\n   • ลากหมุดปลายทางบนแผนที่เอง แล้วระบบจะคำนวณให้' +
+    '\n   • หรือติ๊ก "กรอกระยะทางเอง" แล้วใส่ตัวเลขพร้อมเหตุผล';
+
 /**
  * Validate expense data
  * @param {Object} expense - expense object { requestedBy, description, inputMetadata, attachments, amount, ... }
@@ -44,7 +53,12 @@ function validateExpense(expense, category) {
         const costs = meta._costs || {};
 
         // 1. Validate travel dates
-        if (!travel.startDate) {
+        // ช่องวัน-เวลาอยู่ในแบบ REPORT (FM-SAM-001-04) เท่านั้น
+        // ถ้าหมวดนั้นติ๊กแค่ TRANSPORT_RECEIPT ฟอร์มจะไม่มีช่องนี้ให้กรอกเลย
+        // บังคับตรงนี้จะทำให้ผู้ใช้บันทึกไม่ได้ และหาช่องที่ต้องแก้ไม่เจอด้วย
+        const needDates = templates.includes('REPORT');
+
+        if (needDates && !travel.startDate) {
             errors.push({
                 field: 'dateStart',
                 level: 'error',
@@ -52,7 +66,7 @@ function validateExpense(expense, category) {
             });
         }
 
-        if (!travel.endDate) {
+        if (needDates && !travel.endDate) {
             errors.push({
                 field: 'dateEnd',
                 level: 'error',
@@ -212,7 +226,7 @@ function validateExpense(expense, category) {
                     level: 'error',
                     message: `❌ ระยะทางไม่สอดคล้องกับประเภทรถ!\n` +
                         `🚘 ประเภทรถ: ขาไป แต่ระยะทางขาไป: 0 กม.\n` +
-                        `💡 กรุณากรอกระยะทางขาไป`
+                        `💡 กรุณากรอกระยะทางขาไป` + DIST_HINT
                 });
             }
 
@@ -222,7 +236,7 @@ function validateExpense(expense, category) {
                     level: 'error',
                     message: `❌ ระยะทางไม่สอดคล้องกับประเภทรถ!\n` +
                         `🚘 ประเภทรถ: ขากลับ แต่ระยะทางขากลับ: 0 กม.\n` +
-                        `💡 กรุณากรอกระยะทางขากลับ`
+                        `💡 กรุณากรอกระยะทางขากลับ` + DIST_HINT
                 });
             }
 
@@ -233,7 +247,7 @@ function validateExpense(expense, category) {
                     level: 'error',
                     message: `❌ ระยะทางไม่ครบสำหรับ 'ไป-กลับ'!\n` +
                         `🚘 ประเภทรถ: ไป-กลับ แต่ระยะทาง${missing}: 0 กม.\n` +
-                        `💡 กรุณากรอกระยะทาง${missing}`
+                        `💡 กรุณากรอกระยะทาง${missing}` + DIST_HINT
                 });
             }
 
@@ -241,7 +255,8 @@ function validateExpense(expense, category) {
                 errors.push({
                     field: 'distance',
                     level: 'error',
-                    message: '❌ กรุณากรอกระยะทาง (ขาไป หรือ ขากลับ) สำหรับการเดินทางด้วยรถยนต์'
+                    message: '❌ กรุณากรอกระยะทาง (ขาไป หรือ ขากลับ) สำหรับการเดินทางด้วยรถยนต์' +
+                        DIST_HINT
                 });
             }
         }

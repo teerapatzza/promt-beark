@@ -1,13 +1,20 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
+    <script src="api-fetch.js"></script>
     <meta charset="UTF-8">
     <title>ประวัติการเบิกจ่าย - TUC Finance</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Prompt = หน้าจอ / Sarabun = เอกสาร PDF ราชการ (ห้ามเปลี่ยน) -->
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- ใช้วาดแผนที่เส้นทางลงเอกสารตอนพิมพ์ (ไม่ได้เก็บรูปไว้ในฐานข้อมูล) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- โหลด html2canvas ตรงๆ ไม่พึ่ง bundle ของ html2pdf ซึ่งอาจไม่เผยเป็นตัวแปรสาธารณะ -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
-        body { font-family: 'Sarabun', sans-serif; }
+        body { font-family: 'IBM Plex Sans Thai', 'IBM Plex Sans', sans-serif; }
         #pdf-wrapper { position: fixed; top: 200%; left: -9999px; width: 0; height: 0; overflow: hidden; z-index: -9999; }
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 10px; }
@@ -17,6 +24,47 @@
         /* ⭐️ เพิ่ม page-break-inside: avoid; บังคับไม่ให้ PDF หั่นครึ่งเนื้อหาในหน้านี้เด็ดขาด */
         .pdf-page { width: 190mm; box-sizing: border-box; padding: 10px 20px; position: relative; font-family: 'Sarabun', sans-serif; background: white; font-size: 13.5px; color: black; page-break-inside: avoid; }
         .html2pdf__page-break { page-break-before: always; }
+
+          /* ── กันตัวหนังสือทับกันในเอกสาร PDF ──
+             ข้อความไทยยาวๆ (ที่อยู่ ชื่อหน่วยงาน) เดิมล้นออกนอกช่องแล้วไปทับแถวอื่น */
+          .pdf-page td, .pdf-page th {
+              word-break: break-word;
+              overflow-wrap: anywhere;
+              white-space: normal;
+              vertical-align: top;
+              line-height: 1.55;
+          }
+          /* ตัวเลขเงินและหน่วยห้ามตัดบรรทัด */
+          .pdf-page td[style*="text-align: right"] { white-space: nowrap; }
+          .pdf-page table table { border: none !important; }
+          .pdf-page table table td { border: none !important; padding-top: 0; padding-bottom: 0; }
+
+          /* ── ช่องเส้นใต้ (ชื่อ ตำแหน่ง) ต้องยืดตามความยาวข้อความ ──
+             เดิมกำหนดความกว้างตายตัว 160-250px แต่ชื่อจริงในระบบยาวได้ถึง 27 ตัวอักษร
+             (เช่น "นางสาวมธุรส ภาสน์พิพัฒน์กุล") ข้อความจึงล้นออกไปทับข้อความข้างเคียง
+             เปลี่ยนเป็นความกว้างขั้นต่ำ ช่องว่างยังเห็นเส้น แต่ข้อความยาวทำให้เส้นยืดตาม */
+          .pdf-page .solid-line {
+              width: auto !important;
+              min-width: 120px;
+              max-width: 100%;
+              padding: 0 6px;
+              white-space: normal;
+              word-break: break-word;
+              overflow-wrap: anywhere;
+              line-height: 1.75;
+              vertical-align: bottom;
+          }
+
+          /* หมายเหตุ: ห้ามใส่ height:auto กับ td ทุกตัว
+             เพราะแถวเว้นวรรค (10px) และช่องเซ็นชื่อ (60-85px) ต้องคงความสูงไว้
+             ช่องที่มีข้อความยืดหยุ่นได้ ให้ใส่ min-height เป็นรายจุดแทน */
+
+          /* ข้อความอิสระที่ผู้ใช้พิมพ์เอง (กิจกรรม รายละเอียด) ต้องมีที่หายใจพอ */
+          .pdf-page .free-text {
+              display: block; line-height: 1.7;
+              word-break: break-word; overflow-wrap: anywhere; white-space: normal;
+          }
+
         
         .solid-line { border-bottom: 1px solid #000; display: inline-block; text-align: center; }
         .dot-line { border-bottom: 1px dotted #000; display: inline-block; text-align: center; }
@@ -150,6 +198,15 @@
             raw = [...fromLocal, ...fromApi];
             populateDropdowns();
             draw();
+
+            // เปิดรายการที่ระบุมาทาง ?id= ทันที — ใช้ตอนแอดมินกดจากหน้าบันทึกรายการทั้งระบบ
+            const wantId = new URLSearchParams(location.search).get('id');
+            if (wantId) {
+                const hit = raw.find(x => String(x.id) === String(wantId));
+                if (hit) openDetailsModal(hit);
+                else alert('ไม่พบรายการเลขที่ ' + wantId +
+                           '\nอาจถูกลบไปแล้ว หรือบัญชีนี้ไม่มีสิทธิ์ดูรายการของผู้อื่น');
+            }
         }
 
         function populateDropdowns() {
@@ -513,7 +570,7 @@
             return ['NORMAL'];
         }
 
-        function exportPDF(data) {
+        async function exportPDF(data) {
             const dateObj = new Date(data.createdAt);
             const dateStr = formatDateDisplay(dateObj);
             const formatAmt = data.amount.toLocaleString(undefined, {minimumFractionDigits: 2});
@@ -524,6 +581,37 @@
             const position = meta._position || '';
             const extraAddr = meta._extraAddr || '';
             const extraActivities = Array.isArray(meta._extraActivities) ? meta._extraActivities.filter(Boolean) : [];
+
+            /* ── ที่อยู่: แบ่งบรรทัดเอง ──
+               ปล่อยให้เบราว์เซอร์ตัดบรรทัดในตารางที่มี rowspan แล้ว html2canvas
+               จะวางบรรทัดที่สองผิดตำแหน่งจนตัวหนังสือทับกัน
+               ใช้ _addr ที่แยกส่วนไว้แล้วมาประกอบเป็นบรรทัดตามรูปแบบที่อยู่ไทย */
+            const addrLinesHtml = (function () {
+                const esc = t => String(t == null ? '' : t).replace(/[&<>"']/g,
+                    c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+                const a = meta._addr || {};
+                const isBkk = /กรุงเทพ/.test(a.prov || '');
+                const line1 = [
+                    a.no ? esc(a.no) : '',
+                    a.soi ? 'ซอย' + esc(a.soi) : '',
+                    a.road ? 'ถนน' + esc(a.road) : ''
+                ].filter(Boolean).join(' ');
+                const line2 = [
+                    a.sub  ? (isBkk ? 'แขวง' : 'ตำบล') + esc(a.sub)  : '',
+                    a.dist ? (isBkk ? 'เขต'  : 'อำเภอ') + esc(a.dist) : '',
+                    a.prov ? (isBkk ? esc(a.prov) : 'จังหวัด' + esc(a.prov)) : '',
+                    a.zip ? esc(a.zip) : ''
+                ].filter(Boolean).join(' ');
+
+                if (!line1 && !line2) {
+                    // ใบเบิกเก่าที่ไม่มี _addr แยกส่วน ใช้ข้อความรวมแบบเดิม
+                    return '<div style="line-height:1.75;">ที่อยู่' +
+                           (extraAddr ? ' &nbsp; ' + esc(extraAddr) : '') + '</div>';
+                }
+                let h = '<div style="line-height:1.75;white-space:nowrap;">ที่อยู่ &nbsp; ' + line1 + '</div>';
+                if (line2) h += '<div style="line-height:1.75;white-space:nowrap;padding-left:44px;">' + line2 + '</div>';
+                return h;
+            })();
             const templates = resolveTemplates(meta);
             const hasTravel   = templates.some(t => ['REPORT', 'TRANSPORT_RECEIPT'].includes(t));
             const hasGeneral  = templates.includes('GENERAL_RECEIPT');
@@ -539,6 +627,17 @@
                 const distOut = parseFloat(tr.distOut || 0);
                 const distRet = parseFloat(tr.distRet || 0);
                 const fRate = parseFloat(c.fuelRate || 0);
+
+                // กันไม่ให้เอกสารพิมพ์ "[object Object]" ออกมา
+                // ใบเบิกบางใบเคยบันทึก from/to เป็นวัตถุเพราะบั๊กตอนบันทึก
+                // ถ้าเจอแบบนั้นให้ถอยไปใช้ชื่อจากหมุด (fromGeo/toGeo) แทน
+                const asText = (v, fallback) => {
+                    if (typeof v === 'string') return v.trim();
+                    if (v && typeof v === 'object') return String(v.label || v.name || fallback || '').trim();
+                    return String(fallback || '');
+                };
+                tr.from = asText(tr.from, tr.fromGeo && tr.fromGeo.label);
+                tr.to   = asText(tr.to,   tr.toGeo   && tr.toGeo.label);
 
                 const taxiType = meta._taxiType || 'ไม่ระบุ'; // backward compat
                 const carType = meta._carType || 'ไม่ระบุ';
@@ -899,17 +998,17 @@
                         <table class="pdf-table">
                             <thead>
                                 <tr style="background: white;">
-                                    <th style="width: 13%; text-align: center;">วัน เดือน ปี</th>
-                                    <th style="width: 68%; text-align: center;">รายละเอียดรายจ่าย</th>
+                                    <th style="width: 16%; text-align: center; padding-left:6px; padding-right:6px;">วัน เดือน ปี</th>
+                                    <th style="width: 65%; text-align: center;">รายละเอียดรายจ่าย</th>
                                     <th style="width: 19%; text-align: center;">จำนวนเงิน</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <!-- row 1: กิจกรรม -->
                                 <tr>
-                                    <td style="border-bottom: none; text-align: center; vertical-align: top;" rowspan="16">${dateStr}</td>
+                                    <td style="border-bottom: none; text-align: center; vertical-align: top; padding-left:6px; padding-right:6px; white-space:nowrap;" rowspan="16">${dateStr}</td>
                                     <td style="border-bottom: 1px solid #000;">
-                                        <b>กิจกรรม</b> &nbsp;&nbsp;&nbsp; ${actName}
+                                        <b>กิจกรรม</b> &nbsp;&nbsp;&nbsp; <span class="free-text" style="display:inline">${actName}</span>
                                     </td>
                                     <td style="border-bottom: 1px solid #000;"></td>
                                 </tr>
@@ -926,8 +1025,7 @@
                                 <!-- row 3: จาก/ถึง taxi 1 (ขาไป) -->
                                 <tr>
                                     <td style="border-top: none; border-bottom: none;">
-                                        จาก <span style="padding-left: 10px;">${firstTaxiOut ? firstTaxiOut.from : ''}</span>
-                                        <span style="float: right; padding-right: 80px;">ถึง ${firstTaxiOut ? firstTaxiOut.to : ''}</span>
+                                        <table style="width:100%;border-collapse:collapse;border:none;table-layout:fixed;"><tr><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">จาก</td><td style="border:none;padding:0 10px 0 0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;">${firstTaxiOut ? firstTaxiOut.from : ''}</td><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">ถึง</td><td style="border:none;padding:0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;">${firstTaxiOut ? firstTaxiOut.to : ''}</td></tr></table>
                                     </td>
                                     <td style="border-top: none; border-bottom: none; text-align: right; vertical-align: middle; white-space: nowrap;">
                                         ${taxiOutDisplayAmt > 0 ? formatNumber(taxiOutDisplayAmt) : ''}
@@ -936,8 +1034,7 @@
                                 <!-- row 4: จาก/ถึง taxi 2 (ขากลับ — ถ้า ไป-กลับ ให้สลับทิศ) -->
                                 <tr>
                                     <td style="border-top: none; border-bottom: none;">
-                                        จาก <span style="padding-left: 10px;">${firstTaxiRet ? (firstTaxiRet.direction === 'ไป-กลับ' ? firstTaxiRet.to : firstTaxiRet.from) : ''}</span>
-                                        <span style="float: right; padding-right: 80px;">ถึง ${firstTaxiRet ? (firstTaxiRet.direction === 'ไป-กลับ' ? firstTaxiRet.from : firstTaxiRet.to) : ''}</span>
+                                        <table style="width:100%;border-collapse:collapse;border:none;table-layout:fixed;"><tr><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">จาก</td><td style="border:none;padding:0 10px 0 0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;">${firstTaxiRet ? (firstTaxiRet.direction === 'ไป-กลับ' ? firstTaxiRet.to : firstTaxiRet.from) : ''}</td><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">ถึง</td><td style="border:none;padding:0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;">${firstTaxiRet ? (firstTaxiRet.direction === 'ไป-กลับ' ? firstTaxiRet.from : firstTaxiRet.to) : ''}</td></tr></table>
                                     </td>
                                     <td style="border-top: none; border-bottom: none; text-align: right; vertical-align: middle; white-space: nowrap;">
                                         ${taxiRetDisplayAmt > 0 ? formatNumber(taxiRetDisplayAmt) : ''}
@@ -946,8 +1043,7 @@
                                 <!-- row 5: จาก/ถึง taxi 3 (ใหม่) -->
                                 <tr>
                                     <td style="border-top: none; border-bottom: 1px solid #000;">
-                                        จาก <span style="padding-left: 10px;"></span>
-                                        <span style="float: right; padding-right: 80px;">ถึง</span>
+                                        <table style="width:100%;border-collapse:collapse;border:none;table-layout:fixed;"><tr><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">จาก</td><td style="border:none;padding:0 10px 0 0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;"></td><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">ถึง</td><td style="border:none;padding:0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;"></td></tr></table>
                                     </td>
                                     <td style="border-top: none; border-bottom: 1px solid #000;"></td>
                                 </tr>
@@ -966,8 +1062,7 @@
                                 <!-- row 7: จาก/ถึง fuel 1 -->
                                 <tr>
                                     <td style="border-top: none; border-bottom: none;">
-                                        จาก <span style="padding-left: 10px;">${carType === 'ขาไป' || carType === 'ไป-กลับ' ? tr.from : ''}</span>
-                                        <span style="float: right; padding-right: 80px;">ถึง ${carType === 'ขาไป' || carType === 'ไป-กลับ' ? tr.to : ''}</span>
+                                        <table style="width:100%;border-collapse:collapse;border:none;table-layout:fixed;"><tr><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">จาก</td><td style="border:none;padding:0 10px 0 0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;">${carType === 'ขาไป' || carType === 'ไป-กลับ' ? tr.from : ''}</td><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">ถึง</td><td style="border:none;padding:0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;">${carType === 'ขาไป' || carType === 'ไป-กลับ' ? tr.to : ''}</td></tr></table>
                                     </td>
                                 </tr>
                                 <!-- row 8: ระยะทาง fuel 1 -->
@@ -981,8 +1076,7 @@
                                 <!-- row 9: จาก/ถึง fuel 2 -->
                                 <tr>
                                     <td style="border-top: none; border-bottom: none;">
-                                        จาก <span style="padding-left: 10px;">${carType === 'ขากลับ' || carType === 'ไป-กลับ' ? tr.to : ''}</span>
-                                        <span style="float: right; padding-right: 80px;">ถึง ${carType === 'ขากลับ' || carType === 'ไป-กลับ' ? tr.from : ''}</span>
+                                        <table style="width:100%;border-collapse:collapse;border:none;table-layout:fixed;"><tr><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">จาก</td><td style="border:none;padding:0 10px 0 0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;">${carType === 'ขากลับ' || carType === 'ไป-กลับ' ? tr.to : ''}</td><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">ถึง</td><td style="border:none;padding:0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;">${carType === 'ขากลับ' || carType === 'ไป-กลับ' ? tr.from : ''}</td></tr></table>
                                     </td>
                                 </tr>
                                 <!-- row 10: ระยะทาง fuel 2 -->
@@ -1018,23 +1112,25 @@
                                         ${otherTotal > 0 ? formatNumber(otherTotal) : ''}
                                     </td>
                                 </tr>
-                                <!-- row 14: ที่อยู่ -->
+                                <!-- row 14: ที่อยู่ — แบ่งบรรทัดเอง ไม่ให้เบราว์เซอร์ตัด
+                                     เพราะข้อความไทยยาวๆ ที่ตัดบรรทัดเองในตารางที่มี rowspan
+                                     จะถูก html2canvas วางตำแหน่งผิดจนตัวหนังสือทับกัน -->
                                 <tr>
-                                    <td style="border-top: none; border-bottom: 1px solid #000; padding: 10px 8px; line-height: 1.8;">
-                                        ที่อยู่${extraAddr ? ' &nbsp; ' + extraAddr : ''}
+                                    <td style="border-top: none; border-bottom: 1px solid #000; padding: 10px 8px; vertical-align: top;">
+                                        ${addrLinesHtml}
                                     </td>
                                     <td style="border-top: none; border-bottom: 1px solid #000;"></td>
                                 </tr>
                                 <!-- row 15: กิจกรรม -->
                                 <tr>
                                     <td style="border-top: none; border-bottom: 1px solid #000;">
-                                        <b>กิจกรรม</b>${extraActivities[0] ? ' &nbsp; ' + extraActivities[0] : ''}
+                                        <b>กิจกรรม</b>${extraActivities[0] ? ' &nbsp; <span class="free-text" style="display:inline">' + extraActivities[0] + '</span>' : ''}
                                     </td>
                                     <td style="border-top: none; border-bottom: 1px solid #000;"></td>
                                 </tr>
                                 <!-- row 16: แถวว่าง / กิจกรรมเพิ่มเติม -->
                                 <tr>
-                                    <td style="border-bottom: 1px solid #000; height: 22px;">${extraActivities[1] || ''}</td>
+                                    <td style="border-bottom: 1px solid #000; min-height: 22px; line-height:1.7; word-break:break-word; overflow-wrap:anywhere;">${extraActivities[1] || ''}</td>
                                     <td style="border-bottom: 1px solid #000;"></td>
                                 </tr>
                                 <!-- รวมทั้งสิ้น -->
@@ -1103,7 +1199,7 @@
                 // แถวกิจกรรม (rows 19-20)
                 grRowsHtml += `<tr>
                     <td style="height: 22px; border: 1px solid #000;"></td>
-                    <td style="padding: 4px 8px; border: 1px solid #000;"><b>กิจกรรม</b>${extraActivities[0] ? ' &nbsp; ' + extraActivities[0] : ''}</td>
+                    <td style="padding: 4px 8px; border: 1px solid #000;"><b>กิจกรรม</b>${extraActivities[0] ? ' &nbsp; <span class="free-text" style="display:inline">' + extraActivities[0] + '</span>' : ''}</td>
                     <td style="border: 1px solid #000;"></td>
                 </tr>
                 <tr>
@@ -1171,9 +1267,8 @@
                     </div>
                 </div>`;
 
-                if (data.attachments && data.attachments.images && data.attachments.images.length > 0) {
-                    templateHtml += `<div class="html2pdf__page-break"></div>`;
-                }
+                // ไม่ต้องใส่ตัวคั่นหน้าที่นี่ — ตอนประกอบเอกสารจะใส่ให้ระหว่างส่วนอัตโนมัติ
+                // (เดิมใส่ตรงนี้ด้วย เลยซ้อนกับของหน้าแผนที่ ทำให้เกิดหน้าเปล่า)
             }
 
             if (!hasTravel && !hasGeneral) {
@@ -1236,9 +1331,8 @@
                     </div>
                 </div>`;
 
-                if (data.attachments && data.attachments.images && data.attachments.images.length > 0) {
-                    templateHtml += `<div class="html2pdf__page-break"></div>`;
-                }
+                // ไม่ต้องใส่ตัวคั่นหน้าที่นี่ — ตอนประกอบเอกสารจะใส่ให้ระหว่างส่วนอัตโนมัติ
+                // (เดิมใส่ตรงนี้ด้วย เลยซ้อนกับของหน้าแผนที่ ทำให้เกิดหน้าเปล่า)
             }
 
             let imagesHtml = '';
@@ -1261,20 +1355,54 @@
                 });
             }
 
+            const btn = event.currentTarget;
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+
+            // แผนที่: วาดตอนพิมพ์จากพิกัดที่บันทึกไว้ ไม่ได้เก็บรูปในฐานข้อมูล
+            let mapPageHtml = '';
+            const _tr = (data.inputMetadata && data.inputMetadata._travel) || null;
+            if (_tr && _tr.fromGeo && _tr.toGeo) {
+                // ใบเบิกเก่าไม่มี useAppMap แต่มีพิกัดครบ ก็วาดแผนที่ให้ด้วย
+                btn.innerHTML = '⏳ กำลังวาดแผนที่...';
+                const km = _tr.distOut || (_tr.route && _tr.route.km) || '-';
+                try {
+                    const img = await renderRouteMapImage(_tr);
+                    if (img) {
+                        mapPageHtml = buildMapPageHtml(img, _tr, km);
+                    } else {
+                        // วาดไม่ได้ต้องบอก ไม่ใช่เงียบแล้วเอกสารขาดหน้าไปเฉยๆ
+                        alert('หมายเหตุ: วาดแผนที่ลงเอกสารไม่สำเร็จ\n\n' +
+                              'เอกสารส่วนอื่นจะออกตามปกติ แต่จะไม่มีหน้าแผนที่\n' +
+                              'สาเหตุที่พบบ่อย: อินเทอร์เน็ตช้าจนโหลดแผนที่ไม่ทัน — ลองกดออก PDF ใหม่อีกครั้ง');
+                    }
+                } catch (e) {
+                    console.warn('ข้ามหน้าแผนที่:', e);
+                    alert('หมายเหตุ: วาดแผนที่ลงเอกสารไม่สำเร็จ (' + (e.message || 'ไม่ทราบสาเหตุ') + ')\n\n' +
+                          'เอกสารส่วนอื่นจะออกตามปกติ');
+                }
+            }
+
+            // ประกอบเอกสาร แล้วใส่ตัวคั่นหน้าระหว่างแต่ละส่วนเพียงตัวเดียว
+            const parts = [templateHtml, mapPageHtml, imagesHtml].filter(x => x && x.trim());
+            let docHtml = parts.join('<div class="html2pdf__page-break"></div>');
+
+            // ยุบตัวคั่นหน้าที่ติดกัน — ถ้ามีสองอันซ้อนกันจะได้หน้าเปล่าคั่นกลาง
+            docHtml = docHtml.replace(
+                /(?:<div class="html2pdf__page-break"><\/div>\s*){2,}/g,
+                '<div class="html2pdf__page-break"></div>'
+            ).replace(/^\s*<div class="html2pdf__page-break"><\/div>\s*/, '')
+             .replace(/\s*<div class="html2pdf__page-break"><\/div>\s*$/, '');
+
             const container = document.getElementById('pdf-container');
             container.innerHTML = `
                 <div id="formal-doc" style="background: white; color: black; margin: 0; padding: 0;">
-                    ${templateHtml}
-                    ${imagesHtml}
+                    ${docHtml}
                 </div>
             `;
 
             const element = document.getElementById('formal-doc');
-            const btn = event.currentTarget;
-            const originalText = btn.innerHTML;
-            
-            btn.innerHTML = '⏳ กำลังเตรียมเอกสาร...'; 
-            btn.disabled = true;
+            btn.innerHTML = '⏳ กำลังเตรียมเอกสาร...';
 
             setTimeout(() => {
                 btn.innerHTML = '⏳ กำลังสร้าง PDF...';
@@ -1299,15 +1427,215 @@
             }, 1000); 
         }
         
+        /* ══════════ วาดแผนที่เส้นทางลงเอกสาร ══════════
+           ระบบไม่เก็บรูปแผนที่ในฐานข้อมูล (จะกิน ~149 KB ต่อใบ)
+           เก็บแค่พิกัดกับเส้นทางแบบย่อ (~3 KB) แล้ววาดใหม่ตอนพิมพ์
+           ข้อดี: ประหยัดพื้นที่ ~50 เท่า และถ้าแก้หมุดภายหลัง เอกสารจะถูกต้องเสมอ */
+
+        /** วาดแผนที่จากพิกัดที่บันทึกไว้ คืนค่าเป็น dataURL (คืน null ถ้าวาดไม่ได้) */
+        async function renderRouteMapImage(tr) {
+            if (!tr || !tr.fromGeo || !tr.toGeo) return null;
+            if (typeof L === 'undefined' || typeof html2canvas !== 'function') return null;
+
+            const host = document.createElement('div');
+            // ต้องมีขนาดจริงและทึบเต็มที่ ไม่งั้น Leaflet วัดขนาดไม่ได้
+            // ห้ามใช้ opacity ซ่อน เพราะ html2canvas เคารพค่า opacity ภาพจะออกมาจาง
+            // ใช้วิธีดันออกนอกจอแทน แต่ยังทึบ 100%
+            host.style.cssText = 'position:fixed;left:-11000px;top:0;width:960px;height:560px;' +
+                                 'background:#fff;pointer-events:none;';
+            document.body.appendChild(host);
+
+            const W = 960, H = 560, SCALE = 1.6;
+            let map = null;
+            try {
+                // แผนที่นี้มีแค่แผ่น tile — ไม่ใส่เส้นและหมุดเข้าไปใน Leaflet
+                // เพราะ Leaflet วาดเส้นลงใน SVG ที่จัดตำแหน่งด้วย transform: translate3d()
+                // ซึ่ง html2canvas อ่านไม่ถูก เส้นจะไปโผล่คนละที่กับหมุด (เจอจริงในใบ id=47)
+                // จึงจับเฉพาะแผ่นแผนที่ แล้วค่อยวาดเส้นกับหมุดเองลงบนภาพด้วยพิกัดที่แปลงตรงๆ
+                map = L.map(host, {
+                    zoomControl: false, attributionControl: true,
+                    fadeAnimation: false, zoomAnimation: false, markerZoomAnimation: false
+                });
+                L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19, crossOrigin: 'anonymous',
+                    attribution: '&copy; OpenStreetMap contributors'
+                }).addTo(map);
+
+                const from = L.latLng(tr.fromGeo.lat, tr.fromGeo.lng);
+                const to   = L.latLng(tr.toGeo.lat,   tr.toGeo.lng);
+                const hasPath = Array.isArray(tr.routePath) && tr.routePath.length > 1;
+                const pts = hasPath
+                    ? tr.routePath.filter(p => Array.isArray(p) && p.length >= 2)
+                                  .map(p => L.latLng(p[0], p[1]))
+                    : [from, to];
+
+                map.fitBounds(L.latLngBounds(pts.concat([from, to])),
+                              { padding: [46, 46], maxZoom: 15, animate: false });
+
+                // รอ tile โหลดครบจริงๆ ไม่ใช่เดาเวลา
+                await new Promise(resolve => {
+                    let done = false;
+                    const finish = () => { if (!done) { done = true; resolve(); } };
+                    map.whenReady(() => setTimeout(finish, 2600));
+                    setTimeout(finish, 6000);           // กันค้างถ้า tile บางแผ่นโหลดไม่ขึ้น
+                });
+
+                const canvas = await html2canvas(host, {
+                    useCORS: true, allowTaint: false, backgroundColor: '#ffffff',
+                    scale: SCALE, logging: false, width: W, height: H
+                });
+
+                // ── วาดเส้นทางและหมุดเองลงบนภาพ ──
+                // ต้องคัดลอกลงแคนวาสของเราเองก่อน แล้วค่อยวาดทับ
+                // วาดลงบนแคนวาสที่ html2canvas คืนมาโดยตรงไม่มีผลกับ toDataURL
+                // (ทดสอบแล้ว: แม้แต่สี่เหลี่ยมทึบก็ไม่ปรากฏในภาพที่ได้)
+                const out = document.createElement('canvas');
+                out.width  = canvas.width;
+                out.height = canvas.height;
+                const ctx = out.getContext('2d');
+                ctx.drawImage(canvas, 0, 0);
+
+                // latLngToContainerPoint ให้พิกัดพิกเซลเทียบกับกรอบแผนที่โดยตรง
+                // คูณด้วย SCALE เพราะ html2canvas ขยายภาพไว้
+                const P = ll => {
+                    const q = map.latLngToContainerPoint(ll);
+                    return [q.x * SCALE, q.y * SCALE];
+                };
+
+                if (pts.length > 1) {
+                    ctx.lineJoin = 'round';
+                    ctx.lineCap  = 'round';
+                    // ขอบขาวใต้เส้น ทำให้เส้นเด่นบนแผนที่ที่มีถนนสีใกล้เคียงกัน
+                    [[ '#ffffff', 9 * SCALE, []], ['#2563eb', 5 * SCALE, hasPath ? [] : [10 * SCALE, 7 * SCALE]]]
+                        .forEach(([color, width, dash]) => {
+                            ctx.beginPath();
+                            ctx.setLineDash(dash);
+                            ctx.strokeStyle = color;
+                            ctx.lineWidth = width;
+                            pts.forEach((ll, i) => {
+                                const [x, y] = P(ll);
+                                if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                            });
+                            ctx.stroke();
+                        });
+                    ctx.setLineDash([]);
+                }
+
+                const drawPin = (ll, color, letter) => {
+                    const [x, y] = P(ll);
+                    const r = 13 * SCALE;
+                    ctx.beginPath();
+                    ctx.arc(x, y, r, 0, Math.PI * 2);
+                    ctx.fillStyle = color;
+                    ctx.fill();
+                    ctx.lineWidth = 3 * SCALE;
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.stroke();
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = '700 ' + Math.round(13 * SCALE) + 'px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(letter, x, y + SCALE * 0.5);
+                };
+                drawPin(from, '#059669', 'A');
+                drawPin(to,   '#e11d48', 'B');
+
+                return out.toDataURL('image/jpeg', 0.9);
+            } catch (e) {
+                console.warn('วาดแผนที่ลงเอกสารไม่สำเร็จ:', e);
+                return null;
+            } finally {
+                try { if (map) map.remove(); } catch (_) {}
+                host.remove();
+            }
+        }
+
+        /** สร้างหน้าแผนที่สำหรับแทรกในเอกสาร */
+        function buildMapPageHtml(imgData, tr, km) {
+            if (!imgData) return '';
+            const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g,
+                c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+            const lvl = { exact: 'ตำแหน่งยืนยันโดยผู้ใช้', search: 'ค้นหาจากชื่อสถานที่',
+                          subdistrict: 'ระดับตำบล (±1-3 กม.)', district: 'ระดับอำเภอ (±5 กม.)',
+                          province: 'ระดับจังหวัด', manual: 'พิกัดจากโปรไฟล์',
+                          road: 'ระดับถนน (±500 ม.)', soi: 'ระดับซอย (±500 ม.)' };
+            const p = g => lvl[(g && g.precision) || ''] || 'ไม่ระบุที่มา';
+
+            // ที่อยู่จุดเริ่มต้น: แยก เลขที่ / ซอย / ถนน ให้อ่านออก
+            // เดิมต่อกันเป็น "141/36 สุขสวัสดิ์ 55 สุขสวัสดิ์" ซึ่งดูไม่ออกว่าอันไหนซอยอันไหนถนน
+            const fromLabel = (function () {
+                const a = tr.fromAddr || null;
+                if (a && (a.no || a.soi || a.road)) {
+                    return [a.no ? esc(a.no) : '',
+                            a.soi ? 'ซอย' + esc(a.soi) : '',
+                            a.road ? 'ถนน' + esc(a.road) : ''].filter(Boolean).join(' ');
+                }
+                return esc((tr.fromGeo && tr.fromGeo.label) || tr.from || '-');
+            })();
+
+            return `
+            <div class="pdf-page avoid-break" style="padding-top: 20px;">
+                <div style="font-size:1.25rem;font-weight:bold;margin-bottom:16px;border-bottom:2px solid #334155;padding-bottom:10px;">
+                    แผนที่และเส้นทางการเดินทาง
+                </div>
+                <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:14px;">
+                    <tr>
+                        <td style="border:1px solid #cbd5e1;padding:7px 10px;background:#f8fafc;width:20%;">
+                            <b style="color:#059669;">A</b> จุดเริ่มต้น</td>
+                        <td style="border:1px solid #cbd5e1;padding:7px 10px;">${fromLabel}
+                            <span style="color:#64748b;">— ${esc(p(tr.fromGeo))}</span></td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid #cbd5e1;padding:7px 10px;background:#f8fafc;">
+                            <b style="color:#e11d48;">B</b> ปลายทาง</td>
+                        <td style="border:1px solid #cbd5e1;padding:7px 10px;">${esc((tr.toGeo && tr.toGeo.label) || tr.to || '-')}
+                            <span style="color:#64748b;">— ${esc(p(tr.toGeo))}</span></td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid #cbd5e1;padding:7px 10px;background:#f8fafc;">ระยะทาง</td>
+                        <td style="border:1px solid #cbd5e1;padding:7px 10px;"><b>${esc(km)}</b> กิโลเมตรต่อเที่ยว
+                            <span style="color:#64748b;">— ${tr.distanceSource === 'manual'
+                                ? 'ผู้ใช้กรอกเอง' + (tr.manualReason ? ' (' + esc(tr.manualReason) + ')' : '')
+                                : 'คำนวณจากเส้นทางถนนจริง'}</span></td>
+                    </tr>
+                </table>
+                <div style="width:100%;text-align:center;">
+                    <img src="${imgData}" style="max-width:100%;max-height:170mm;object-fit:contain;border:1px solid #cbd5e1;border-radius:6px;" />
+                </div>
+                <p style="font-size:11px;color:#64748b;margin-top:8px;">
+                    แผนที่สร้างจากพิกัดที่บันทึกไว้ในระบบ · ข้อมูลแผนที่ &copy; OpenStreetMap contributors
+                </p>
+            </div>`;
+        }
+
+        /** อ่านเหตุผลจริงจากเซิร์ฟเวอร์ แล้วเขียนเป็นข้อความที่บอกได้ว่าทำอะไรต่อ */
+        async function explainError(res, action) {
+            let msg = '';
+            try { msg = (await res.json()).error || ''; } catch (_) {}
+            const me = window.__currentUser;
+            const who = me ? (me.email + ' (สิทธิ์: ' + me.role + ')') : 'ไม่ทราบบัญชี';
+            if (res.status === 403)
+                return action + 'ไม่ได้ — ไม่มีสิทธิ์\n\nบัญชีของคุณ: ' + who +
+                       '\nข้อความจากระบบ: ' + (msg || '-') +
+                       '\n\nทางแก้: ใบเบิกที่ไม่ใช่ของคุณ ต้องให้ผู้ดูแลระบบดำเนินการ';
+            if (res.status === 404)
+                return action + 'ไม่ได้ — ไม่พบรายการนี้แล้ว\n\nอาจมีคนอื่นลบไปก่อน กรุณารีเฟรชหน้า';
+            if (res.status === 400)
+                return action + 'ไม่ได้ — ข้อมูลไม่ถูกต้อง\n\nข้อความจากระบบ: ' + (msg || '-');
+            if (res.status === 401)
+                return 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่';
+            return action + 'ไม่สำเร็จ (HTTP ' + res.status + ')\n\nข้อความจากระบบ: ' + (msg || '-');
+        }
+
         async function deleteExpense(id) {
             if (!confirm('ต้องการลบรายการนี้ใช่ไหม? ไม่สามารถกู้คืนได้')) return;
             try {
                 const res = await fetch(`/expenses/${id}`, { method: 'DELETE' });
-                if (!res.ok) throw new Error();
+                if (!res.ok) return alert(await explainError(res, 'ลบรายการ'));
                 raw = raw.filter(x => x.id !== id);
                 draw();
             } catch(e) {
-                alert('ไม่สามารถลบได้ กรุณาลองใหม่');
+                alert('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้\n\nสาเหตุ: ' + (e.message || 'ไม่ทราบ'));
             }
         }
 

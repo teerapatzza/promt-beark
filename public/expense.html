@@ -1,21 +1,97 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
+    <script src="api-fetch.js"></script>
     <meta charset="UTF-8">
     <title>ฟอร์มเบิกจ่ายงบประมาณ - TUC Finance</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
     <!-- Choices.js for searchable dropdown -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
     <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+    <script src="thai-address.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <style>
-        body { font-family: 'Sarabun', sans-serif; }
+        body { font-family: 'IBM Plex Sans Thai', 'IBM Plex Sans', sans-serif; }
         .animate-fade-in { animation: fadeIn 0.3s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* ── dropdown ต้องลอยเหนือทุกอย่างและเลื่อนดูได้เสมอ ──
+           Choices.js ตั้ง z-index มาแค่ 1 จะจมอยู่ใต้หัวเว็บ sticky และการ์ดอื่น */
+        .choices { position: relative; }
+        .choices.is-open,
+        .choices.is-focused { z-index: 9000; }
+
+        .choices__list--dropdown,
+        .choices__list[aria-expanded] {
+            z-index: 9001 !important;
+            position: absolute;
+        }
+
+        .choices__list--dropdown .choices__list,
+        .choices__list[aria-expanded] .choices__list {
+            max-height: 240px;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
+        }
+
+        /* ── เส้นเวลากำหนดการเดินทาง ──
+           แทนไอคอน emoji ด้วยไอคอนเส้น และเชื่อมสามขั้นให้เห็นว่าเป็นการเดินทางเดียวกัน */
+        .tl { display: grid; gap: 0; }
+        .tl-row { display: grid; grid-template-columns: 34px 1fr; gap: 14px; padding-bottom: 20px; position: relative; }
+        .tl-row.tl-last { padding-bottom: 0; }
+        .tl-mark { display: flex; justify-content: center; }
+        /* เส้นเชื่อมระหว่างจุด */
+        .tl-row:not(.tl-last) .tl-mark::after {
+            content: ''; position: absolute; top: 34px; bottom: 4px; left: 16.5px;
+            width: 2px; background: linear-gradient(#cbd5e1 55%, transparent 0) 0 0/2px 7px repeat-y;
+        }
+        .tl-dot {
+            width: 34px; height: 34px; border-radius: 11px; display: flex;
+            align-items: center; justify-content: center; flex: none; z-index: 1;
+        }
+        .tl-dot svg { width: 18px; height: 18px; }
+        .tl-dot-start { background: #ecfdf5; color: #059669; box-shadow: inset 0 0 0 1.5px #a7f3d0; }
+        .tl-dot-mid   { background: #eff6ff; color: #2563eb; box-shadow: inset 0 0 0 1.5px #bfdbfe; }
+        .tl-dot-end   { background: #fff7ed; color: #ea580c; box-shadow: inset 0 0 0 1.5px #fed7aa; }
+        .tl-label {
+            display: block; font-size: 12px; font-weight: 600; color: #475569;
+            margin-bottom: 7px; letter-spacing: .01em;
+        }
+        .tl-body { min-width: 0; padding-top: 4px; }
+
+        /* ช่องกรอกมาตรฐาน */
+        .fld {
+            border: 1px solid #cbd5e1; background: #fff; padding: 8px 11px;
+            border-radius: 9px; font-size: 14px; outline: none;
+            font-family: inherit; color: #1e293b; transition: border-color .15s, box-shadow .15s;
+        }
+        .fld:focus { border-color: #60a5fa; box-shadow: 0 0 0 3px rgba(96,165,250,.15); }
+
+        /* ปุ่มสองตัวเลือกแบบสลับ แทน dropdown ที่ต้องกดสองครั้ง */
+        .seg { display: inline-flex; background: #f1f5f9; padding: 3px; border-radius: 10px; gap: 3px; }
+        .seg-btn {
+            border: 0; background: transparent; padding: 6px 14px; border-radius: 8px;
+            font-size: 13px; font-weight: 600; color: #64748b; cursor: pointer;
+            font-family: inherit; transition: background .15s, color .15s;
+        }
+        .seg-btn:hover { color: #334155; }
+        .seg-btn.is-on { background: #fff; color: #1d4ed8; box-shadow: 0 1px 3px rgba(15,23,42,.12); }
+
+        /* ปุ่มลัดกำหนดจำนวนวัน */
+        .chip {
+            border: 1px solid #e2e8f0; background: #fff; color: #64748b;
+            padding: 5px 11px; border-radius: 999px; font-size: 12px; font-weight: 600;
+            cursor: pointer; font-family: inherit; transition: all .15s; white-space: nowrap;
+        }
+        .chip:hover { border-color: #93c5fd; color: #2563eb; background: #eff6ff; }
+        .chip.is-on { border-color: #2563eb; background: #2563eb; color: #fff; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800">
@@ -67,7 +143,7 @@
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                         </button>
                     </div>
-                    <div id="profileDropdown" class="hidden absolute z-50 w-full bg-white border border-blue-200 shadow-2xl rounded-xl mt-1 max-h-72 overflow-y-auto"></div>
+                    <div id="profileDropdown" class="hidden absolute z-[9002] w-full bg-white border border-blue-200 shadow-2xl rounded-xl mt-1 max-h-72 overflow-y-auto overscroll-contain"></div>
                 </div>
                 <a href="profile.html" target="_blank" class="shrink-0 bg-white border border-blue-200 text-blue-600 px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-colors flex items-center">
                     จัดการโปรไฟล์
@@ -81,15 +157,20 @@
                     <label class="block text-sm font-bold text-slate-700 mb-2">ชื่อผู้ขอเบิก (ภาษาไทย)</label>
                     <input type="text" id="requestedBy" placeholder="ระบุชื่อ-นามสกุล ของท่าน" class="w-full border border-slate-200 p-3.5 rounded-xl text-lg focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all">
                 </div>
+                <!-- เลือกจากรายการก็ได้ พิมพ์เองก็ได้ — ค่าที่พิมพ์ใหม่จะถูกเก็บเข้ารายการกลาง -->
                 <div>
                     <label class="block text-sm font-bold text-slate-700 mb-2">ตำแหน่งงาน</label>
-                    <select id="position" class="w-full border border-slate-200 p-3.5 rounded-xl text-lg focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all bg-white">
-                        <option value="">— เลือกตำแหน่ง —</option>
-                    </select>
+                    <input type="text" id="position" list="positionOptions" autocomplete="off"
+                        placeholder="เลือกจากรายการ หรือพิมพ์ตำแหน่งใหม่..."
+                        class="w-full border border-slate-200 p-3.5 rounded-xl text-lg focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all bg-white">
+                    <datalist id="positionOptions"></datalist>
                 </div>
                 <div class="md:col-span-2">
                     <label class="block text-sm font-bold text-slate-700 mb-2">สังกัด / กลุ่มงาน</label>
-                    <input type="text" id="affiliation" placeholder="ระบุสังกัด (สำหรับใบรายงาน)" class="w-full border border-slate-200 p-3.5 rounded-xl text-lg focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all">
+                    <input type="text" id="affiliation" list="affilOptions" autocomplete="off"
+                        placeholder="เลือกจากรายการ หรือพิมพ์สังกัดใหม่..."
+                        class="w-full border border-slate-200 p-3.5 rounded-xl text-lg focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all">
+                    <datalist id="affilOptions"></datalist>
                 </div>
             </div>
         </div>
@@ -102,7 +183,7 @@
             </div>
             <div class="p-6">
                 <input type="text" id="activityName" placeholder="ระบุชื่อกิจกรรม (จะแสดงเฉพาะในใบรับรองแทนใบเสร็จฯ)" class="w-full border-2 border-slate-200 p-3.5 rounded-xl text-lg focus:border-blue-500 outline-none transition-all" oninput="syncActivityFromMainToExtra()">
-                <p class="text-xs text-slate-500 mt-2">💡 หากไม่ระบุ ระบบจะเว้นว่างไว้ในเอกสาร PDF <span class="text-blue-600">🔄 ข้อมูลจะ sync กับกิจกรรมด้านล่างอัตโนมัติ</span></p>
+                <p class="text-xs text-slate-500 mt-2"><svg class="inline w-3.5 h-3.5 -mt-0.5 flex-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2Z"/></svg> หากไม่ระบุ ระบบจะเว้นว่างไว้ในเอกสาร PDF <span class="text-blue-600">🔄 ข้อมูลจะ sync กับกิจกรรมด้านล่างอัตโนมัติ</span></p>
             </div>
         </div>
 
@@ -129,58 +210,134 @@
                 </div>
 
                 <div id="addressSection" class="hidden mt-6 bg-slate-50 p-5 rounded-xl border border-slate-200 animate-fade-in">
-                    <h3 class="text-sm font-bold text-blue-900 mb-3 border-b pb-2">ข้อมูลที่อยู่ผู้เดินทาง (แสดงในใบรายงาน/รับรอง)</h3>
+                    <div class="flex items-center justify-between border-b pb-2 mb-3 gap-3 flex-wrap">
+                        <h3 class="text-sm font-bold text-blue-900">ข้อมูลที่อยู่ผู้เดินทาง (แสดงในใบรายงาน/รับรอง)</h3>
+                        <label class="inline-flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+                            <input type="checkbox" id="addrOverride" onchange="toggleAddrOverride()" class="rounded">
+                            <span>แก้เฉพาะใบนี้</span>
+                        </label>
+                    </div>
+                    <p id="addrLockNote" class="text-xs text-slate-500 mb-3">
+                        ดึงจากโปรไฟล์ผู้เดินทางอัตโนมัติ — ติ๊ก "แก้เฉพาะใบนี้" ถ้าต้องการใช้ที่อยู่อื่นสำหรับใบนี้
+                        <b>(ไม่กระทบที่อยู่ในโปรไฟล์)</b>
+                    </p>
                     <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
                         <input type="text" id="addrNo" placeholder="เลขที่" class="border p-2.5 rounded-lg text-sm outline-none focus:border-blue-500" oninput="syncAddressToExtraLine()">
                         <input type="text" id="addrRoad" placeholder="ถนน" class="border p-2.5 rounded-lg text-sm outline-none focus:border-blue-500" oninput="syncAddressToExtraLine()">
                         <input type="text" id="addrSoi" placeholder="ซอย" class="border p-2.5 rounded-lg text-sm outline-none focus:border-blue-500" oninput="syncAddressToExtraLine()">
+                        <!-- ตำบล/อำเภอ/จังหวัด: ปกติอ่านอย่างเดียว พอติ๊ก "แก้เฉพาะใบนี้"
+                             จะสลับเป็น dropdown ทะเบียนราชการ ไม่ให้พิมพ์เอง กันข้อมูลเพี้ยน -->
                         <input type="text" id="addrSub" placeholder="ตำบล/แขวง" class="border p-2.5 rounded-lg text-sm outline-none focus:border-blue-500" oninput="syncAddressToExtraLine()">
                         <input type="text" id="addrDist" placeholder="อำเภอ/เขต" class="border p-2.5 rounded-lg text-sm outline-none focus:border-blue-500" oninput="syncAddressToExtraLine()">
                         <input type="text" id="addrProv" placeholder="จังหวัด" class="border p-2.5 rounded-lg text-sm outline-none focus:border-blue-500 col-span-2" oninput="syncAddressToExtraLine()">
                         <input type="text" id="addrZip" placeholder="รหัสไปรษณีย์" class="border p-2.5 rounded-lg text-sm outline-none focus:border-blue-500" oninput="syncAddressToExtraLine()">
                     </div>
+                    <!-- ชุด dropdown ที่จะแสดงแทนเมื่อกด "แก้เฉพาะใบนี้" -->
+                    <div id="addrOverrideBox" class="hidden grid grid-cols-1 md:grid-cols-4 gap-3 mt-3">
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-500 mb-1">จังหวัด</label>
+                            <select id="ovProv" class="w-full border p-2.5 rounded-lg text-sm outline-none focus:border-blue-500 bg-white">
+                                <option value="">— เลือกจังหวัด —</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label id="ovDistLabel" class="block text-[11px] font-bold text-slate-500 mb-1">อำเภอ</label>
+                            <select id="ovDist" disabled class="w-full border p-2.5 rounded-lg text-sm outline-none focus:border-blue-500 bg-white">
+                                <option value="">— เลือกจังหวัดก่อน —</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label id="ovSubLabel" class="block text-[11px] font-bold text-slate-500 mb-1">ตำบล</label>
+                            <select id="ovSub" disabled class="w-full border p-2.5 rounded-lg text-sm outline-none focus:border-blue-500 bg-white">
+                                <option value="">— เลือกอำเภอก่อน —</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-500 mb-1">รหัสไปรษณีย์ (อัตโนมัติ)</label>
+                            <input type="text" id="ovZip" readonly placeholder="—"
+                                class="w-full border p-2.5 rounded-lg text-sm bg-slate-100 text-slate-600 font-semibold cursor-not-allowed outline-none">
+                    </div>
                 </div>
 
-                <div id="travelTimeBox" class="hidden mt-6 bg-white p-4 rounded-xl border border-slate-200 animate-fade-in">
-                    <h3 class="text-sm font-bold text-blue-900 mb-3 pb-2 border-b">กำหนดการเดินทาง</h3>
+                <div id="travelTimeBox" class="hidden mt-6 bg-white p-5 rounded-xl border border-slate-200 animate-fade-in">
+                    <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-100 gap-3 flex-wrap">
+                        <h3 class="text-sm font-bold text-slate-800">กำหนดการเดินทาง</h3>
+                        <span id="tripSummary" class="text-xs font-semibold text-slate-400">เลือกวันออกเดินทางก่อน</span>
+                    </div>
 
-                    <!-- Compact Form -->
-                    <div class="space-y-3">
+                    <!-- เส้นเวลา: ออกเดินทาง -> ปลายทาง -> กลับถึง -->
+                    <div class="tl">
                         <!-- ออกเดินทาง -->
-                        <div class="flex items-start gap-3">
-                            <span class="text-xl mt-1">🚗</span>
-                            <div class="flex-1">
-                                <label class="block text-xs font-bold text-slate-700 mb-1.5">ออกเดินทาง</label>
-                                <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
-                                    <input type="date" id="dateStart" class="border border-slate-300 p-2 rounded text-sm outline-none focus:border-blue-500">
-                                    <div id="timeStart" class="flex items-center gap-1"></div>
-                                    <select id="startFromType" onchange="onStartFromTypeChange()" class="border border-slate-300 p-2 rounded text-sm outline-none focus:border-blue-500">
-                                        <option value="ที่พัก">ที่พัก</option>
-                                        <option value="ที่ทำงาน">ที่ทำงาน</option>
-                                    </select>
-                                    <input type="text" id="startFromLocation" value="ที่พัก" readonly class="hidden">
+                        <div class="tl-row">
+                            <div class="tl-mark">
+                                <span class="tl-dot tl-dot-start">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M5 17h14M5 17a2 2 0 0 1-2-2v-3l2-5h14l2 5v3a2 2 0 0 1-2 2M7 17v2M17 17v2"/><circle cx="7.5" cy="14.5" r="1"/><circle cx="16.5" cy="14.5" r="1"/>
+                                    </svg>
+                                </span>
+                            </div>
+                            <div class="tl-body">
+                                <label class="tl-label">ออกเดินทาง</label>
+                                <div class="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-2 items-start">
+                                    <div class="flex flex-wrap gap-2 items-center">
+                                        <input type="date" id="dateStart" onchange="onTripDatesChange()" class="fld">
+                                        <div id="timeStart" class="flex items-center gap-1"></div>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-xs text-slate-400 whitespace-nowrap">ออกจาก</span>
+                                        <div class="seg" id="startFromSeg">
+                                            <button type="button" data-v="ที่พัก"   class="seg-btn is-on">ที่พัก</button>
+                                            <button type="button" data-v="ที่ทำงาน" class="seg-btn">ที่ทำงาน</button>
+                                        </div>
+                                    </div>
                                 </div>
+                                <!-- คงไว้เพื่อไม่ให้ logic เดิมพัง -->
+                                <select id="startFromType" onchange="onStartFromTypeChange()" class="hidden">
+                                    <option value="ที่พัก">ที่พัก</option>
+                                    <option value="ที่ทำงาน">ที่ทำงาน</option>
+                                </select>
+                                <input type="text" id="startFromLocation" value="ที่พัก" readonly class="hidden">
                             </div>
                         </div>
 
                         <!-- ปลายทาง -->
-                        <div class="flex items-start gap-3">
-                            <span class="text-xl mt-1">📍</span>
-                            <div class="flex-1">
-                                <label class="block text-xs font-bold text-slate-700 mb-1.5">ไปปฏิบัติงาน ณ จังหวัด</label>
-                                <input type="text" id="targetProv" placeholder="เช่น เชียงใหม่, กรุงเทพฯ, ขอนแก่น" class="w-full border border-slate-300 p-2 rounded text-sm outline-none focus:border-blue-500">
+                        <div class="tl-row">
+                            <div class="tl-mark">
+                                <span class="tl-dot tl-dot-mid">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>
+                                    </svg>
+                                </span>
+                            </div>
+                            <div class="tl-body">
+                                <label class="tl-label">ไปปฏิบัติงาน ณ จังหวัด</label>
+                                <select id="targetProv" class="fld w-full max-w-sm bg-white">
+                                    <option value="">— เลือกจังหวัด —</option>
+                                </select>
                             </div>
                         </div>
 
                         <!-- กลับถึง -->
-                        <div class="flex items-start gap-3">
-                            <span class="text-xl mt-1">🏠</span>
-                            <div class="flex-1">
-                                <label class="block text-xs font-bold text-slate-700 mb-1.5">กลับถึง</label>
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                    <input type="date" id="dateEnd" class="border border-slate-300 p-2 rounded text-sm outline-none focus:border-blue-500">
+                        <div class="tl-row tl-last">
+                            <div class="tl-mark">
+                                <span class="tl-dot tl-dot-end">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5"/><path d="M9.5 21v-6h5v6"/>
+                                    </svg>
+                                </span>
+                            </div>
+                            <div class="tl-body">
+                                <label class="tl-label">กลับถึง</label>
+                                <div class="flex flex-wrap gap-2 items-center">
+                                    <input type="date" id="dateEnd" onchange="onTripDatesChange()" class="fld">
                                     <div id="timeEnd" class="flex items-center gap-1"></div>
+                                    <div class="flex gap-1.5 ml-1" id="quickDays">
+                                        <button type="button" onclick="setTripDays(0)" class="chip">ไป-กลับวันเดียว</button>
+                                        <button type="button" onclick="setTripDays(1)" class="chip">2 วัน</button>
+                                        <button type="button" onclick="setTripDays(2)" class="chip">3 วัน</button>
+                                    </div>
                                 </div>
+                                <p id="dateWarn" class="hidden text-xs text-rose-600 font-semibold mt-1.5"></p>
                             </div>
                         </div>
                     </div>
@@ -192,7 +349,8 @@
                     </label>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
-                        <div class="bg-white p-3 rounded-lg border border-blue-100 shadow-sm">
+                        <!-- ค่า Taxi: ใช้เฉพาะ "ใบรับรองค่าพาหนะ" -->
+                        <div id="costTaxiBox" class="bg-white p-3 rounded-lg border border-blue-100 shadow-sm">
                             <div class="flex items-center justify-between mb-2">
                                 <label class="text-xs font-bold text-slate-500">การเดินทางด้วยรถ Taxi</label>
                                 <button type="button" onclick="addTaxiEntry()"
@@ -203,6 +361,8 @@
                                     เพิ่มรอบ Taxi
                                 </button>
                             </div>
+                            <div id="taxiCapNote"
+                                class="hidden mb-2 text-[11px] px-2.5 py-1.5 rounded-md bg-amber-50 border border-amber-200 text-amber-800"></div>
                             <div id="taxiEntriesList" class="space-y-2">
                                 <!-- entries added by addTaxiEntry() -->
                             </div>
@@ -217,43 +377,87 @@
                                 <option value="ไป-กลับ" selected>ไป-กลับ</option>
                             </select>
                             <div class="mt-2">
-                                <label for="fuelRate" class="block text-[10px] text-slate-400 mb-1">ค่าน้ำมัน (บาท/กม.) 🔒</label>
+                                <label for="fuelRate" class="block text-[10px] text-slate-400 mb-1">ค่าน้ำมัน (บาท/กม.) <svg class="inline w-3.5 h-3.5 -mt-0.5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></label>
                                 <input type="number" id="fuelRate" readonly class="w-full border border-slate-300 bg-slate-100 p-2 rounded text-sm outline-none cursor-not-allowed text-slate-600 font-bold" value="4">
-                                <p class="text-[9px] text-slate-400 mt-1">💡 อัตรานี้กำหนดโดย Admin (ไม่สามารถแก้ไขได้)</p>
+                                <p class="text-[9px] text-slate-400 mt-1"><svg class="inline w-3.5 h-3.5 -mt-0.5 flex-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2Z"/></svg> อัตรานี้กำหนดโดย Admin (ไม่สามารถแก้ไขได้)</p>
                             </div>
                         </div>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div>
-                            <label class="block text-xs font-bold text-slate-500 mb-1">จุดเริ่มต้น <span class="text-rose-500">*</span></label>
-                            <input type="text" id="travelFrom" placeholder="พิมพ์ชื่อสถานที่ต้นทาง (ค้นหาจาก Google Maps)" class="w-full border-2 border-white p-3 rounded-lg text-sm shadow-sm focus:border-blue-400 outline-none">
-                            <p class="text-xs text-slate-400 mt-1">💡 ค้นหาสถานที่ใน Google Maps แล้วคัดลอกชื่อมาวาง</p>
+                            <label class="block text-xs font-bold text-emerald-700 mb-1"><svg class="inline w-3.5 h-3.5 -mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5"/></svg> จุดเริ่มต้น <span class="text-rose-500">*</span></label>
+                            <div class="relative">
+                                <input type="text" id="travelFrom" autocomplete="off" placeholder="พิมพ์ชื่อสถานที่ แล้วเลือกจากรายการ"
+                                    class="w-full border-2 border-white p-3 rounded-lg text-sm shadow-sm focus:border-emerald-400 outline-none">
+                                <div id="fromSuggest" class="hidden absolute z-[9100] w-full bg-white border border-slate-200 shadow-xl rounded-xl mt-1 max-h-64 overflow-y-auto overscroll-contain"></div>
+                            </div>
+                            <p class="text-xs text-slate-400 mt-1" id="fromHint">ดึงจากโปรไฟล์ผู้เดินทางอัตโนมัติ</p>
                         </div>
 
                         <div>
-                            <label class="block text-xs font-bold text-slate-500 mb-1">จุดหมาย <span class="text-rose-500">*</span></label>
-                            <input type="text" id="travelTo" placeholder="พิมพ์ชื่อสถานที่ปลายทาง (ค้นหาจาก Google Maps)" class="w-full border-2 border-white p-3 rounded-lg text-sm shadow-sm focus:border-blue-400 outline-none">
-                            <p class="text-xs text-slate-400 mt-1">💡 ค้นหาสถานที่ใน Google Maps แล้วคัดลอกชื่อมาวาง</p>
+                            <label class="block text-xs font-bold text-rose-700 mb-1"><svg class="inline w-3.5 h-3.5 -mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg> จุดหมาย <span class="text-rose-500">*</span></label>
+                            <div class="relative">
+                                <input type="text" id="travelTo" autocomplete="off" placeholder="เช่น โรงพยาบาลนครพิงค์, รพ.สต.บ้านหนองบัว"
+                                    class="w-full border-2 border-white p-3 rounded-lg text-sm shadow-sm focus:border-rose-400 outline-none">
+                                <div id="toSuggest" class="hidden absolute z-[9100] w-full bg-white border border-slate-200 shadow-xl rounded-xl mt-1 max-h-64 overflow-y-auto overscroll-contain"></div>
+                            </div>
+                            <p class="text-xs text-slate-400 mt-1" id="toHint">พิมพ์ชื่อสถานที่ ระบบจะค้นหาให้</p>
                         </div>
+                    </div>
+
+                    <!-- แผนที่: ยืนยัน/ลากปรับหมุดทั้งสองจุด -->
+                    <div class="mb-4">
+                        <div class="flex items-center justify-between mb-2 gap-2 flex-wrap">
+                            <span class="text-xs font-bold text-slate-600">แผนที่เส้นทาง — <span class="font-normal text-slate-400">ลากหมุดปรับให้ตรงได้</span></span>
+                            <div class="flex gap-2 flex-wrap">
+                                <button type="button" onclick="fitRoute(true)" class="chip" title="ย่อ/ขยายให้เห็นหมุดและเส้นทางทั้งหมด">
+                                    <svg class="inline w-3.5 h-3.5 -mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                                    </svg>
+                                    ดูหมุดทั้งหมด
+                                </button>
+                                <button type="button" onclick="recalcRoute(true)"
+                                    class="text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg transition-colors">
+                                    คำนวณระยะทางใหม่
+                                </button>
+                            </div>
+                        </div>
+                        <div id="routeMap" class="w-full h-64 rounded-xl border border-slate-200 shadow-inner bg-slate-100"></div>
+                        <div id="routeStatus" class="mt-2 text-xs"></div>
                     </div>
 
                     <div class="grid grid-cols-2 gap-4 mb-4">
                         <div class="bg-white p-3 rounded-xl border border-emerald-200 shadow-sm">
-                            <div class="text-xs font-bold text-emerald-700 mb-1 text-center">ระยะทางขาไป (กม.)</div>
-                            <input type="number" id="distOutbound" value="0" placeholder="ระบุระยะทาง" class="w-full text-center font-black text-xl text-emerald-600 outline-none border border-emerald-200 rounded p-2" oninput="calculateTravelTotal()">
-                            <p class="text-xs text-slate-400 mt-2 text-center">กรอกระยะทางที่ตรวจสอบจาก Google Maps</p>
+                            <div class="text-xs font-bold text-emerald-700 mb-1 text-center">ระยะทางขาไป (กม.) <svg class="inline w-3.5 h-3.5 -mt-0.5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+                            <input type="number" id="distOutbound" value="0" readonly
+                                class="w-full text-center font-black text-xl text-emerald-600 outline-none border border-emerald-200 rounded p-2 bg-emerald-50/60 cursor-not-allowed">
+                            <p class="text-xs text-slate-400 mt-2 text-center">ระบบคำนวณจากเส้นทางจริง</p>
                         </div>
                         <div class="bg-white p-3 rounded-xl border border-amber-200 shadow-sm">
-                            <div class="text-xs font-bold text-amber-700 mb-1 text-center">ระยะทางขากลับ (กม.)</div>
-                            <input type="number" id="distReturn" value="0" placeholder="ระบุระยะทาง" class="w-full text-center font-black text-xl text-amber-600 outline-none border border-amber-200 rounded p-2" oninput="calculateTravelTotal()">
-                            <p class="text-xs text-slate-400 mt-2 text-center">กรอกระยะทางที่ตรวจสอบจาก Google Maps</p>
+                            <div class="text-xs font-bold text-amber-700 mb-1 text-center">ระยะทางขากลับ (กม.) <svg class="inline w-3.5 h-3.5 -mt-0.5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+                            <input type="number" id="distReturn" value="0" readonly
+                                class="w-full text-center font-black text-xl text-amber-600 outline-none border border-amber-200 rounded p-2 bg-amber-50/60 cursor-not-allowed">
+                            <p class="text-xs text-slate-400 mt-2 text-center">ระบบคำนวณจากเส้นทางจริง</p>
+                        </div>
+                    </div>
+
+                    <!-- ทางออกเมื่อระบบคำนวณไม่ได้จริงๆ -->
+                    <div class="mb-2">
+                        <label class="inline-flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+                            <input type="checkbox" id="manualDistOverride" onchange="toggleManualDistance()" class="rounded">
+                            <span>ระบบคำนวณไม่ได้ ขอกรอกระยะทางเอง</span>
+                        </label>
+                        <div id="manualReasonBox" class="hidden mt-2">
+                            <input type="text" id="manualDistReason" placeholder="ระบุเหตุผล เช่น ปลายทางเป็นพื้นที่ห่างไกลที่แผนที่ไม่ครอบคลุม"
+                                class="w-full border border-amber-300 bg-amber-50 p-2 rounded-lg text-xs outline-none focus:border-amber-500">
+                            <p class="text-[11px] text-amber-700 mt-1">⚠️ ใบเบิกนี้จะติดป้าย "ระยะทางกรอกเอง" ให้ผู้อนุมัติเห็น</p>
                         </div>
                     </div>
 
                     <p class="text-xs text-blue-600 mt-3 flex items-start gap-2 bg-blue-50 border border-blue-100 p-3 rounded-lg shadow-sm">
-                        <span>💡</span>
-                        <span><b>วิธีใช้:</b> ค้นหาเส้นทางใน Google Maps ระหว่างจุดเริ่มต้นและจุดหมาย → ดูระยะทางที่แสดง → กรอกในช่องข้างบน (แยกขาไปและขากลับ)</span>
+                        <span class="flex-none"><svg class="inline w-3.5 h-3.5 -mt-0.5 flex-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2Z"/></svg></span>
+                        <span><b>วิธีใช้:</b> จุดเริ่มต้นดึงจากโปรไฟล์ให้เอง → พิมพ์ชื่อปลายทางแล้วเลือกจากรายการ → ระบบคำนวณระยะทางตามถนนจริง <b>ถ้าหมุดยังไม่ตรง ลากปรับได้ แล้วกด "คำนวณระยะทางใหม่"</b></span>
                     </p>
                 </div>
 
@@ -261,14 +465,15 @@
                     <h3 class="text-sm font-bold text-blue-900 mb-4 border-b pb-2">รายละเอียดค่าใช้จ่ายเพิ่มเติม</h3>
 
                     
-                    <div class="mb-4 bg-white p-3 rounded-lg border border-slate-200">
+                    <!-- ค่าที่พัก: ใช้เฉพาะ "ใบรายงานการเดินทาง" -->
+                    <div id="costHotelBox" class="mb-4 bg-white p-3 rounded-lg border border-slate-200">
                         <label class="block text-xs font-bold text-slate-700 mb-2">1. ค่าที่พัก</label>
 
                         <!-- Hotel Name (Single field) -->
                         <div class="mb-3">
                             <label class="block text-xs text-slate-600 mb-1">ชื่อโรงแรม</label>
                             <input type="text" id="hotelName" placeholder="เช่น โรงแรม A / โรงแรม B (ถ้าหลายโรงแรม ใช้ / คั่น)" class="w-full border p-2 rounded text-sm outline-none focus:border-blue-500">
-                            <p class="text-[10px] text-slate-400 mt-1">💡 ถ้าพักหลายโรงแรม ให้ใช้ "/" คั่น เช่น โรงแรม A / โรงแรม B</p>
+                            <p class="text-[10px] text-slate-400 mt-1"><svg class="inline w-3.5 h-3.5 -mt-0.5 flex-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2Z"/></svg> ถ้าพักหลายโรงแรม ให้ใช้ "/" คั่น เช่น โรงแรม A / โรงแรม B</p>
                         </div>
 
                         <!-- Accommodation Entries -->
@@ -280,15 +485,17 @@
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div class="bg-white p-3 rounded-lg border border-slate-200">
+                        <!-- ค่าตั๋วเครื่องบิน: ใช้เฉพาะ "ใบรายงานการเดินทาง" -->
+                        <div id="costAirBox" class="bg-white p-3 rounded-lg border border-slate-200">
                             <label class="block text-xs font-bold text-slate-700 mb-2">2. ค่าตั๋วเครื่องบิน (บาท)</label>
                             <input type="number" id="airfareCost" placeholder="จำนวนเงิน" class="w-full border p-2 rounded text-sm outline-none focus:border-blue-500" oninput="calculateTravelTotal()">
                         </div>
-                        <div class="bg-white p-3 rounded-lg border border-slate-200">
+                        <!-- ค่าทางด่วน และ ค่าอื่นๆ: ใช้ทั้งสองเอกสาร -->
+                        <div id="costTollBox" class="bg-white p-3 rounded-lg border border-slate-200">
                             <label class="block text-xs font-bold text-slate-700 mb-2">3. ค่าทางด่วน/ที่จอดรถ</label>
                             <input type="number" id="tollCost" placeholder="จำนวนเงิน" class="w-full border p-2 rounded text-sm outline-none focus:border-blue-500" oninput="calculateTravelTotal()">
                         </div>
-                        <div class="bg-white p-3 rounded-lg border border-slate-200">
+                        <div id="costOtherBox" class="bg-white p-3 rounded-lg border border-slate-200">
                             <label class="block text-xs font-bold text-slate-700 mb-2">4. ค่าเบี้ยเลี้ยง/อื่นๆ</label>
                             <input type="number" id="otherCost" placeholder="จำนวนเงิน" class="w-full border p-2 rounded text-sm outline-none focus:border-blue-500" oninput="calculateTravelTotal()">
                         </div>
@@ -490,7 +697,580 @@
     function anyAttachmentShown(rules) {
         return Object.keys(rules).some(id => rules[id] && rules[id].show);
     }
+    /* ── จังหวัดปลายทาง: เปลี่ยนจากพิมพ์เองเป็น dropdown 77 จังหวัด ──
+       เดิมพิมพ์เองทำให้มี "กรุงเทพ" / "กรุงเทพฯ" / "กรุงเทพมหานคร" ปนกันในระบบ
+       ค่าใน option ใช้ "ชื่อจังหวัด" เพื่อให้เข้ากันได้กับข้อมูลเดิมที่บันทึกเป็นชื่อ */
+    let targetProvChoices = null;
+
+    async function initTargetProvince() {
+        await ThaiAddress.load('data/thailand-address.json');
+        const el = document.getElementById('targetProv');
+        if (!el) return;
+        el.innerHTML = '<option value="">— เลือกจังหวัด —</option>';
+        ThaiAddress.provinces().forEach(p => {
+            const o = document.createElement('option');
+            o.value = p.name;              // เก็บเป็นชื่อ ตรงกับรูปแบบเดิมใน _travel.toProv
+            o.textContent = p.name;
+            o.dataset.code = p.code;       // รหัสมาตรฐาน เผื่อส่งออก/เชื่อม API
+            el.appendChild(o);
+        });
+        targetProvChoices = new Choices(el, {
+            searchEnabled: true, shouldSort: false, itemSelectText: '',
+            searchPlaceholderValue: 'ค้นหาจังหวัด...', noResultsText: 'ไม่พบจังหวัด'
+        });
+    }
+
+    /** ตั้งค่าจังหวัดปลายทางจากข้อมูลเดิม — แปลงชื่อเก่าให้ตรงทะเบียนก่อน */
+    function setTargetProvince(name) {
+        const el = document.getElementById('targetProv');
+        if (!el || !name) return;
+        let v = String(name).trim();
+        if (window.ThaiAddress && ThaiAddress.ready()) {
+            const n = ThaiAddress.normalize({ prov: v, dist: '', sub: '', zip: '' });
+            if (n.provinceCode) v = n.prov;          // "กรุงเทพ" -> "กรุงเทพมหานคร"
+        }
+        if (!Array.from(el.options).some(o => o.value === v)) {
+            // ค่าเดิมไม่มีในรายการ — เก็บไว้ไม่ให้ข้อมูลหาย พร้อมป้ายบอก
+            const o = document.createElement('option');
+            o.value = v; o.textContent = v + '  (ค่าเดิม ไม่พบในทะเบียน)';
+            el.appendChild(o);
+        }
+        el.value = v;
+        if (targetProvChoices) targetProvChoices.setChoiceByValue(v);
+    }
+
+    /** รหัสจังหวัดปลายทางที่เลือกอยู่ (สำหรับบันทึกคู่กับชื่อ) */
+    function targetProvinceCode() {
+        const el = document.getElementById('targetProv');
+        const o = el && el.selectedIndex > 0 ? el.options[el.selectedIndex] : null;
+        return (o && o.dataset.code) || null;
+    }
+
+    /* ══════════ แผนที่เส้นทาง + คำนวณระยะทางอัตโนมัติ ══════════
+       หลักการ: ค้นหาช่วยหาที่ตั้งคร่าวๆ -> ลากหมุดปรับให้ตรง -> คำนวณตามถนนจริง
+       ระยะทางล็อกไม่ให้พิมพ์ เว้นแต่ติ๊ก "ขอกรอกเอง" ซึ่งต้องระบุเหตุผล      */
+
+    let routeMap = null, mFrom = null, mTo = null, routeLine = null;
+    let geoFrom = null, geoTo = null;          // {lat, lng, label, precision, source}
+    let routeInfo = null;                       // ผลการคำนวณล่าสุด
+    let routePath = null;                       // เส้นทางแบบย่อ สำหรับวาดใน PDF
+
+    /**
+     * ย่อจำนวนจุดของเส้นทางให้เหลือประมาณ 120 จุด
+     * เส้นทางจริงมีได้ถึง 4,600 จุด (~150 KB) แต่พอวาดในกระดาษ A4 มองไม่เห็นความต่าง
+     * ย่อแล้วเหลือราว 3 KB และยังเก็บจุดต้น-ปลายไว้ครบ
+     */
+    function simplifyPath(coords, target) {
+        target = target || 120;
+        if (!coords || coords.length <= target) return coords || [];
+        const step = Math.ceil(coords.length / target);
+        const out = [];
+        for (let i = 0; i < coords.length; i += step) {
+            out.push([ +coords[i][0].toFixed(5), +coords[i][1].toFixed(5) ]);
+        }
+        const last = coords[coords.length - 1];
+        out.push([ +last[0].toFixed(5), +last[1].toFixed(5) ]);
+        return out;
+    }
+
+    function initRouteMap() {
+        const el = document.getElementById('routeMap');
+        if (!el || routeMap) return;
+        routeMap = L.map('routeMap').setView([13.7563, 100.5018], 6);
+        // ใช้ OpenStreetMap มาตรฐาน — CARTO เปลี่ยนนโยบายต้องใช้ API key แล้ว
+        // ภาพจะขึ้นลายน้ำ "API KEY REQUIRED" ทับทั้งแผนที่ถ้ายังใช้ของเดิม
+        // crossOrigin ต้องเปิด ไม่งั้นแคปรูปแผนที่ออกมาเป็นสีขาว
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19, crossOrigin: 'anonymous',
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(routeMap);
+
+        // กล่องนี้ถูกซ่อนตอนโหลดหน้า Leaflet เลยวัดขนาดไม่ได้ ทำให้แผนที่เพี้ยน
+        // เฝ้าดูขนาดกล่อง พอมีขนาดจริงเมื่อไหร่ให้วัดใหม่ทันที
+        if (window.ResizeObserver) {
+            let done = false;
+            new ResizeObserver(() => {
+                if (el.offsetWidth > 0 && el.offsetHeight > 0) {
+                    routeMap.invalidateSize();
+                    if (!done) { done = true; fitRoute(); }
+                }
+            }).observe(el);
+        }
+        setTimeout(() => routeMap.invalidateSize(), 300);
+    }
+
+    function pin(color) {
+        return L.divIcon({
+            className: '', iconSize: [22, 22], iconAnchor: [11, 22],
+            html: `<div style="width:20px;height:20px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);
+                   background:${color};border:2.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35)"></div>`
+        });
+    }
+
+    /** วางหมุด (ลากได้เสมอ) แล้วคำนวณใหม่เมื่อลากเสร็จ */
+    function setPoint(which, lat, lng, label, precision, source) {
+        initRouteMap();
+        const ll = L.latLng(lat, lng);
+        const isFrom = which === 'from';
+        const store = { lat, lng, label: label || '', precision: precision || 'search', source: source || 'auto' };
+        if (isFrom) geoFrom = store; else geoTo = store;
+
+        let m = isFrom ? mFrom : mTo;
+        if (!m) {
+            m = L.marker(ll, { draggable: true, icon: pin(isFrom ? '#059669' : '#e11d48') }).addTo(routeMap);
+            m.bindTooltip(isFrom ? 'จุดเริ่มต้น (ลากได้)' : 'จุดหมาย (ลากได้)', { permanent: false });
+            m.on('dragend', () => {
+                const p = m.getLatLng();
+                const t = isFrom ? geoFrom : geoTo;
+                t.lat = p.lat; t.lng = p.lng;
+                t.precision = 'exact'; t.source = 'user';   // คนยืนยันเอง = แม่นที่สุด
+                recalcRoute(false);
+            });
+            if (isFrom) mFrom = m; else mTo = m;
+        } else {
+            m.setLatLng(ll);
+        }
+        fitRoute();
+        recalcRoute(false);
+    }
+
+    /**
+     * จัดกรอบแผนที่ให้เห็นหมุดและเส้นทางทั้งหมด
+     * ระยะใกล้เว้นขอบมาก ระยะไกลเว้นน้อย เพื่อให้สัดส่วนสมดุลทุกระยะ
+     */
+    function fitRoute(userAsked) {
+        if (!routeMap) return;
+        routeMap.invalidateSize();
+        const pts = [mFrom, mTo].filter(Boolean).map(m => m.getLatLng());
+        if (routeLine) {
+            routeMap.fitBounds(routeLine.getBounds(), { padding: [28, 28], maxZoom: 16 });
+        } else if (pts.length === 2) {
+            const km = pts[0].distanceTo(pts[1]) / 1000;
+            const pad = km < 5 ? 0.45 : km < 30 ? 0.3 : 0.18;   // ใกล้เว้นขอบเยอะ ไกลเว้นน้อย
+            routeMap.fitBounds(L.latLngBounds(pts).pad(pad), { maxZoom: 15 });
+        } else if (pts.length === 1) {
+            routeMap.setView(pts[0], 15);
+        } else if (userAsked) {
+            alert('ยังไม่มีหมุดบนแผนที่\n\nเลือกโปรไฟล์ผู้เดินทาง (จุดเริ่มต้นจะขึ้นเอง) และพิมพ์ชื่อปลายทางก่อน');
+        }
+    }
+
+    function routeStatus(html) {
+        const el = document.getElementById('routeStatus');
+        if (el) el.innerHTML = html;
+    }
+
+    const badge = (cls, txt) =>
+        `<span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg border font-bold ${cls}">${txt}</span>`;
+
+    /** คำนวณระยะทางตามถนนจริงจาก /map-route */
+    async function recalcRoute(userAsked) {
+        if (document.getElementById('manualDistOverride')?.checked) return;
+        if (!geoFrom || !geoTo) {
+            routeStatus(badge('bg-slate-50 border-slate-200 text-slate-500',
+                'เลือกจุดเริ่มต้นและจุดหมายก่อน ระบบจะคำนวณระยะทางให้อัตโนมัติ'));
+            return;
+        }
+        routeStatus(badge('bg-blue-50 border-blue-200 text-blue-700', 'กำลังคำนวณเส้นทาง...'));
+        try {
+            const u = `/map-route?flat=${geoFrom.lat}&flon=${geoFrom.lng}&tlat=${geoTo.lat}&tlon=${geoTo.lng}`;
+            const res = await fetch(u);
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const gj = await res.json();
+
+            let meters = 0;
+            const coords = [];
+            (gj.features || []).forEach(f => {
+                meters += Number((f.properties && f.properties.distance) || 0);
+                const c = f.geometry && f.geometry.coordinates;
+                if (Array.isArray(c)) c.forEach(p => coords.push([p[1], p[0]]));
+            });
+            if (!meters) throw new Error('ไม่พบเส้นทางระหว่างสองจุดนี้');
+
+            const km = Math.round((meters / 1000) * 10) / 10;
+            document.getElementById('distOutbound').value = km;
+            document.getElementById('distReturn').value = km;
+            if (typeof calculateTravelTotal === 'function') calculateTravelTotal();
+
+            if (routeLine) { routeMap.removeLayer(routeLine); routeLine = null; }
+            if (coords.length) {
+                routeLine = L.polyline(coords, { color: '#2563eb', weight: 5, opacity: .75 }).addTo(routeMap);
+                routeMap.fitBounds(routeLine.getBounds().pad(0.15));
+            }
+
+            routeInfo = { km, meters, computedAt: new Date().toISOString(), provider: 'longdo' };
+            routePath  = simplifyPath(coords);   // เก็บเส้นทางแบบย่อไว้วาดใน PDF
+
+            const worst = [geoFrom.precision, geoTo.precision]
+                .includes('province') ? 'province'
+                : [geoFrom.precision, geoTo.precision].includes('district') ? 'district'
+                : [geoFrom.precision, geoTo.precision].includes('subdistrict') ? 'subdistrict' : 'exact';
+            const note = {
+                exact:       ['bg-emerald-50 border-emerald-200 text-emerald-800', 'ตำแหน่งยืนยันแล้ว — แม่นยำที่สุด'],
+                subdistrict: ['bg-amber-50 border-amber-200 text-amber-800',       'พิกัดระดับตำบล ±1-3 กม. — ลากหมุดให้ตรงบ้านเพื่อความแม่นยำ'],
+                district:    ['bg-amber-50 border-amber-200 text-amber-800',       'พิกัดระดับอำเภอ ±5 กม. — แนะนำให้ลากหมุด'],
+                province:    ['bg-rose-50 border-rose-200 text-rose-800',          'พิกัดระดับจังหวัดเท่านั้น — ควรลากหมุดให้ตรง']
+            }[worst];
+
+            routeStatus(
+                badge('bg-blue-50 border-blue-200 text-blue-800', `เส้นทางจริง ${km.toLocaleString('th-TH')} กม. ต่อเที่ยว`) +
+                ' ' + badge(note[0], note[1])
+            );
+        } catch (e) {
+            routeStatus(
+                badge('bg-rose-50 border-rose-200 text-rose-800', 'คำนวณไม่สำเร็จ: ' + (e.message || 'ไม่ทราบสาเหตุ')) +
+                '<div class="text-slate-500 mt-1">ลองลากหมุดให้ใกล้ถนนใหญ่แล้วกด "คำนวณระยะทางใหม่" — หรือติ๊ก "ขอกรอกเอง" ด้านล่าง</div>'
+            );
+            if (userAsked) console.warn('route error', e);
+        }
+    }
+
+    /* ══════════ แผนที่ในเอกสาร ══════════
+       ไม่เก็บรูปในฐานข้อมูล — เก็บแค่พิกัด (fromGeo/toGeo/route) ซึ่งหนักไม่ถึง 1 KB
+       แล้ววาดแผนที่ตอนสร้าง PDF แทน
+       เทียบกัน: เก็บรูป 149 KB/ใบ vs เก็บพิกัด 0.3 KB/ใบ — เล็กลงราว 500 เท่า
+       ข้อดีอีกอย่าง: ถ้าแก้หมุดภายหลัง เอกสารจะวาดใหม่ให้ถูกต้องเสมอ            */
+
+    /**
+     * ตั้งค่าตำแหน่งให้ทั้งค่าในฟอร์มและหน้าจอตรงกัน
+     * ถ้าตำแหน่งจากโปรไฟล์ไม่มีในรายการที่ admin ตั้งไว้ ให้เพิ่มเป็นตัวเลือกชั่วคราว
+     * จะได้ไม่เงียบหายไปโดยผู้ใช้ไม่รู้ตัว
+     */
+    /** ตั้งค่าตำแหน่ง — ตอนนี้เป็นช่องพิมพ์ได้ จึงใส่ค่าตรงๆ ได้เลย
+        ถ้าค่านั้นยังไม่มีในรายการกลาง ก็ยังใช้ได้ปกติ ไม่หายไปไหน */
+    function setPositionValue(v) {
+        const el = document.getElementById('position');
+        if (el) el.value = (v || '').trim();
+    }
+
+    function onUseAppMapToggle() {
+        const on = document.getElementById('useAppMapImage')?.checked;
+        document.getElementById('appMapCaptureBox')?.classList.toggle('hidden', !on);
+        document.getElementById('manualMapUploadBox')?.classList.toggle('hidden', on);
+    }
+
+    function toggleManualDistance() {
+        const on = document.getElementById('manualDistOverride').checked;
+        document.getElementById('manualReasonBox').classList.toggle('hidden', !on);
+        ['distOutbound', 'distReturn'].forEach(id => {
+            const el = document.getElementById(id);
+            el.readOnly = !on;
+            el.classList.toggle('cursor-not-allowed', !on);
+            el.oninput = on ? () => { if (typeof calculateTravelTotal === 'function') calculateTravelTotal(); } : null;
+        });
+        if (on) routeStatus(badge('bg-amber-50 border-amber-200 text-amber-800',
+            'โหมดกรอกเอง — ใบเบิกจะติดป้ายให้ผู้อนุมัติเห็น'));
+        else recalcRoute(false);
+    }
+
+    /* ── ช่องค้นหาสถานที่ ── */
+    function attachPlaceSearch(inputId, boxId, which) {
+        const input = document.getElementById(inputId);
+        const box   = document.getElementById(boxId);
+        if (!input || !box) return;
+        let timer = null;
+
+        const close = () => box.classList.add('hidden');
+        document.addEventListener('click', e => {
+            if (!input.contains(e.target) && !box.contains(e.target)) close();
+        });
+
+        // แสดงคำแนะนำระหว่างพิมพ์ก่อน (เร็ว) แล้วค่อยตามด้วยผลค้นหาจริง (ช้ากว่า)
+        // ผู้ใช้จะได้ไม่ต้องนั่งรอหน้าจอว่าง และเห็นชื่อที่ถูกต้องให้กดเลือกได้ทันที
+        let seq = 0;
+        input.addEventListener('input', function () {
+            clearTimeout(timer);
+            const q = this.value.trim();
+            if (q.length < 2) return close();
+            const my = ++seq;
+            box.classList.remove('hidden');
+            box.innerHTML = '<div class="p-3 text-sm text-slate-500">กำลังค้นหา...</div>';
+
+            // 1) คำแนะนำ — เร็ว รอแค่ 250ms
+            timer = setTimeout(async () => {
+                const sug = await placeSuggest(q);
+                if (my !== seq) return;                       // ผู้ใช้พิมพ์ต่อแล้ว ผลนี้เก่าไปแล้ว
+                if (sug.length) renderSuggestions(sug, q, box, input, which);
+
+                // 2) ผลค้นหาจริง — ตามมาทีหลัง ทับของเดิมเมื่อได้ผล
+                const prov = which === 'to' ? (document.getElementById('targetProv')?.value || '') : '';
+                let r = await placeSearch(q + (prov && q.indexOf(prov) < 0 ? ' ' + prov : ''));
+                if (!r.data.length && prov) r = await placeSearch(q);
+                if (my !== seq) return;
+                if (r.data.length || !sug.length)
+                    renderPlaceResults(r, q, prov, box, input, which);
+            }, 250);
+        });
+    }
+
+    async function placeSearch(q) {
+        try {
+            const r = await fetch('/map-search?q=' + encodeURIComponent(q));
+            if (!r.ok) return { data: [] };
+            const j = await r.json();
+            return { data: j.data || [], usedQuery: j.usedQuery, didYouMean: j.didYouMean || [] };
+        } catch (e) { return { data: [] }; }
+    }
+
+    async function placeSuggest(q) {
+        try {
+            const r = await fetch('/map-suggest?q=' + encodeURIComponent(q));
+            if (!r.ok) return [];
+            return (await r.json()).data || [];
+        } catch (e) { return []; }
+    }
+
+    /** ผู้ใช้เลือกที่ไหน จำไว้ ครั้งหน้าจะค้นเจอแม้พิมพ์ผิด */
+    function rememberPlace(x) {
+        try {
+            fetch('/map-pick', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: x.name, address: x.address || '', lat: x.lat, lng: x.lon,
+                                       source: x.source || 'search' })
+            });
+        } catch (e) { /* จำไม่ได้ก็ไม่เป็นไร ไม่กระทบการใช้งาน */ }
+    }
+
+    function pickPlace(x, box, input, which) {
+        input.value = x.name || '';
+        box.classList.add('hidden');
+        setPoint(which, parseFloat(x.lat), parseFloat(x.lon), x.name, 'search', x.source || 'auto');
+        rememberPlace(x);
+    }
+
+    /** รายการชื่อที่เดาว่าผู้ใช้กำลังจะพิมพ์ — กดแล้วค้นด้วยชื่อเต็มที่ถูกต้อง */
+    function renderSuggestions(sug, q, box, input, which) {
+        box.innerHTML =
+            '<div class="px-3 py-1.5 text-[11px] text-slate-400 bg-slate-50 border-b">คุณหมายถึง</div>' +
+            sug.map((s, i) => `
+            <button type="button" class="w-full text-left px-3 py-2 hover:bg-blue-50 border-b border-slate-50 last:border-0 flex items-center gap-2"
+                    data-i="${i}">
+                <span class="text-sm text-slate-800 flex-1">${escHtml(s.text)}</span>
+                ${s.kind === 'saved'
+                    ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">เคยใช้</span>'
+                    : ''}
+            </button>`).join('');
+        Array.from(box.querySelectorAll('button')).forEach(b => {
+            b.onclick = async () => {
+                const s = sug[parseInt(b.dataset.i, 10)];
+                input.value = s.text;
+                box.innerHTML = '<div class="p-3 text-sm text-slate-500">กำลังค้นหา...</div>';
+                const r = await placeSearch(s.text);
+                if (r.data.length === 1) return pickPlace(r.data[0], box, input, which);
+                renderPlaceResults(r, s.text, '', box, input, which);
+            };
+        });
+    }
+
+    function renderPlaceResults(r, q, prov, box, input, which) {
+        const list = r.data || [];
+        if (!list.length) {
+            const dym = r.didYouMean || [];
+            box.innerHTML = `
+                <div class="p-3 text-sm">
+                    <div class="font-bold text-slate-700 mb-1">ไม่พบ "${escHtml(q)}"</div>
+                    ${dym.length ? '' : `<div class="text-slate-500 text-xs mb-2">ลองพิมพ์แค่ชื่อหลัก เช่น "ทีเค พาเลซ" ไม่ต้องใส่คำว่าโรงแรม</div>`}
+                    ${prov ? `<button type="button" class="w-full text-left px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 hover:bg-amber-100 text-xs"
+                        onclick="useProvinceFallback('${which}')">
+                        ใช้ตำแหน่งกลางจังหวัด <b>${escHtml(prov)}</b> ไปก่อน แล้วลากหมุดปรับเอง
+                    </button>` : '<div class="text-xs text-slate-400">เลือกจังหวัดปลายทางด้านบน จะมีตัวเลือกสำรองให้</div>'}
+                </div>`;
+            // สถานที่ที่เคยใช้และชื่อใกล้เคียง — กู้เคสพิมพ์ผิดที่ผู้ให้บริการภายนอกจับไม่ได้
+            if (dym.length) {
+                const wrap = document.createElement('div');
+                wrap.innerHTML =
+                    '<div class="px-3 py-1.5 text-[11px] text-emerald-700 bg-emerald-50 border-y border-emerald-100">' +
+                    'สถานที่ที่เคยใช้ ชื่อใกล้เคียงกับที่พิมพ์</div>' +
+                    dym.map((x, i) => `
+                    <button type="button" class="w-full text-left px-3 py-2 hover:bg-emerald-50 border-b border-slate-50 last:border-0" data-i="${i}">
+                        <div class="text-sm font-semibold text-slate-800">${escHtml(x.name || '')}</div>
+                        <div class="text-[11px] text-slate-500 truncate">${escHtml(x.address || '')}</div>
+                    </button>`).join('');
+                Array.from(wrap.querySelectorAll('button')).forEach(b => {
+                    b.onclick = () => pickPlace(dym[parseInt(b.dataset.i, 10)], box, input, which);
+                });
+                box.appendChild(wrap);
+            }
+            return;
+        }
+        // บอกตรงๆ ว่าระบบไปค้นด้วยคำอะไร ผู้ใช้จะได้ไม่งงว่าทำไมผลไม่ตรงกับที่พิมพ์
+        const note = r.usedQuery
+            ? `<div class="px-3 py-1.5 text-[11px] text-blue-700 bg-blue-50 border-b border-blue-100">
+                   ไม่พบ "${escHtml(q)}" ตรงตัว — แสดงผลของ "<b>${escHtml(r.usedQuery)}</b>"</div>`
+            : '';
+        box.innerHTML = note + list.map((x, i) => `
+            <button type="button" class="w-full text-left px-3 py-2.5 hover:bg-blue-50 border-b border-slate-50 last:border-0"
+                    data-i="${i}">
+                <div class="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                    <span class="flex-1">${escHtml(x.name || '')}</span>
+                    ${x.source === 'saved'
+                        ? '<span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">เคยใช้</span>'
+                        : ''}
+                </div>
+                <div class="text-[11px] text-slate-500 truncate">${escHtml(x.address || '')}</div>
+            </button>`).join('');
+        Array.from(box.querySelectorAll('button')).forEach(b => {
+            b.onclick = () => pickPlace(list[parseInt(b.dataset.i, 10)], box, input, which);
+        });
+    }
+
+    async function useProvinceFallback(which) {
+        const prov = document.getElementById('targetProv')?.value;
+        if (!prov) return;
+        const list = (await placeSearch('จังหวัด' + prov)).data;
+        if (!list.length) return alert('หาตำแหน่งจังหวัดไม่ได้ กรุณาลากหมุดบนแผนที่เอง');
+        const x = list[0];
+        document.getElementById(which === 'to' ? 'toSuggest' : 'fromSuggest').classList.add('hidden');
+        setPoint(which, parseFloat(x.lat), parseFloat(x.lon), prov, 'province', 'fallback');
+    }
+
+    function escHtml(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g,
+            c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+    }
+
+    /**
+     * ตั้งจุดเริ่มต้นจากโปรไฟล์ผู้เดินทาง
+     * ถ้าโปรไฟล์มีพิกัดที่ยืนยันไว้แล้ว ใช้เลย (แม่นที่สุด)
+     * ถ้ายังไม่มี ค้นหาจากที่อยู่แบบไล่ลำดับ ซอย -> ถนน -> ตำบล
+     */
+    async function setOriginFromProfile(p) {
+        const input = document.getElementById('travelFrom');
+        const hint  = document.getElementById('fromHint');
+        if (!input) return;
+
+        // ไม่ใส่คำว่า "ที่พัก" ซ้ำ เพราะมีตัวเลือก ที่พัก/ที่ทำงาน อยู่ด้านบนแล้ว
+        // ใส่คำนำหน้า ซอย/ถนน ให้ชัด ไม่งั้นจะอ่านเป็น "141/36 สุขสวัสดิ์ 55 สุขสวัสดิ์"
+        // ซึ่งดูไม่ออกว่าอันไหนซอยอันไหนถนน
+        const isBkk = /กรุงเทพ/.test(p.prov || '');
+        const label = [
+            p.no   ? p.no : '',
+            p.soi  ? 'ซอย' + p.soi : '',
+            p.road ? 'ถนน' + p.road : ''
+        ].filter(Boolean).join(' ') || [
+            p.sub  ? (isBkk ? 'แขวง' : 'ตำบล') + p.sub  : '',
+            p.dist ? (isBkk ? 'เขต'  : 'อำเภอ') + p.dist : '',
+            p.prov || ''
+        ].filter(Boolean).join(' ');
+        input.value = label;
+        // เก็บที่อยู่แยกส่วนไว้ด้วย เอกสารจะได้แสดงแยก เลขที่ / ซอย / ถนน ได้
+        window.__fromAddrParts = { no: p.no || '', soi: p.soi || '', road: p.road || '',
+                                   sub: p.sub || '', dist: p.dist || '', prov: p.prov || '' };
+
+        if (p.lat && p.lng) {
+            const conf = p.geo && p.geo.source === 'user';
+            setPoint('from', p.lat, p.lng, label, conf ? 'exact' : (p.geo && p.geo.precision) || 'search', 'profile');
+            if (hint) hint.innerHTML = conf
+                ? '<span class="text-emerald-600 font-bold">พิกัดยืนยันแล้วจากโปรไฟล์</span>'
+                : '<span class="text-amber-600">พิกัดจากโปรไฟล์ (ยังไม่ยืนยัน) — ลากหมุดปรับได้</span>';
+            return;
+        }
+
+        if (hint) hint.textContent = 'กำลังหาพิกัดจากที่อยู่ในโปรไฟล์...';
+        const prov = p.prov || '';
+        let lv = 'subdistrict';
+        const tries = [];
+        if (p.soi)  tries.push([p.soi  + ' ' + [p.sub, p.dist, prov].filter(Boolean).join(' '), 'search']);
+        if (p.road) tries.push([p.road + ' ' + [p.sub, p.dist, prov].filter(Boolean).join(' '), 'search']);
+        if (p.sub)  tries.push([[p.sub, p.dist, prov].filter(Boolean).join(' '), 'subdistrict']);
+        if (p.dist) tries.push([[p.dist, prov].filter(Boolean).join(' '), 'district']);
+        if (prov)   tries.push([prov, 'province']);
+
+        for (const [q, level] of tries) {
+            const list = (await placeSearch(q)).data;
+            if (list.length && list[0].lat) {
+                lv = level;
+                setPoint('from', parseFloat(list[0].lat), parseFloat(list[0].lon), label, level, 'auto');
+                if (hint) hint.innerHTML = level === 'search'
+                    ? '<span class="text-sky-600">พิกัดระดับซอย/ถนน ±500 ม. — ลากปรับได้</span>'
+                    : '<span class="text-amber-600">พิกัดระดับ' +
+                      ({ subdistrict: 'ตำบล ±1-3 กม.', district: 'อำเภอ ±5 กม.', province: 'จังหวัด' }[level] || '') +
+                      ' — <b>แนะนำให้ลากหมุดไปที่บ้านจริง</b></span>';
+                return;
+            }
+        }
+        if (hint) hint.innerHTML = '<span class="text-rose-600">หาพิกัดจากที่อยู่ไม่ได้ — กรุณาลากหมุดบนแผนที่เอง</span>';
+    }
+
+    /* ══════════ กำหนดการเดินทาง — ลดจำนวนคลิกและกันกรอกผิด ══════════ */
+
+    /** ปุ่มสลับ ที่พัก/ที่ทำงาน — กดครั้งเดียวจบ แทน dropdown ที่ต้องกดสองครั้ง */
+    function initStartFromSegment() {
+        const seg = document.getElementById('startFromSeg');
+        const sel = document.getElementById('startFromType');
+        if (!seg || !sel) return;
+        const btns = Array.from(seg.querySelectorAll('.seg-btn'));
+        const paint = () => btns.forEach(b => b.classList.toggle('is-on', b.dataset.v === sel.value));
+        btns.forEach(b => {
+            b.onclick = () => {
+                sel.value = b.dataset.v;
+                sel.dispatchEvent(new Event('change'));   // ให้ logic เดิมทำงานเหมือนเดิม
+                paint();
+            };
+        });
+        sel.addEventListener('change', paint);
+        paint();
+    }
+
+    const _d = s => { const p = String(s || '').split('-'); return p.length === 3 ? new Date(+p[0], +p[1] - 1, +p[2]) : null; };
+    const _s = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+    /** ปุ่มลัด: ไป-กลับวันเดียว / 2 วัน / 3 วัน */
+    function setTripDays(extra) {
+        const a = document.getElementById('dateStart');
+        const b = document.getElementById('dateEnd');
+        if (!a.value) { a.value = _s(new Date()); }
+        const d = _d(a.value);
+        d.setDate(d.getDate() + extra);
+        b.value = _s(d);
+        onTripDatesChange();
+    }
+
+    /** ตรวจวันที่ให้สมเหตุสมผล + สรุปจำนวนวัน/คืนให้เห็นทันที */
+    function onTripDatesChange() {
+        const a = document.getElementById('dateStart');
+        const b = document.getElementById('dateEnd');
+        const sum = document.getElementById('tripSummary');
+        const warn = document.getElementById('dateWarn');
+        if (!a || !b) return;
+
+        // วันกลับต้องไม่ก่อนวันออกเดินทาง — กันเลือกผิดตั้งแต่ต้น
+        if (a.value) b.min = a.value;
+
+        // เลือกวันออกแล้วแต่ยังไม่เลือกวันกลับ -> เติมวันเดียวกันให้ (กรณีที่พบบ่อยสุด)
+        if (a.value && !b.value) b.value = a.value;
+
+        warn.classList.add('hidden');
+        if (!a.value || !b.value) {
+            sum.textContent = 'เลือกวันออกเดินทางก่อน';
+            sum.className = 'text-xs font-semibold text-slate-400';
+            return;
+        }
+
+        const da = _d(a.value), db = _d(b.value);
+        const days = Math.round((db - da) / 86400000);
+        if (days < 0) {
+            warn.textContent = 'วันกลับอยู่ก่อนวันออกเดินทาง กรุณาตรวจสอบ';
+            warn.classList.remove('hidden');
+            sum.textContent = 'วันที่ไม่ถูกต้อง';
+            sum.className = 'text-xs font-bold text-rose-600';
+        } else {
+            sum.textContent = days === 0 ? 'ไป-กลับวันเดียว' : `รวม ${days + 1} วัน ${days} คืน`;
+            sum.className = 'text-xs font-bold text-blue-600';
+        }
+        // ไฮไลต์ปุ่มลัดที่ตรงกับช่วงวันที่เลือกอยู่
+        document.querySelectorAll('#quickDays .chip').forEach((c, i) =>
+            c.classList.toggle('is-on', i === days));
+    }
+
     async function init() {
+        initTargetProvince().catch(e => console.warn('โหลดรายชื่อจังหวัดไม่สำเร็จ:', e));
+        initStartFromSegment();
+        onTripDatesChange();
+        lockAddressFields(true);      // ที่อยู่ล็อกไว้ก่อน ดึงจากโปรไฟล์
+        initRouteMap();
+        attachPlaceSearch('travelFrom', 'fromSuggest', 'from');
+        attachPlaceSearch('travelTo',   'toSuggest',   'to');
         const sel = document.getElementById('categorySelect');
         sel.innerHTML = '<option value="">-- กรุณาเลือกหมวดการเบิก --</option>';
         try {
@@ -614,15 +1394,19 @@
     function applyProfileDataFromObj(p) {
         if(!p) return;
         document.getElementById('requestedBy').value = p.fullName || '';
-        if (p.position) document.getElementById('position').value = p.position;
+        setPositionValue(p.position || '');
         document.getElementById('affiliation').value = p.affiliation || '';
-        document.getElementById('addrNo').value = p.no || '';
-        document.getElementById('addrSoi').value = p.soi || '';
-        document.getElementById('addrRoad').value = p.road || '';
-        document.getElementById('addrSub').value = p.sub || '';
-        document.getElementById('addrDist').value = p.dist || '';
-        document.getElementById('addrProv').value = p.prov || '';
-        document.getElementById('addrZip').value = p.zip || '';
+
+        // เก็บที่อยู่ตามโปรไฟล์ไว้ เผื่อผู้ใช้ติ๊ก "แก้เฉพาะใบนี้" แล้วเปลี่ยนใจ จะได้คืนค่าเดิมได้
+        window.__profileAddr = {
+            no: p.no || '', soi: p.soi || '', road: p.road || '',
+            sub: p.sub || '', dist: p.dist || '', prov: p.prov || '', zip: p.zip || ''
+        };
+        // ถ้ากำลังใช้ที่อยู่เฉพาะใบนี้อยู่ อย่าเขียนทับสิ่งที่ผู้ใช้ตั้งไว้
+        if (!document.getElementById('addrOverride')?.checked) restoreProfileAddr();
+
+        // ── จุดเริ่มต้น: ดึงพิกัดที่พักจากโปรไฟล์มาให้เลย ผู้ประสานงานไม่ต้องพิมพ์ ──
+        setOriginFromProfile(p);
 
         // Mark extraAddrLine as NOT user-edited when applying profile
         const addrLine = document.getElementById('extraAddrLine');
@@ -712,12 +1496,12 @@
             <div class="flex items-end gap-2">
                 <div class="flex-1 flex gap-1.5">
                     <div class="taxi-out-wrap flex-1">
-                        <label class="taxi-out-label text-[10px] text-slate-400 font-bold block mb-0.5">ขาไป (บาท)</label>
-                        <input type="number" min="0" step="any" class="taxi-amt-out w-full border border-slate-200 px-2 py-1.5 rounded text-xs outline-none focus:border-blue-400" placeholder="ขาไป (บาท)" oninput="onTaxiAmtChange(this)">
+                        <label class="taxi-out-label text-[10px] text-slate-400 font-bold block mb-0.5">ขาไป (บาท) <span class="taxi-cap text-[9px] font-normal text-amber-600"></span></label>
+                        <input type="number" min="0" step="any" class="taxi-amt-out w-full border border-slate-200 px-2 py-1.5 rounded text-xs outline-none focus:border-blue-400" placeholder="ไม่เกิน — บาท" oninput="onTaxiAmtChange(this)">
                     </div>
                     <div class="taxi-ret-wrap flex-1 hidden">
-                        <label class="text-[10px] text-slate-400 font-bold block mb-0.5">ขากลับ</label>
-                        <input type="number" min="0" step="any" class="taxi-amt-ret w-full border border-slate-200 px-2 py-1.5 rounded text-xs outline-none focus:border-blue-400" placeholder="ยอดขากลับ (บาท)" oninput="onTaxiAmtChange(this)">
+                        <label class="text-[10px] text-slate-400 font-bold block mb-0.5">ขากลับ <span class="taxi-cap text-[9px] font-normal text-amber-600"></span></label>
+                        <input type="number" min="0" step="any" class="taxi-amt-ret w-full border border-slate-200 px-2 py-1.5 rounded text-xs outline-none focus:border-blue-400" placeholder="ไม่เกิน — บาท" oninput="onTaxiAmtChange(this)">
                     </div>
                 </div>
                 <button type="button" onclick="removeTaxiEntry(this)"
@@ -730,6 +1514,7 @@
             <div class="taxi-err hidden text-[11px] text-rose-600 mt-1 font-semibold"></div>
         `;
         list.appendChild(div);
+        showTaxiCap();   // แถวที่เพิ่งเพิ่มต้องเห็นวงเงินด้วย
     }
 
     function onTaxiDirChange(select) {
@@ -819,6 +1604,28 @@
             list.innerHTML = '<p class="text-xs text-slate-400 italic">ยังไม่มีรายการ — กดปุ่ม "เพิ่มแถว" ด้านบน</p>';
         }
         syncActivityFromExtraToMain();
+    }
+
+    /** บอกวงเงิน Taxi ของหมวดนี้ตั้งแต่ยังไม่กรอก
+        เดิมต้องกรอกเกินก่อนถึงจะขึ้นเตือน ซึ่งสายไปแล้ว ผู้ใช้กรอกเสร็จค่อยมารู้ */
+    function showTaxiCap() {
+        const has  = taxiMaxPerTrip !== Infinity;
+        const text = has ? 'ไม่เกิน ' + taxiMaxPerTrip.toLocaleString() + ' บาท' : '';
+        const note = document.getElementById('taxiCapNote');
+        if (note) {
+            note.classList.toggle('hidden', !has);
+            note.innerHTML = has
+                ? 'หมวดนี้กำหนดวงเงินค่า Taxi <b>ไม่เกิน ' + taxiMaxPerTrip.toLocaleString() +
+                  ' บาทต่อเที่ยว</b> — กรอกเกินจะบันทึกไม่ได้'
+                : '';
+        }
+        document.querySelectorAll('.taxi-cap').forEach(el => {
+            el.textContent = has ? '(ไม่เกิน ' + taxiMaxPerTrip.toLocaleString() + ')' : '';
+        });
+        document.querySelectorAll('.taxi-amt-out, .taxi-amt-ret').forEach(el => {
+            el.placeholder = has ? text : 'ยอดเงิน (บาท)';
+            el.max = has ? taxiMaxPerTrip : '';
+        });
     }
 
     function onTaxiAmtChange(input) {
@@ -998,12 +1805,33 @@
         const hasGeneral = templates.includes('GENERAL_RECEIPT');
         const hasNormal  = templates.includes('NORMAL') || templates.length === 0;
 
-        document.getElementById('addressSection').classList.toggle('hidden', !hasTravel);
-        document.getElementById('travelTimeBox').classList.toggle('hidden', !hasTravel);
-        document.getElementById('travelDetailsBox').classList.toggle('hidden', !hasTravel);
-        document.getElementById('travelCostBox').classList.toggle('hidden', !hasTravel);
-        document.getElementById('extraEntriesBox').classList.toggle('hidden', !hasTravel);
-        if (hasTravel) { setTimeout(autoFillExtraEntries, 100); }
+        /* ── แสดงเฉพาะช่องที่เอกสารที่ติ๊กไว้ใช้จริง ──
+           อ่านจากโค้ดที่สร้างเอกสารในระบบ (history.html) ว่าแต่ละใบใช้ข้อมูลอะไร
+             ใบรายงานการเดินทาง (REPORT)      : วัน-เวลา · ออกจากไหน · จังหวัด · ที่พัก · เครื่องบิน
+             ใบรับรองค่าพาหนะ (TRANSPORT_RECEIPT): ต้นทาง-ปลายทาง · ระยะทาง · ประเภทรถ · Taxi · ที่อยู่ · กิจกรรม
+             ใช้ทั้งสองใบ                      : ค่าทางด่วน · ค่าอื่นๆ · ชื่อผู้ขอเบิก           */
+        const hasReport  = templates.includes('REPORT');
+        const hasReceipt = templates.includes('TRANSPORT_RECEIPT');
+        const show = (id, on) => {
+            const el = document.getElementById(id);
+            if (el) el.classList.toggle('hidden', !on);
+        };
+
+        show('addressSection',   hasReceipt);            // ที่อยู่ผู้เดินทาง
+        show('travelTimeBox',    hasReport);             // วัน-เวลา · ออกจากไหน · จังหวัดปลายทาง
+        show('travelDetailsBox', hasReceipt);            // แผนที่ · ระยะทาง · ประเภทรถ · Taxi
+        show('extraEntriesBox',  hasReceipt);            // กิจกรรมเพิ่มเติม
+        show('travelCostBox',    hasTravel);             // กล่องรวมค่าใช้จ่าย
+        show('costHotelBox',     hasReport);             // ค่าที่พัก
+        show('costAirBox',       hasReport);             // ค่าตั๋วเครื่องบิน
+        show('costTaxiBox',      hasReceipt);            // ค่า Taxi
+        show('costTollBox',      hasTravel);             // ค่าทางด่วน  (ทั้งสองใบ)
+        show('costOtherBox',     hasTravel);             // ค่าอื่นๆ    (ทั้งสองใบ)
+        if (hasTravel) {
+            setTimeout(autoFillExtraEntries, 100);
+            // Leaflet วัดขนาดตอนกล่องยังซ่อนอยู่ไม่ได้ ต้องสั่งวัดใหม่หลังกล่องแสดง
+            setTimeout(() => { if (routeMap) { routeMap.invalidateSize(); fitRoute(); } }, 150);
+        }
         document.getElementById('generalReceiptSection').classList.toggle('hidden', !hasGeneral);
         document.getElementById('descBox').classList.toggle('hidden', !hasNormal || hasTravel);
         document.getElementById('dynamicInputs').classList.toggle('hidden', !hasNormal || hasTravel);
@@ -1040,6 +1868,7 @@
         const rules = getAttachmentRules(category);
         const catTaxi = category.taxiMaxPerTrip;
         taxiMaxPerTrip = (catTaxi != null && catTaxi > 0) ? catTaxi : Infinity;
+        showTaxiCap();
         applyCategoryPdfTemplate(category);
 
         // Apply fuel rate from category (if defined by admin)
@@ -1086,9 +1915,29 @@
                 if (field === 'LOCATION') {
                     eviDiv.innerHTML += `
                     <div class="bg-blue-50 p-5 rounded-xl border border-blue-200 mb-4 shadow-sm">
-                        <label class="block text-sm font-black text-blue-900 mb-3">📍 ภาพแคปหน้าจอแผนที่ / เส้นทาง (Google Maps) ${reqTag(r)}</label>
-                        <p class="text-xs text-slate-600 mb-3">💡 กรุณาถ่ายภาพหน้าจอแผนที่จาก Google Maps แล้วอัปโหลดที่นี่ (เลือกได้หลายไฟล์)</p>
-                        <input type="file" id="mapManualUpload" accept="image/*" multiple class="mt-2 w-full text-sm text-slate-600 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700 file:font-medium transition-all cursor-pointer border-2 border-dashed border-blue-300 rounded-lg p-3 hover:border-blue-500">
+                        <label class="block text-sm font-black text-blue-900 mb-3"><svg class="inline w-3.5 h-3.5 -mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg> ภาพแผนที่ / เส้นทาง ${reqTag(r)}</label>
+
+                        <label class="flex items-start gap-2.5 p-3 rounded-lg bg-white border border-blue-200 cursor-pointer mb-3">
+                            <input type="checkbox" id="useAppMapImage" checked onchange="onUseAppMapToggle()" class="mt-0.5 rounded">
+                            <span class="text-xs leading-relaxed">
+                                <b class="text-blue-900">ใช้แผนที่จากระบบ</b>
+                                <span class="block text-slate-500 mt-0.5">ระบบจะวาดแผนที่พร้อมเส้นทางลงในเอกสาร PDF ให้ตอนพิมพ์ ไม่ต้องไปแคปจาก Google Maps</span>
+                            </span>
+                        </label>
+
+                        <div id="appMapCaptureBox">
+                            <div id="mapCaptureStatus" class="flex items-start gap-2 text-xs text-slate-600 bg-white border border-blue-100 rounded-lg p-3">
+                                <svg class="w-3.5 h-3.5 mt-0.5 flex-none text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>
+                                </svg>
+                                <span>ใช้แผนที่ด้านบนที่คุณปักหมุดไว้ — <b>ไม่เก็บเป็นไฟล์รูปในระบบ</b> จึงไม่กินพื้นที่ และถ้าแก้หมุดภายหลัง เอกสารจะวาดใหม่ให้ถูกต้องเสมอ</span>
+                            </div>
+                        </div>
+
+                        <div id="manualMapUploadBox" class="hidden">
+                            <p class="text-xs text-slate-600 mb-2">อัปโหลดภาพเอง (เลือกได้หลายไฟล์)</p>
+                            <input type="file" id="mapManualUpload" accept="image/*" multiple class="w-full text-sm text-slate-600 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700 file:font-medium transition-all cursor-pointer border-2 border-dashed border-blue-300 rounded-lg p-3 hover:border-blue-500">
+                        </div>
                     </div>`;
                     return;
                 }
@@ -1186,10 +2035,101 @@
         return items;
     }
 
-    const fileToBase64 = (file) => new Promise((resolve, reject) => {
-        const reader = new FileReader(); reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result); reader.onerror = error => reject(error);
+    /* ── ย่อรูปก่อนบันทึก ────────────────────────────────────
+       รูปจากมือถือใบละ 200-250 KB แนบ 3 รูปก็เกือบ 1 MB ต่อใบเบิก
+       วัดจริงจากฐานข้อมูล: รูปแนบกินพื้นที่ราว 88% ของทั้งหมด
+       1600 px คุณภาพ 0.82 ≈ 200 DPI บนกระดาษ A4 — ตัวเลขในใบเสร็จยังอ่านออกชัด
+       ทุกทางที่ล้มเหลวจะคืนไฟล์ต้นฉบับเสมอ แย่ที่สุดคือเท่าเดิม ไม่มีทางแย่กว่าเดิม */
+
+    const IMG_MAX_EDGE = 1600;   // ด้านยาวสุด (px)
+    const IMG_QUALITY  = 0.82;   // คุณภาพ JPEG
+    // เกณฑ์ข้ามต้องต่ำ เพราะไฟล์ที่ประหยัดได้มากที่สุดคือ PNG ขนาดภาพเล็กแต่ไฟล์ใหญ่
+    // วัดจากรูปจริงในระบบ: PNG 196x190 หนักถึง 92 KB แปลงเป็น JPEG เหลือ 11 KB (-88%)
+    // ถ้าตั้งเกณฑ์ไว้สูง รูปกลุ่มนี้จะถูกข้ามทั้งหมด ซึ่งเป็นกลุ่มที่ได้ผลมากที่สุด
+    // การเข้ารหัสใหม่ปลอดภัยอยู่แล้ว เพราะถ้าผลลัพธ์ไม่เล็กลง ระบบจะใช้ต้นฉบับแทน
+    const IMG_SKIP_UNDER = 60 * 1024;
+
+    let imgStats = { before: 0, after: 0, n: 0, failed: [] };
+
+    const readAsDataURL = file => new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload  = () => resolve(r.result);
+        r.onerror = () => reject(new Error('อ่านไฟล์ไม่สำเร็จ'));
+        r.readAsDataURL(file);
     });
+
+    /** ถอดรหัสรูปโดยเคารพทิศทางที่กล้องบันทึกไว้ (EXIF)
+        ถ้าไม่ทำ รูปถ่ายแนวตั้งจากมือถือจะกลายเป็นแนวนอนตอนวาดลงแคนวาส */
+    async function decodeImage(file) {
+        if (typeof createImageBitmap === 'function') {
+            try { return await createImageBitmap(file, { imageOrientation: 'from-image' }); }
+            catch (_) { /* เบราว์เซอร์เก่าไม่รองรับตัวเลือกนี้ ลองแบบไม่ใส่ */ }
+            try { return await createImageBitmap(file); } catch (_) {}
+        }
+        // ทางถอยสุดท้าย — <img> จัดการ EXIF ให้เองอยู่แล้วในเบราว์เซอร์ปัจจุบัน
+        return await new Promise((resolve, reject) => {
+            const url = URL.createObjectURL(file);
+            const im = new Image();
+            im.onload  = () => { URL.revokeObjectURL(url); resolve(im); };
+            im.onerror = () => { URL.revokeObjectURL(url); reject(new Error('ถอดรหัสรูปไม่ได้')); };
+            im.src = url;
+        });
+    }
+
+    const fileToBase64 = async (file) => {
+        imgStats.n++;
+        imgStats.before += file.size || 0;
+
+        // ไม่ใช่รูป (เช่น PDF) ส่งต้นฉบับไปตามเดิม
+        if (!/^image\//i.test(file.type || '')) {
+            const raw = await readAsDataURL(file);
+            imgStats.after += raw.length * 0.75;
+            return raw;
+        }
+
+        const original = await readAsDataURL(file);
+
+        // ไฟล์เล็กอยู่แล้ว ไม่ต้องเข้ารหัสใหม่ให้เสียคุณภาพเปล่าๆ
+        if ((file.size || 0) < IMG_SKIP_UNDER) {
+            imgStats.after += original.length * 0.75;
+            return original;
+        }
+
+        try {
+            const src = await decodeImage(file);
+            const w0 = src.width, h0 = src.height;
+            if (!w0 || !h0) throw new Error('ขนาดรูปผิดปกติ');
+
+            const scale = Math.min(1, IMG_MAX_EDGE / Math.max(w0, h0));
+            const cv = document.createElement('canvas');
+            cv.width  = Math.max(1, Math.round(w0 * scale));
+            cv.height = Math.max(1, Math.round(h0 * scale));
+            const cx = cv.getContext('2d');
+            // JPEG ไม่มีพื้นโปร่งใส ต้องรองพื้นขาวก่อน
+            // ไม่งั้นรูป PNG ที่พื้นใสจะกลายเป็นพื้นดำสนิท อ่านอะไรไม่ออกเลย
+            cx.fillStyle = '#fff';
+            cx.fillRect(0, 0, cv.width, cv.height);
+            cx.imageSmoothingQuality = 'high';
+            cx.drawImage(src, 0, 0, cv.width, cv.height);
+            if (src.close) src.close();
+
+            const out = cv.toDataURL('image/jpeg', IMG_QUALITY);
+            // ย่อแล้วไม่ได้เล็กลง (เช่นรูปที่บีบอัดมาดีอยู่แล้ว) ใช้ต้นฉบับดีกว่า
+            if (!out || out.length >= original.length) {
+                imgStats.after += original.length * 0.75;
+                return original;
+            }
+            imgStats.after += out.length * 0.75;
+            return out;
+        } catch (e) {
+            // ย่อไม่สำเร็จ (เช่น HEIC ที่เบราว์เซอร์ถอดรหัสไม่ได้) — ส่งต้นฉบับไป
+            // ห้ามทิ้งรูป เอกสารต้องมีหลักฐานแนบครบ
+            console.warn('ย่อรูปไม่สำเร็จ ใช้ไฟล์ต้นฉบับแทน:', file.name, e);
+            imgStats.failed.push(file.name || 'ไม่ทราบชื่อไฟล์');
+            imgStats.after += original.length * 0.75;
+            return original;
+        }
+    };
 
     // Validation helper functions
     function showValidationErrors(errors) {
@@ -1242,7 +2182,7 @@
                     message: `❌ ไฟล์ "${file.name}" ขนาดใหญ่เกินไป!\n` +
                         `📊 ขนาด: ${(file.size / 1024 / 1024).toFixed(2)} MB\n` +
                         `📏 ขนาดสูงสุด: ${maxSizeMB} MB\n\n` +
-                        `💡 กรุณาลดขนาดไฟล์หรือเลือกไฟล์อื่น`
+                        `<svg class="inline w-3.5 h-3.5 -mt-0.5 flex-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2Z"/></svg> กรุณาลดขนาดไฟล์หรือเลือกไฟล์อื่น`
                 });
             }
 
@@ -1253,7 +2193,7 @@
                     level: 'error',
                     message: `❌ ไฟล์ "${file.name}" ไม่ใช่รูปภาพ!\n` +
                         `📄 ชนิด: ${file.type || 'ไม่ทราบ'}\n\n` +
-                        `💡 กรุณาเลือกไฟล์รูปภาพเท่านั้น (JPG, PNG, etc.)`
+                        `<svg class="inline w-3.5 h-3.5 -mt-0.5 flex-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2Z"/></svg> กรุณาเลือกไฟล์รูปภาพเท่านั้น (JPG, PNG, etc.)`
                 });
             }
         }
@@ -1303,22 +2243,32 @@
             _affiliation:  document.getElementById('affiliation')?.value || ''
         };
 
+        // บังคับกรอกเฉพาะช่องที่เอกสารที่ติ๊กไว้ใช้จริง
+        // เดิมบังคับทุกช่องแม้เอกสารไม่ได้ใช้ ทำให้บันทึกไม่ได้ทั้งที่กรอกครบตามเอกสารแล้ว
+        const needReport  = templates.includes('REPORT');
+        const needReceipt = templates.includes('TRANSPORT_RECEIPT');
+
         if (hasTravel) {
-            const travelFrom = document.getElementById('travelFrom').value;
-            const travelTo = document.getElementById('travelTo').value;
-            if (!travelFrom.trim() || !travelTo.trim()) return alert("❌ กรุณาระบุสถานที่ 'จุดเริ่มต้น' และ 'จุดหมาย' ให้ครบถ้วน");
+            // ต้องประกาศนอกบล็อก if — ด้านล่างใช้ค่านี้ตอนประกอบ _travel
+            // ถ้าประกาศไว้ในบล็อก ชื่อจะไปชนกับตัวแปรกลางที่เบราว์เซอร์สร้างจาก id ของ input
+            // แล้วบันทึกลงฐานข้อมูลเป็น {} ทำให้เอกสารพิมพ์ออกมาเป็น [object Object]
+            const travelFrom = document.getElementById('travelFrom')?.value || '';
+            const travelTo   = document.getElementById('travelTo')?.value   || '';
+            if (needReceipt && (!travelFrom.trim() || !travelTo.trim()))
+                return alert("❌ กรุณาระบุสถานที่ 'จุดเริ่มต้น' และ 'จุดหมาย' ให้ครบถ้วน");
             const dateStart = document.getElementById('dateStart').value;
             const dateEnd   = document.getElementById('dateEnd').value;
-            if (!dateStart) return alert("❌ กรุณาระบุวันที่ออกเดินทาง");
-            if (!dateEnd)   return alert("❌ กรุณาระบุวันที่กลับถึง");
+            if (needReport && !dateStart) return alert("❌ กรุณาระบุวันที่ออกเดินทาง");
+            if (needReport && !dateEnd)   return alert("❌ กรุณาระบุวันที่กลับถึง");
 
             // Validate date range: end date must be >= start date
+            // ตรวจเฉพาะเมื่อมีวันที่ทั้งคู่ (ถ้าไม่ได้ติ๊กใบรายงานการเดินทาง อาจเว้นว่างได้)
             const startTime = getTime24('timeStart');
             const endTime = getTime24('timeEnd');
             const startDateTime = new Date(dateStart + ' ' + startTime);
             const endDateTime = new Date(dateEnd + ' ' + endTime);
 
-            if (endDateTime < startDateTime) {
+            if (dateStart && dateEnd && endDateTime < startDateTime) {
                 return alert(
                     "❌ วันเวลากลับถึงต้องไม่ก่อนวันเวลาออกเดินทาง!\n\n" +
                     "📅 วันที่ออกเดินทาง: " + dateStart + " เวลา " + startTime + "\n" +
@@ -1339,7 +2289,19 @@
                 startFromLocation: document.getElementById('startFromLocation')?.value || '',
                 startDate: document.getElementById('dateStart')?.value || '', startTime: getTime24('timeStart'),
                 endDate: document.getElementById('dateEnd')?.value || '', endTime: getTime24('timeEnd'),
-                from: travelFrom, to: travelTo, toProv: document.getElementById('targetProv')?.value || '',
+                from: travelFrom, to: travelTo,
+                toProv: document.getElementById('targetProv')?.value || '',
+                toProvCode: targetProvinceCode(),   // รหัสมาตรฐาน สำหรับส่งออก/เชื่อม API
+                // ── หลักฐานที่มาของระยะทาง ให้ผู้อนุมัติตรวจย้อนหลังได้ ──
+                // เก็บพิกัดแทนรูป เพื่อให้ PDF วาดแผนที่เองตอนพิมพ์ (ประหยัดพื้นที่ ~500 เท่า)
+                fromGeo: geoFrom, toGeo: geoTo,
+                fromAddr: window.__fromAddrParts || null,   // ที่อยู่แยกส่วน ให้เอกสารแสดง ซอย/ถนน แยกได้
+                useAppMap: !!document.getElementById('useAppMapImage')?.checked,
+                routePath: routePath,
+                distanceSource: document.getElementById('manualDistOverride')?.checked ? 'manual' : 'route',
+                manualReason: document.getElementById('manualDistOverride')?.checked
+                    ? (document.getElementById('manualDistReason')?.value || '') : '',
+                route: routeInfo,
                 distOut: document.getElementById('distOutbound')?.value || 0, distRet: document.getElementById('distReturn')?.value || 0
             };
             metadata._costs = {
@@ -1487,7 +2449,9 @@
         const taxiEntries = collectTaxiEntries();
         const usingTaxi = taxiEntries && taxiEntries.length > 0;
 
-        if (hasTravel && !usingTaxi) {
+        // ระยะทางกับประเภทรถอยู่ใน "ใบรับรองค่าพาหนะ" เท่านั้น
+        // ถ้าติ๊กแค่ใบรายงานการเดินทาง ไม่ต้องบังคับ
+        if (needReceipt && !usingTaxi) {
             // If using personal car, must have distance
             const dO = parseFloat(metadata._travel.distOut) || 0;
             const dR = parseFloat(metadata._travel.distRet) || 0;
@@ -1551,9 +2515,16 @@
 
         // Location attachment validation (if required by category)
         const locRule = rules.LOCATION || {};
-        if (locRule.show && locRule.required && hasTravel) {
+        // แผนที่/เส้นทาง ใช้เฉพาะ "ใบรับรองค่าพาหนะ"
+        if (locRule.show && locRule.required && needReceipt) {
+            const useApp = document.getElementById('useAppMapImage')?.checked;
+            if (useApp && !(geoFrom && geoTo)) {
+                return alert('❌ ยังปักหมุดไม่ครบทั้งสองจุด\n\n' +
+                             'เลือกโปรไฟล์ผู้เดินทาง (จุดเริ่มต้นจะขึ้นเอง) และเลือกปลายทางก่อน\n' +
+                             'หรือเอาติ๊ก "ใช้แผนที่จากระบบ" ออก แล้วอัปโหลดภาพเอง');
+            }
             const manualInput = document.getElementById('mapManualUpload');
-            if (!manualInput || !manualInput.files || manualInput.files.length === 0) {
+            if (!useApp && (!manualInput || !manualInput.files || manualInput.files.length === 0)) {
                 return alert("❌ กรุณาอัปโหลดรูปภาพแผนที่ (Screenshot จาก Google Maps)");
             }
         }
@@ -1571,13 +2542,18 @@
         btn.innerHTML = '⏳ กำลังประมวลผลไฟล์...'; btn.disabled = true;
 
         const uploadedImages = [];
+        imgStats = { before: 0, after: 0, n: 0, failed: [] };
 
-        // Handle map upload (screenshot from Google Maps)
-        if (locRule.show && hasTravel) {
-            const manualInput = document.getElementById('mapManualUpload');
-            if (manualInput && manualInput.files) {
-                for (let i = 0; i < manualInput.files.length; i++) {
-                    uploadedImages.push(await fileToBase64(manualInput.files[i]));
+        // ภาพแผนที่: ใช้ภาพที่ระบบสร้าง หรือภาพที่ผู้ใช้อัปโหลดเอง อย่างใดอย่างหนึ่ง
+        if (locRule.show && needReceipt) {
+            if (document.getElementById('useAppMapImage')?.checked) {
+                // ไม่แนบรูป — เก็บแค่พิกัดใน _travel แล้ววาดแผนที่ตอนออก PDF
+            } else {
+                const manualInput = document.getElementById('mapManualUpload');
+                if (manualInput && manualInput.files) {
+                    for (let i = 0; i < manualInput.files.length; i++) {
+                        uploadedImages.push(await fileToBase64(manualInput.files[i]));
+                    }
                 }
             }
         }
@@ -1586,6 +2562,18 @@
             if (input.files) {
                 for (let i = 0; i < input.files.length; i++) uploadedImages.push(await fileToBase64(input.files[i]));
             }
+        }
+
+        // ย่อรูปไม่ได้บางไฟล์ก็ยังบันทึกได้ แต่ต้องบอกให้รู้ ไม่ใช่เงียบ
+        if (imgStats.failed.length) {
+            console.warn('ไฟล์ที่ย่อไม่ได้ ใช้ต้นฉบับแทน:', imgStats.failed);
+        }
+        if (imgStats.n) {
+            const kb = b => Math.round(b / 1024);
+            console.log('รูปแนบ ' + imgStats.n + ' ไฟล์: ' +
+                kb(imgStats.before) + ' KB -> ' + kb(imgStats.after) + ' KB' +
+                (imgStats.before > 0
+                    ? '  (ลดลง ' + Math.round((1 - imgStats.after / imgStats.before) * 100) + '%)' : ''));
         }
 
         btn.innerHTML = '☁️ กำลังบันทึกเข้าสู่ระบบ...';
@@ -1617,6 +2605,9 @@
                 });
             }
             if (res.ok) {
+                // เก็บตำแหน่ง/สังกัดที่พิมพ์ใหม่เข้ารายการกลาง ให้คนถัดไปเลือกได้
+                await rememberListValue('positionList',    metadata._position,    knownPositions);
+                await rememberListValue('affiliationList', metadata._affiliation, knownAffils);
                 alert(editingExpenseId ? "✅ อัปเดตข้อมูลสำเร็จ!" : "🎉 บันทึกข้อมูลสำเร็จ!");
                 window.location.href = 'history.html';
                 return;
@@ -1626,7 +2617,19 @@
                 return;
             }
             const errData = await res.json().catch(() => ({}));
-            alert('บันทึกไม่สำเร็จ: ' + (errData.error || 'HTTP ' + res.status));
+            // เซิร์ฟเวอร์ส่งเหตุผลรายข้อมาใน errors[] — เดิมโค้ดทิ้งทั้งหมดแล้วโชว์แค่
+            // "Validation failed" ผู้ใช้จึงไม่รู้เลยว่าต้องไปแก้ตรงไหน
+            const list = Array.isArray(errData.errors) ? errData.errors : [];
+            if (list.length) {
+                showValidationErrors(list);
+                document.getElementById('validationErrors')
+                        ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                alert('บันทึกไม่สำเร็จ — พบ ' + list.length + ' ข้อที่ต้องแก้\n\n' +
+                    list.map((e, i) => (i + 1) + '. ' + String(e.message || '').replace(/\n+/g, ' ')).join('\n\n'));
+            } else {
+                alert('บันทึกไม่สำเร็จ: ' +
+                    (errData.error || 'เซิร์ฟเวอร์ตอบรหัส ' + res.status + ' โดยไม่ระบุเหตุผล'));
+            }
         } catch (e) {
             alert('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาตรวจสอบการเชื่อมต่อ');
         }
@@ -1680,7 +2683,7 @@
             setTime24('timeStart', tr.startTime || '');
             document.getElementById('dateEnd').value       = tr.endDate   || '';
             setTime24('timeEnd', tr.endTime || '');
-            document.getElementById('targetProv').value    = tr.toProv    || '';
+            setTargetProvince(tr.toProv);
             document.getElementById('travelFrom').value    = tr.from      || '';
             document.getElementById('travelTo').value      = tr.to        || '';
             document.getElementById('distOutbound').value  = tr.distOut   || 0;
@@ -1799,23 +2802,182 @@
         if (mSel) mSel.value = m;
     }
 
+    /**
+     * ช่องนี้เป็นแค่ "ป้ายระบุ" ว่าออกเดินทางจากที่พักหรือที่ทำงาน
+     * ไม่ต้องให้ผู้ใช้พิมพ์อะไร — เดิมพอเลือก "ที่ทำงาน" จะเด้งช่องว่างให้กรอก ซึ่งไม่จำเป็น
+     * เก็บ input ไว้ (ซ่อน) เพื่อให้การบันทึกและการโหลดใบเบิกเก่าทำงานเหมือนเดิม
+     */
     function onStartFromTypeChange() {
         const type = document.getElementById('startFromType').value;
         const loc  = document.getElementById('startFromLocation');
         if (!loc) return;
-        if (type === 'ที่พัก') {
-            loc.value    = 'ที่พัก';
-            loc.readOnly = true;
-            loc.className = 'w-full border p-2.5 rounded-lg text-sm outline-none bg-slate-100 text-slate-500 cursor-default mb-2';
-        } else {
-            if (loc.value === 'ที่พัก') loc.value = '';
-            loc.readOnly = false;
-            loc.className = 'w-full border p-2.5 rounded-lg text-sm outline-none focus:border-blue-500 mb-2';
-            setTimeout(() => loc.focus(), 50);
-        }
+        loc.value    = type;      // "ที่พัก" หรือ "ที่ทำงาน"
+        loc.readOnly = true;
+        loc.className = 'hidden';
     }
 
-    let positionChoices; // Global Choices instance
+    /* ══════════ ที่อยู่ผู้เดินทาง ══════════
+       ปกติดึงจากโปรไฟล์และล็อกไว้ — ป้องกันการพิมพ์ผิดที่ทำให้ข้อมูลเพี้ยนกลับเข้าระบบ
+       ถ้าใบนี้ต้องใช้ที่อยู่อื่น ติ๊ก "แก้เฉพาะใบนี้" แล้วเลือกจาก dropdown ทะเบียนราชการ
+       การแก้ตรงนี้ไม่กระทบที่อยู่ในโปรไฟล์                                            */
+
+    const ADDR_IDS = ['addrNo', 'addrRoad', 'addrSoi', 'addrSub', 'addrDist', 'addrProv', 'addrZip'];
+
+    function lockAddressFields(locked) {
+        ADDR_IDS.forEach(id => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.readOnly = locked;
+            el.classList.toggle('bg-slate-100', locked);
+            el.classList.toggle('text-slate-600', locked);
+            el.classList.toggle('cursor-not-allowed', locked);
+        });
+    }
+
+    /** เขียนที่อยู่ตามโปรไฟล์กลับลงช่องกรอก */
+    function restoreProfileAddr() {
+        const a = window.__profileAddr;
+        if (!a) return;
+        const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+        set('addrNo', a.no);   set('addrSoi', a.soi);   set('addrRoad', a.road);
+        set('addrSub', a.sub); set('addrDist', a.dist); set('addrProv', a.prov); set('addrZip', a.zip);
+        if (typeof syncAddressToExtraLine === 'function') syncAddressToExtraLine();
+    }
+
+    async function toggleAddrOverride() {
+        const on = document.getElementById('addrOverride')?.checked;
+        const box = document.getElementById('addrOverrideBox');
+        const note = document.getElementById('addrLockNote');
+
+        // เอาติ๊กออก = กลับไปใช้ที่อยู่ตามโปรไฟล์ ไม่ทิ้งค่าที่เพิ่งแก้ค้างไว้ให้เข้าใจผิด
+        if (!on) {
+            restoreProfileAddr();
+            ['ovProv', 'ovDist', 'ovSub'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.selectedIndex = 0;
+            });
+            const z = document.getElementById('ovZip'); if (z) z.value = '';
+        }
+
+        // เลขที่ / ซอย / ถนน พิมพ์เองได้เมื่อเปิดโหมดแก้ (ที่อยู่ไม่ซ้ำกัน ทำ dropdown ไม่ได้)
+        ['addrNo', 'addrRoad', 'addrSoi'].forEach(id => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.readOnly = !on;
+            el.classList.toggle('bg-slate-100', !on);
+            el.classList.toggle('cursor-not-allowed', !on);
+        });
+        // ตำบล/อำเภอ/จังหวัด/ปณ. ล็อกตลอด — แก้ผ่าน dropdown ด้านล่างแทน
+        ['addrSub', 'addrDist', 'addrProv', 'addrZip'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) { el.readOnly = true; el.classList.add('bg-slate-100', 'cursor-not-allowed'); }
+        });
+
+        box?.classList.toggle('hidden', !on);
+        if (note) {
+            note.innerHTML = on
+                ? 'กำลังใช้ที่อยู่เฉพาะใบนี้ — <b>ที่อยู่ในโปรไฟล์ยังเป็นค่าเดิม ไม่ถูกแก้</b>'
+                : 'ดึงจากโปรไฟล์ผู้เดินทางอัตโนมัติ — ติ๊ก "แก้เฉพาะใบนี้" ถ้าต้องการใช้ที่อยู่อื่นสำหรับใบนี้ <b>(ไม่กระทบที่อยู่ในโปรไฟล์)</b>';
+        }
+        if (on) await initAddrOverrideDropdowns();
+    }
+
+    let ovReady = false;
+    async function initAddrOverrideDropdowns() {
+        if (ovReady) return;
+        await ThaiAddress.load('data/thailand-address.json');
+        const pv = document.getElementById('ovProv');
+        pv.innerHTML = '<option value="">— เลือกจังหวัด —</option>';
+        ThaiAddress.provinces().forEach(p => {
+            const o = document.createElement('option');
+            o.value = p.code; o.textContent = p.name;
+            pv.appendChild(o);
+        });
+        pv.onchange = onOvProvChange;
+        document.getElementById('ovDist').onchange = onOvDistChange;
+        document.getElementById('ovSub').onchange  = onOvSubChange;
+        ovReady = true;
+    }
+
+    function onOvProvChange() {
+        const pc = document.getElementById('ovProv').value;
+        const L  = pc ? ThaiAddress.labels(pc) : { district: 'อำเภอ', subdistrict: 'ตำบล' };
+        document.getElementById('ovDistLabel').textContent = L.district;
+        document.getElementById('ovSubLabel').textContent  = L.subdistrict;
+
+        const d = document.getElementById('ovDist'), s = document.getElementById('ovSub');
+        d.innerHTML = '<option value="">— เลือก' + L.district + ' —</option>';
+        (pc ? ThaiAddress.districts(pc) : []).forEach(x => {
+            const o = document.createElement('option'); o.value = x.code; o.textContent = x.name; d.appendChild(o);
+        });
+        d.disabled = !pc;
+        s.innerHTML = '<option value="">— เลือก' + L.district + 'ก่อน —</option>';
+        s.disabled = true;
+        document.getElementById('ovZip').value = '';
+        applyOverrideToAddr();
+    }
+
+    function onOvDistChange() {
+        const pc = document.getElementById('ovProv').value;
+        const dc = document.getElementById('ovDist').value;
+        const L  = ThaiAddress.labels(pc);
+        const s  = document.getElementById('ovSub');
+        s.innerHTML = '<option value="">— เลือก' + L.subdistrict + ' —</option>';
+        (dc ? ThaiAddress.subdistricts(dc) : []).forEach(x => {
+            const o = document.createElement('option');
+            o.value = x.code; o.textContent = x.name; o.dataset.zip = x.zip;
+            s.appendChild(o);
+        });
+        s.disabled = !dc;
+        document.getElementById('ovZip').value = '';
+        applyOverrideToAddr();
+    }
+
+    function onOvSubChange() {
+        const s = document.getElementById('ovSub');
+        const o = s.selectedIndex > 0 ? s.options[s.selectedIndex] : null;
+        document.getElementById('ovZip').value = (o && o.dataset.zip) || '';
+        applyOverrideToAddr();
+    }
+
+    /** ย้ายค่าจาก dropdown ไปใส่ช่องที่ใช้บันทึกจริง (เก็บเป็นชื่อไทยเหมือนเดิม) */
+    function applyOverrideToAddr() {
+        const txt = el => (el && el.selectedIndex > 0) ? el.options[el.selectedIndex].textContent.trim() : '';
+        document.getElementById('addrProv').value = txt(document.getElementById('ovProv'));
+        document.getElementById('addrDist').value = txt(document.getElementById('ovDist'));
+        document.getElementById('addrSub').value  = txt(document.getElementById('ovSub'));
+        document.getElementById('addrZip').value  = document.getElementById('ovZip').value;
+        if (typeof syncAddressToExtraLine === 'function') syncAddressToExtraLine();
+    }
+
+    /* ── ตำแหน่ง / สังกัด: datalist ให้เลือกหรือพิมพ์เองก็ได้ ── */
+    let knownPositions = [], knownAffils = [];
+
+    function fillDatalist(id, items) {
+        const dl = document.getElementById(id);
+        if (!dl) return;
+        dl.innerHTML = '';
+        (items || []).forEach(v => {
+            const o = document.createElement('option');
+            o.value = v;
+            dl.appendChild(o);
+        });
+    }
+
+    /** ค่าที่พิมพ์ใหม่ เก็บเข้ารายการกลางให้คนถัดไปเลือกได้ */
+    async function rememberListValue(key, value, known) {
+        const v = (value || '').trim().replace(/\s+/g, ' ');
+        if (!v) return;
+        if (known.some(x => String(x).trim() === v)) return;
+        try {
+            const r = await fetch('/settings/list-append', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key, value: v })
+            });
+            if (r.ok) known.push(v);
+        } catch (e) { /* เก็บไม่ได้ก็ไม่กระทบการบันทึกใบเบิก */ }
+    }
 
     // Load settings from backend
     async function loadSettings() {
@@ -1829,27 +2991,11 @@
                     document.getElementById('fuelRate').value = settings.fuelRate;
                 }
 
-                // Populate position dropdown
-                const positions = settings.positionList || [];
-                const positionSelect = document.getElementById('position');
-                positionSelect.innerHTML = '<option value="">— เลือกตำแหน่ง —</option>';
-                positions.forEach(pos => {
-                    const option = document.createElement('option');
-                    option.value = pos;
-                    option.textContent = pos;
-                    positionSelect.appendChild(option);
-                });
-
-                // Initialize Choices.js for searchable dropdown
-                if (positionChoices) positionChoices.destroy();
-                positionChoices = new Choices('#position', {
-                    searchEnabled: true,
-                    searchPlaceholderValue: 'ค้นหาตำแหน่ง...',
-                    noResultsText: 'ไม่พบตำแหน่ง',
-                    itemSelectText: 'กดเพื่อเลือก',
-                    removeItemButton: false,
-                    shouldSort: false
-                });
+                // ตำแหน่ง/สังกัด: เลือกจากรายการหรือพิมพ์เองก็ได้
+                knownPositions = settings.positionList || [];
+                knownAffils    = settings.affiliationList || [];
+                fillDatalist('positionOptions', knownPositions);
+                fillDatalist('affilOptions', knownAffils);
 
                 // Store settings globally for validation
                 window.appSettings = settings;
