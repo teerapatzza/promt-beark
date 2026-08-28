@@ -406,6 +406,30 @@
                         </div>
                     </div>
 
+                    <!-- ขากลับไปคนละที่กับตอนไป เช่น ไปที่ทำงาน แล้วกลับเข้าโรงแรม
+                         แบบฟอร์ม FM-SAM-095-00 มีช่อง จาก/ถึง ของค่าน้ำมันสองแถวอยู่แล้ว
+                         เดิมโค้ดกรอกแถวสองแบบสลับทางตายตัว ทำให้เคสนี้พิมพ์ออกมาผิด -->
+                    <div class="mb-4" id="returnDiffWrap">
+                        <label class="flex items-start gap-2 text-sm text-slate-700 cursor-pointer">
+                            <input type="checkbox" id="returnDiff" onchange="toggleReturnDiff()" class="rounded mt-0.5">
+                            <span>
+                                ขากลับไปที่อื่น <span class="text-slate-400 font-normal">(ไม่ได้กลับที่จุดเริ่มต้น)</span>
+                                <span class="block text-xs text-slate-400">เช่น ไปที่ทำงาน แล้วขากลับเข้าโรงแรม — ระยะทางสองขาจะคิดแยกกัน</span>
+                            </span>
+                        </label>
+                        <div id="returnToBox" class="hidden mt-2 pl-6">
+                            <label class="block text-xs font-bold text-violet-700 mb-1">ปลายทางขากลับ</label>
+                            <div class="relative">
+                                <input type="text" id="travelReturnTo" autocomplete="off" placeholder="เช่น โรงแรมที่เข้าพัก"
+                                    class="w-full border-2 border-white p-3 rounded-lg text-sm shadow-sm focus:border-violet-400 outline-none">
+                                <div id="returnToSuggest" class="hidden absolute z-[9100] w-full bg-white border border-slate-200 shadow-xl rounded-xl mt-1 max-h-64 overflow-y-auto overscroll-contain"></div>
+                            </div>
+                            <p class="text-xs text-slate-400 mt-1" id="returnToHint">
+                                ขากลับจะคิดจาก <b>จุดหมาย</b> ไปยังที่นี่ — หมุดสีม่วงบนแผนที่ ลากปรับได้
+                            </p>
+                        </div>
+                    </div>
+
                     <!-- แผนที่: ยืนยัน/ลากปรับหมุดทั้งสองจุด -->
                     <div class="mb-4">
                         <div class="flex items-center justify-between mb-2 gap-2 flex-wrap">
@@ -751,9 +775,15 @@
        ระยะทางล็อกไม่ให้พิมพ์ เว้นแต่ติ๊ก "ขอกรอกเอง" ซึ่งต้องระบุเหตุผล      */
 
     let routeMap = null, mFrom = null, mTo = null, routeLine = null;
+    let mRet = null, retLine = null;   // หมุดและเส้นทางขากลับ ใช้เมื่อขากลับไปคนละที่
     let geoFrom = null, geoTo = null;          // {lat, lng, label, precision, source}
+    let geoRet  = null;                         // ปลายทางขากลับ ใช้เมื่อขากลับไปคนละที่
     let routeInfo = null;                       // ผลการคำนวณล่าสุด
     let routePath = null;                       // เส้นทางแบบย่อ สำหรับวาดใน PDF
+    let retPath   = null;                       // เส้นทางขากลับ (เฉพาะเมื่อไปคนละที่)
+    let retInfo   = null;
+
+    const returnIsDifferent = () => !!document.getElementById('returnDiff')?.checked;
 
     /**
      * ย่อจำนวนจุดของเส้นทางให้เหลือประมาณ 120 จุด
@@ -808,30 +838,60 @@
     }
 
     /** วางหมุด (ลากได้เสมอ) แล้วคำนวณใหม่เมื่อลากเสร็จ */
+    const PT = {
+        from: { color: '#059669', tip: 'จุดเริ่มต้น (ลากได้)' },
+        to:   { color: '#e11d48', tip: 'จุดหมาย (ลากได้)' },
+        ret:  { color: '#7c3aed', tip: 'ปลายทางขากลับ (ลากได้)' }
+    };
+    const getGeo = w => w === 'from' ? geoFrom : w === 'to' ? geoTo : geoRet;
+    const setGeo = (w, v) => { if (w === 'from') geoFrom = v; else if (w === 'to') geoTo = v; else geoRet = v; };
+    const getMk  = w => w === 'from' ? mFrom : w === 'to' ? mTo : mRet;
+    const setMk  = (w, v) => { if (w === 'from') mFrom = v; else if (w === 'to') mTo = v; else mRet = v; };
+
     function setPoint(which, lat, lng, label, precision, source) {
         initRouteMap();
         const ll = L.latLng(lat, lng);
-        const isFrom = which === 'from';
-        const store = { lat, lng, label: label || '', precision: precision || 'search', source: source || 'auto' };
-        if (isFrom) geoFrom = store; else geoTo = store;
+        const cfg = PT[which] || PT.to;
+        setGeo(which, { lat, lng, label: label || '', precision: precision || 'search', source: source || 'auto' });
 
-        let m = isFrom ? mFrom : mTo;
+        let m = getMk(which);
         if (!m) {
-            m = L.marker(ll, { draggable: true, icon: pin(isFrom ? '#059669' : '#e11d48') }).addTo(routeMap);
-            m.bindTooltip(isFrom ? 'จุดเริ่มต้น (ลากได้)' : 'จุดหมาย (ลากได้)', { permanent: false });
+            m = L.marker(ll, { draggable: true, icon: pin(cfg.color) }).addTo(routeMap);
+            m.bindTooltip(cfg.tip, { permanent: false });
             m.on('dragend', () => {
                 const p = m.getLatLng();
-                const t = isFrom ? geoFrom : geoTo;
+                const t = getGeo(which);
+                if (!t) return;
                 t.lat = p.lat; t.lng = p.lng;
                 t.precision = 'exact'; t.source = 'user';   // คนยืนยันเอง = แม่นที่สุด
                 recalcRoute(false);
             });
-            if (isFrom) mFrom = m; else mTo = m;
+            setMk(which, m);
         } else {
             m.setLatLng(ll);
         }
         fitRoute();
         recalcRoute(false);
+    }
+
+    /** เอาหมุดปลายทางขากลับออกเมื่อผู้ใช้เอาติ๊กออก */
+    function clearReturnPoint() {
+        if (mRet && routeMap) { routeMap.removeLayer(mRet); }
+        mRet = null; geoRet = null; retPath = null; retInfo = null;
+        if (retLine && routeMap) { routeMap.removeLayer(retLine); }
+        retLine = null;
+    }
+
+    async function toggleReturnDiff() {
+        const on = returnIsDifferent();
+        document.getElementById('returnToBox')?.classList.toggle('hidden', !on);
+        if (!on) {
+            const inp = document.getElementById('travelReturnTo');
+            if (inp) inp.value = '';
+            clearReturnPoint();
+        }
+        await recalcRoute(false);
+        fitRoute();
     }
 
     /**
@@ -841,10 +901,15 @@
     function fitRoute(userAsked) {
         if (!routeMap) return;
         routeMap.invalidateSize();
-        const pts = [mFrom, mTo].filter(Boolean).map(m => m.getLatLng());
-        if (routeLine) {
-            routeMap.fitBounds(routeLine.getBounds(), { padding: [28, 28], maxZoom: 16 });
-        } else if (pts.length === 2) {
+        const pts = [mFrom, mTo, mRet].filter(Boolean).map(m => m.getLatLng());
+        if (routeLine || retLine) {
+            let b = null;
+            [routeLine, retLine].filter(Boolean).forEach(l => {
+                b = b ? b.extend(l.getBounds()) : L.latLngBounds(l.getBounds());
+            });
+            pts.forEach(p => b.extend(p));
+            routeMap.fitBounds(b, { padding: [28, 28], maxZoom: 16 });
+        } else if (pts.length >= 2) {
             const km = pts[0].distanceTo(pts[1]) / 1000;
             const pad = km < 5 ? 0.45 : km < 30 ? 0.3 : 0.18;   // ใกล้เว้นขอบเยอะ ไกลเว้นน้อย
             routeMap.fitBounds(L.latLngBounds(pts).pad(pad), { maxZoom: 15 });
@@ -863,6 +928,23 @@
     const badge = (cls, txt) =>
         `<span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg border font-bold ${cls}">${txt}</span>`;
 
+    /** ขอเส้นทางหนึ่งขาจาก /map-route คืนระยะทางและพิกัดตลอดเส้น */
+    async function routeLeg(a, b) {
+        const u = `/map-route?flat=${a.lat}&flon=${a.lng}&tlat=${b.lat}&tlon=${b.lng}`;
+        const res = await fetch(u);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const gj = await res.json();
+        let meters = 0;
+        const coords = [];
+        (gj.features || []).forEach(f => {
+            meters += Number((f.properties && f.properties.distance) || 0);
+            const c = f.geometry && f.geometry.coordinates;
+            if (Array.isArray(c)) c.forEach(p => coords.push([p[1], p[0]]));
+        });
+        if (!meters) throw new Error('ไม่พบเส้นทางระหว่างสองจุดนี้');
+        return { km: Math.round((meters / 1000) * 10) / 10, meters, coords };
+    }
+
     /** คำนวณระยะทางตามถนนจริงจาก /map-route */
     async function recalcRoute(userAsked) {
         if (document.getElementById('manualDistOverride')?.checked) return;
@@ -873,33 +955,45 @@
         }
         routeStatus(badge('bg-blue-50 border-blue-200 text-blue-700', 'กำลังคำนวณเส้นทาง...'));
         try {
-            const u = `/map-route?flat=${geoFrom.lat}&flon=${geoFrom.lng}&tlat=${geoTo.lat}&tlon=${geoTo.lng}`;
-            const res = await fetch(u);
-            if (!res.ok) throw new Error('HTTP ' + res.status);
-            const gj = await res.json();
+            const leg = await routeLeg(geoFrom, geoTo);
+            const km = leg.km;
+            const coords = leg.coords;
 
-            let meters = 0;
-            const coords = [];
-            (gj.features || []).forEach(f => {
-                meters += Number((f.properties && f.properties.distance) || 0);
-                const c = f.geometry && f.geometry.coordinates;
-                if (Array.isArray(c)) c.forEach(p => coords.push([p[1], p[0]]));
-            });
-            if (!meters) throw new Error('ไม่พบเส้นทางระหว่างสองจุดนี้');
-
-            const km = Math.round((meters / 1000) * 10) / 10;
             document.getElementById('distOutbound').value = km;
-            document.getElementById('distReturn').value = km;
-            if (typeof calculateTravelTotal === 'function') calculateTravelTotal();
-
             if (routeLine) { routeMap.removeLayer(routeLine); routeLine = null; }
             if (coords.length) {
                 routeLine = L.polyline(coords, { color: '#2563eb', weight: 5, opacity: .75 }).addTo(routeMap);
-                routeMap.fitBounds(routeLine.getBounds().pad(0.15));
             }
+            routeInfo = { km, meters: leg.meters, computedAt: new Date().toISOString(), provider: 'longdo' };
+            routePath = simplifyPath(coords);   // เก็บเส้นทางแบบย่อไว้วาดใน PDF
 
-            routeInfo = { km, meters, computedAt: new Date().toISOString(), provider: 'longdo' };
-            routePath  = simplifyPath(coords);   // เก็บเส้นทางแบบย่อไว้วาดใน PDF
+            // ── ขากลับ ──
+            // ปกติกลับทางเดิม ระยะเท่ากัน แต่ถ้าติ๊กว่าไปคนละที่ ต้องคิดจากจุดหมายไปยังที่ใหม่
+            let retKm = km, retMsg = '';
+            if (retLine) { routeMap.removeLayer(retLine); retLine = null; }
+            retPath = null; retInfo = null;
+
+            if (returnIsDifferent()) {
+                if (!geoRet) {
+                    retKm = 0;
+                    retMsg = ' ' + badge('bg-amber-50 border-amber-200 text-amber-800',
+                        'ยังไม่ได้เลือกปลายทางขากลับ');
+                } else {
+                    const back = await routeLeg(geoTo, geoRet);
+                    retKm = back.km;
+                    if (back.coords.length) {
+                        retLine = L.polyline(back.coords,
+                            { color: '#7c3aed', weight: 5, opacity: .75, dashArray: '10 6' }).addTo(routeMap);
+                    }
+                    retInfo = { km: retKm, meters: back.meters, computedAt: new Date().toISOString(), provider: 'longdo' };
+                    retPath = simplifyPath(back.coords);
+                    retMsg = ' ' + badge('bg-violet-50 border-violet-200 text-violet-800',
+                        `ขากลับคนละทาง ${retKm.toLocaleString('th-TH')} กม.`);
+                }
+            }
+            document.getElementById('distReturn').value = retKm;
+            if (typeof calculateTravelTotal === 'function') calculateTravelTotal();
+            fitRoute();
 
             const worst = [geoFrom.precision, geoTo.precision]
                 .includes('province') ? 'province'
@@ -913,8 +1007,10 @@
             }[worst];
 
             routeStatus(
-                badge('bg-blue-50 border-blue-200 text-blue-800', `เส้นทางจริง ${km.toLocaleString('th-TH')} กม. ต่อเที่ยว`) +
-                ' ' + badge(note[0], note[1])
+                badge('bg-blue-50 border-blue-200 text-blue-800',
+                    returnIsDifferent() ? `ขาไป ${km.toLocaleString('th-TH')} กม.`
+                                        : `เส้นทางจริง ${km.toLocaleString('th-TH')} กม. ต่อเที่ยว`) +
+                retMsg + ' ' + badge(note[0], note[1])
             );
         } catch (e) {
             routeStatus(
@@ -1269,8 +1365,9 @@
         onTripDatesChange();
         lockAddressFields(true);      // ที่อยู่ล็อกไว้ก่อน ดึงจากโปรไฟล์
         initRouteMap();
-        attachPlaceSearch('travelFrom', 'fromSuggest', 'from');
-        attachPlaceSearch('travelTo',   'toSuggest',   'to');
+        attachPlaceSearch('travelFrom',     'fromSuggest',     'from');
+        attachPlaceSearch('travelTo',       'toSuggest',       'to');
+        attachPlaceSearch('travelReturnTo', 'returnToSuggest', 'ret');
         const sel = document.getElementById('categorySelect');
         sel.innerHTML = '<option value="">-- กรุณาเลือกหมวดการเบิก --</option>';
         try {
@@ -2256,6 +2353,11 @@
             const travelTo   = document.getElementById('travelTo')?.value   || '';
             if (needReceipt && (!travelFrom.trim() || !travelTo.trim()))
                 return alert("❌ กรุณาระบุสถานที่ 'จุดเริ่มต้น' และ 'จุดหมาย' ให้ครบถ้วน");
+            // ติ๊กว่าขากลับไปที่อื่นแล้วต้องกรอกให้ครบ ไม่งั้นเอกสารจะมีช่องว่าง
+            if (needReceipt && returnIsDifferent() &&
+                !(document.getElementById('travelReturnTo')?.value || '').trim())
+                return alert('❌ ติ๊กว่า "ขากลับไปที่อื่น" ไว้ แต่ยังไม่ได้ระบุปลายทางขากลับ\n\n' +
+                             'กรุณาพิมพ์ชื่อสถานที่ปลายทางขากลับ หรือเอาติ๊กออกถ้ากลับที่จุดเริ่มต้น');
             const dateStart = document.getElementById('dateStart').value;
             const dateEnd   = document.getElementById('dateEnd').value;
             if (needReport && !dateStart) return alert("❌ กรุณาระบุวันที่ออกเดินทาง");
@@ -2295,6 +2397,12 @@
                 // ── หลักฐานที่มาของระยะทาง ให้ผู้อนุมัติตรวจย้อนหลังได้ ──
                 // เก็บพิกัดแทนรูป เพื่อให้ PDF วาดแผนที่เองตอนพิมพ์ (ประหยัดพื้นที่ ~500 เท่า)
                 fromGeo: geoFrom, toGeo: geoTo,
+                // ขากลับไปคนละที่ — เก็บแยกเพื่อให้เอกสารพิมพ์ถูก และส่งออก API ได้ตรงความจริง
+                returnDifferent: returnIsDifferent(),
+                returnTo:   returnIsDifferent() ? (document.getElementById('travelReturnTo')?.value || '') : '',
+                returnGeo:  returnIsDifferent() ? geoRet  : null,
+                returnPath: returnIsDifferent() ? retPath : null,
+                returnRoute: returnIsDifferent() ? retInfo : null,
                 fromAddr: window.__fromAddrParts || null,   // ที่อยู่แยกส่วน ให้เอกสารแสดง ซอย/ถนน แยกได้
                 useAppMap: !!document.getElementById('useAppMapImage')?.checked,
                 routePath: routePath,
@@ -2690,6 +2798,19 @@
             document.getElementById('travelTo').value      = tr.to        || '';
             document.getElementById('distOutbound').value  = tr.distOut   || 0;
             document.getElementById('distReturn').value    = tr.distRet   || 0;
+
+            // ขากลับไปคนละที่ — คืนสถานะให้ครบตอนเปิดใบเดิมมาแก้
+            const rdiff = document.getElementById('returnDiff');
+            if (rdiff) {
+                rdiff.checked = !!tr.returnDifferent;
+                document.getElementById('returnToBox')?.classList.toggle('hidden', !rdiff.checked);
+                document.getElementById('travelReturnTo').value = tr.returnTo || '';
+                if (tr.returnDifferent && tr.returnGeo) {
+                    geoRet  = tr.returnGeo;
+                    retPath = tr.returnPath || null;
+                    retInfo = tr.returnRoute || null;
+                }
+            }
 
             document.getElementById('carType').value   = meta._carType   || 'ไม่ระบุ';
             document.getElementById('fuelRate').value  = c.fuelRate       || 4;

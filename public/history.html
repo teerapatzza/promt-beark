@@ -639,6 +639,16 @@
                 tr.from = asText(tr.from, tr.fromGeo && tr.fromGeo.label);
                 tr.to   = asText(tr.to,   tr.toGeo   && tr.toGeo.label);
 
+                // ขากลับ: ปกติกลับทางเดิม (จุดหมาย -> จุดเริ่มต้น)
+                // แต่ถ้าใบเบิกระบุว่าขากลับไปคนละที่ ต้องพิมพ์ปลายทางจริง
+                // ไม่ใช่สลับทางกลับบ้านซึ่งไม่ตรงกับที่เดินทางจริง
+                const retDiff = !!tr.returnDifferent &&
+                                !!asText(tr.returnTo, tr.returnGeo && tr.returnGeo.label);
+                const retFrom = tr.to;
+                const retTo   = retDiff
+                    ? asText(tr.returnTo, tr.returnGeo && tr.returnGeo.label)
+                    : tr.from;
+
                 const taxiType = meta._taxiType || 'ไม่ระบุ'; // backward compat
                 const carType = meta._carType || 'ไม่ระบุ';
 
@@ -1076,7 +1086,7 @@
                                 <!-- row 9: จาก/ถึง fuel 2 -->
                                 <tr>
                                     <td style="border-top: none; border-bottom: none;">
-                                        <table style="width:100%;border-collapse:collapse;border:none;table-layout:fixed;"><tr><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">จาก</td><td style="border:none;padding:0 10px 0 0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;">${carType === 'ขากลับ' || carType === 'ไป-กลับ' ? tr.to : ''}</td><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">ถึง</td><td style="border:none;padding:0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;">${carType === 'ขากลับ' || carType === 'ไป-กลับ' ? tr.from : ''}</td></tr></table>
+                                        <table style="width:100%;border-collapse:collapse;border:none;table-layout:fixed;"><tr><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">จาก</td><td style="border:none;padding:0 10px 0 0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;">${carType === 'ขากลับ' || carType === 'ไป-กลับ' ? retFrom : ''}</td><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">ถึง</td><td style="border:none;padding:0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;">${carType === 'ขากลับ' || carType === 'ไป-กลับ' ? retTo : ''}</td></tr></table>
                                     </td>
                                 </tr>
                                 <!-- row 10: ระยะทาง fuel 2 -->
@@ -1469,7 +1479,17 @@
                                   .map(p => L.latLng(p[0], p[1]))
                     : [from, to];
 
-                map.fitBounds(L.latLngBounds(pts.concat([from, to])),
+                // ขากลับไปคนละที่: ต้องเห็นทั้งสองขาบนแผนที่ ไม่งั้นเอกสารเล่าไม่ครบ
+                const rg = tr.returnDifferent && tr.returnGeo ? tr.returnGeo : null;
+                const ret = rg ? L.latLng(rg.lat, rg.lng) : null;
+                const retPts = ret
+                    ? ((Array.isArray(tr.returnPath) && tr.returnPath.length > 1)
+                        ? tr.returnPath.filter(p => Array.isArray(p) && p.length >= 2)
+                                       .map(p => L.latLng(p[0], p[1]))
+                        : [to, ret])
+                    : [];
+
+                map.fitBounds(L.latLngBounds(pts.concat(retPts, [from, to], ret ? [ret] : [])),
                               { padding: [46, 46], maxZoom: 15, animate: false });
 
                 // รอ tile โหลดครบจริงๆ ไม่ใช่เดาเวลา
@@ -1502,24 +1522,27 @@
                     return [q.x * SCALE, q.y * SCALE];
                 };
 
-                if (pts.length > 1) {
+                // ขอบขาวใต้เส้น ทำให้เส้นเด่นบนแผนที่ที่มีถนนสีใกล้เคียงกัน
+                const drawLine = (list, color, solid) => {
+                    if (!list || list.length < 2) return;
                     ctx.lineJoin = 'round';
                     ctx.lineCap  = 'round';
-                    // ขอบขาวใต้เส้น ทำให้เส้นเด่นบนแผนที่ที่มีถนนสีใกล้เคียงกัน
-                    [[ '#ffffff', 9 * SCALE, []], ['#2563eb', 5 * SCALE, hasPath ? [] : [10 * SCALE, 7 * SCALE]]]
-                        .forEach(([color, width, dash]) => {
+                    [['#ffffff', 9 * SCALE, []],
+                     [color,     5 * SCALE, solid ? [] : [10 * SCALE, 7 * SCALE]]]
+                        .forEach(([c, width, dash]) => {
                             ctx.beginPath();
                             ctx.setLineDash(dash);
-                            ctx.strokeStyle = color;
+                            ctx.strokeStyle = c;
                             ctx.lineWidth = width;
-                            pts.forEach((ll, i) => {
+                            list.forEach((ll, i) => {
                                 const [x, y] = P(ll);
                                 if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
                             });
                             ctx.stroke();
                         });
                     ctx.setLineDash([]);
-                }
+                };
+                drawLine(pts, '#2563eb', hasPath);
 
                 const drawPin = (ll, color, letter) => {
                     const [x, y] = P(ll);
@@ -1537,8 +1560,10 @@
                     ctx.textBaseline = 'middle';
                     ctx.fillText(letter, x, y + SCALE * 0.5);
                 };
+                if (retPts.length > 1) drawLine(retPts, '#7c3aed', !!(tr.returnPath && tr.returnPath.length > 1));
                 drawPin(from, '#059669', 'A');
                 drawPin(to,   '#e11d48', 'B');
+                if (ret) drawPin(ret, '#7c3aed', 'C');
 
                 return out.toDataURL('image/jpeg', 0.9);
             } catch (e) {
@@ -1591,9 +1616,19 @@
                         <td style="border:1px solid #cbd5e1;padding:7px 10px;">${esc((tr.toGeo && tr.toGeo.label) || tr.to || '-')}
                             <span style="color:#64748b;">— ${esc(p(tr.toGeo))}</span></td>
                     </tr>
+                    ${(tr.returnDifferent && (tr.returnTo || (tr.returnGeo && tr.returnGeo.label))) ? `
+                    <tr>
+                        <td style="border:1px solid #cbd5e1;padding:7px 10px;background:#f8fafc;">
+                            <b style="color:#7c3aed;">C</b> ปลายทางขากลับ</td>
+                        <td style="border:1px solid #cbd5e1;padding:7px 10px;">${esc((tr.returnGeo && tr.returnGeo.label) || tr.returnTo)}
+                            <span style="color:#64748b;">— ขากลับไม่ได้กลับที่จุดเริ่มต้น</span></td>
+                    </tr>` : ''}
                     <tr>
                         <td style="border:1px solid #cbd5e1;padding:7px 10px;background:#f8fafc;">ระยะทาง</td>
-                        <td style="border:1px solid #cbd5e1;padding:7px 10px;"><b>${esc(km)}</b> กิโลเมตรต่อเที่ยว
+                        <td style="border:1px solid #cbd5e1;padding:7px 10px;">${
+                            (tr.returnDifferent && tr.returnGeo)
+                              ? `ขาไป <b>${esc(tr.distOut || km)}</b> กม. · ขากลับ <b>${esc(tr.distRet || '-')}</b> กม.`
+                              : `<b>${esc(km)}</b> กิโลเมตรต่อเที่ยว`}
                             <span style="color:#64748b;">— ${tr.distanceSource === 'manual'
                                 ? 'ผู้ใช้กรอกเอง' + (tr.manualReason ? ' (' + esc(tr.manualReason) + ')' : '')
                                 : 'คำนวณจากเส้นทางถนนจริง'}</span></td>
