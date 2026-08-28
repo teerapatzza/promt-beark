@@ -2,6 +2,7 @@
 <html lang="th">
 <head>
     <script src="api-fetch.js"></script>
+    <script src="combobox.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>จัดการโปรไฟล์ผู้เดินทาง — Prompt-Berk</title>
@@ -98,19 +99,17 @@
                          ค่าที่พิมพ์ใหม่จะถูกเก็บเข้ารายการกลางอัตโนมัติ ให้คนถัดไปเลือกได้เลย -->
                     <div>
                         <label class="block text-xs font-bold text-slate-500 mb-1.5">ตำแหน่ง</label>
-                        <input type="text" id="pPosition" list="positionOptions" autocomplete="off"
+                        <input type="text" id="pPosition" autocomplete="off"
                             placeholder="เลือกจากรายการ หรือพิมพ์ตำแหน่งใหม่..."
                             class="w-full border border-slate-200 p-3 rounded-xl text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition bg-white">
-                        <datalist id="positionOptions"></datalist>
-                        <p class="text-xs text-slate-400 mt-1">พิมพ์ตำแหน่งใหม่ได้ — ระบบจะเก็บเข้ารายการให้คนอื่นเลือกต่อ</p>
+                        <p class="text-xs text-slate-400 mt-1">เลือกจากรายการ หรือพิมพ์ใหม่ได้</p>
                     </div>
                     <div class="col-span-full md:col-span-1">
                         <label class="block text-xs font-bold text-slate-500 mb-1.5">สังกัด / กลุ่มงาน</label>
-                        <input type="text" id="pAffil" list="affilOptions" autocomplete="off"
+                        <input type="text" id="pAffil" autocomplete="off"
                             placeholder="เลือกจากรายการ หรือพิมพ์สังกัดใหม่..."
                             class="w-full border border-slate-200 p-3 rounded-xl text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition bg-white">
-                        <datalist id="affilOptions"></datalist>
-                        <p class="text-xs text-slate-400 mt-1">พิมพ์สังกัดใหม่ได้ — ระบบจะเก็บเข้ารายการให้คนอื่นเลือกต่อ</p>
+                        <p class="text-xs text-slate-400 mt-1">เลือกจากรายการ หรือพิมพ์ใหม่ได้</p>
                     </div>
                 </div>
 
@@ -875,18 +874,22 @@
         }
 
         /* ── ตำแหน่ง / สังกัด: เลือกจากรายการหรือพิมพ์เองก็ได้ ──
-           ใช้ datalist ของเบราว์เซอร์ ซึ่งพิมพ์ไปกรองไปได้และไม่บังคับต้องเลือก
+           ใช้ combobox ที่เขียนเอง พิมพ์ไปกรองไป และเพิ่มค่าใหม่ได้จากในรายการเลย
            ค่าที่พิมพ์ใหม่จะถูกส่งเข้ารายการกลางตอนบันทึก ให้คนถัดไปเลือกได้ทันที */
 
+        // เปลี่ยนจาก <datalist> ของเบราว์เซอร์มาเป็น combobox ที่เราคุมหน้าตาเองได้
+        // ชื่อฟังก์ชันคงเดิม จุดที่เรียกใช้ทั่วหน้าจึงไม่ต้องแก้
+        const CB_FOR = { positionOptions: 'pPosition', affilOptions: 'pAffil' };
+        const _cb = {};
         function fillDatalist(id, items) {
-            const dl = document.getElementById(id);
-            if (!dl) return;
-            dl.innerHTML = '';
-            (items || []).forEach(v => {
-                const o = document.createElement('option');
-                o.value = v;
-                dl.appendChild(o);
-            });
+            const inputId = CB_FOR[id];
+            if (!inputId || !window.Combobox) return;
+            if (!_cb[id]) {
+                _cb[id] = Combobox.attach(inputId, {
+                    addLabel: id === 'positionOptions' ? 'ตำแหน่ง' : 'ส่วนงาน'
+                });
+            }
+            if (_cb[id]) _cb[id].setItems(items || []);
         }
 
         let knownPositions = [], knownAffils = [];

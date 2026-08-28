@@ -276,8 +276,8 @@
     <div class="container">
         <!-- Welcome Card -->
         <div class="welcome-card">
-            <h2>👋 ยินดีต้อนรับ</h2>
-            <p>เลือกเมนูด้านล่างเพื่อเริ่มใช้งานระบบ</p>
+            <h2>👋 ยินดีต้อนรับ<span id="welcomeName"></span></h2>
+            <p id="welcomeSub">เลือกเมนูด้านล่างเพื่อเริ่มใช้งานระบบ</p>
         </div>
 
         <!-- Menu Grid -->
@@ -355,6 +355,17 @@
                     const user = await res.json();
                     document.getElementById('userName').textContent = user.email;
                     document.getElementById('userRole').textContent = user.role === 'admin' ? 'ผู้ดูแลระบบ' : 'ผู้ใช้งาน';
+
+                    // ทักด้วยชื่อผู้ใช้ — ระบบเก็บแค่อีเมล จึงใช้ส่วนหน้า @ มาแสดง
+                    // แปลงจุดกับขีดเป็นเว้นวรรค เช่น teerapat@ha.or.th -> "คุณ teerapat"
+                    const nick = String(user.email || '').split('@')[0]
+                        .replace(/[._-]+/g, ' ').trim();
+                    const el = document.getElementById('welcomeName');
+                    if (el && nick) el.textContent = ' คุณ' + nick;
+                    const sub = document.getElementById('welcomeSub');
+                    if (sub) sub.textContent = user.role === 'admin'
+                        ? 'คุณเข้าใช้งานในสิทธิ์ผู้ดูแลระบบ — เลือกเมนูด้านล่างเพื่อเริ่มใช้งาน'
+                        : 'เลือกเมนูด้านล่างเพื่อเริ่มใช้งานระบบ';
 
                     // Show admin menu if admin
                     if (user.role === 'admin') {

@@ -2,6 +2,7 @@
 <html lang="th">
 <head>
     <script src="api-fetch.js"></script>
+    <script src="combobox.js"></script>
     <meta charset="UTF-8">
     <title>ฟอร์มเบิกจ่ายงบประมาณ - TUC Finance</title>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -160,17 +161,15 @@
                 <!-- เลือกจากรายการก็ได้ พิมพ์เองก็ได้ — ค่าที่พิมพ์ใหม่จะถูกเก็บเข้ารายการกลาง -->
                 <div>
                     <label class="block text-sm font-bold text-slate-700 mb-2">ตำแหน่งงาน</label>
-                    <input type="text" id="position" list="positionOptions" autocomplete="off"
+                    <input type="text" id="position" autocomplete="off"
                         placeholder="เลือกจากรายการ หรือพิมพ์ตำแหน่งใหม่..."
                         class="w-full border border-slate-200 p-3.5 rounded-xl text-lg focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all bg-white">
-                    <datalist id="positionOptions"></datalist>
                 </div>
                 <div class="md:col-span-2">
                     <label class="block text-sm font-bold text-slate-700 mb-2">สังกัด / กลุ่มงาน</label>
-                    <input type="text" id="affiliation" list="affilOptions" autocomplete="off"
+                    <input type="text" id="affiliation" autocomplete="off"
                         placeholder="เลือกจากรายการ หรือพิมพ์สังกัดใหม่..."
                         class="w-full border border-slate-200 p-3.5 rounded-xl text-lg focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all">
-                    <datalist id="affilOptions"></datalist>
                 </div>
             </div>
         </div>
@@ -3073,18 +3072,22 @@
         if (typeof syncAddressToExtraLine === 'function') syncAddressToExtraLine();
     }
 
-    /* ── ตำแหน่ง / สังกัด: datalist ให้เลือกหรือพิมพ์เองก็ได้ ── */
+    /* ── ตำแหน่ง / สังกัด: เลือกจากรายการ หรือพิมพ์ค่าใหม่เองก็ได้ ── */
     let knownPositions = [], knownAffils = [];
 
+    // เปลี่ยนจาก <datalist> ของเบราว์เซอร์มาเป็น combobox ที่เราคุมหน้าตาเองได้
+    // ชื่อฟังก์ชันคงเดิม จุดที่เรียกใช้ทั่วหน้าจึงไม่ต้องแก้
+    const CB_FOR = { positionOptions: 'position',  affilOptions: 'affiliation' };
+    const _cb = {};
     function fillDatalist(id, items) {
-        const dl = document.getElementById(id);
-        if (!dl) return;
-        dl.innerHTML = '';
-        (items || []).forEach(v => {
-            const o = document.createElement('option');
-            o.value = v;
-            dl.appendChild(o);
-        });
+        const inputId = CB_FOR[id];
+        if (!inputId || !window.Combobox) return;
+        if (!_cb[id]) {
+            _cb[id] = Combobox.attach(inputId, {
+                addLabel: id === 'positionOptions' ? 'ตำแหน่ง' : 'ส่วนงาน'
+            });
+        }
+        if (_cb[id]) _cb[id].setItems(items || []);
     }
 
     /** ค่าที่พิมพ์ใหม่ เก็บเข้ารายการกลางให้คนถัดไปเลือกได้ */
