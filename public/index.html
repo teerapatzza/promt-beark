@@ -96,35 +96,36 @@
             background-image: var(--hero, none);
             background-size: cover;
             background-position: center 38%;
-            filter: blur(18px) saturate(.82);
+            filter: blur(13px) saturate(.9);
             opacity: 0;
             transform: scale(1.08);
             transition: opacity .8s ease;
             will-change: transform;
         }
-        body.has-photo .photo { opacity: .5; }
+        body.has-photo .photo { opacity: .92; }
         /* มีรูปแล้วลดฉากลายเส้นลง ไม่ให้ตีกันสองชั้น */
-        body.has-photo .scene { opacity: .14; }
+        body.has-photo .scene { display: none; }   /* มีรูปจริงแล้ว ไม่ต้องซ้อนลายเส้นอีก */
 
         /* ม่านไล่สี: กันตัวหนังสือกลืนกับรูป และคุมโทนให้เข้ากับสีสถาบัน */
         .scrim {
             position: fixed; inset: 0; z-index: 0; pointer-events: none;
             opacity: 0; transition: opacity .8s ease;
             background:
-                linear-gradient(180deg, rgba(244,247,251,.94) 0%,
-                                        rgba(244,247,251,.80) 34%,
-                                        rgba(238,242,247,.72) 62%,
-                                        rgba(238,242,247,.88) 100%),
-                linear-gradient(100deg, rgba(22,22,127,.10), transparent 58%);
+                linear-gradient(180deg, rgba(246,249,252,.90) 0%,
+                                        rgba(246,249,252,.66) 30%,
+                                        rgba(240,244,249,.44) 58%,
+                                        rgba(238,242,247,.62) 100%),
+                linear-gradient(100deg, rgba(22,22,127,.12), transparent 62%);
         }
         body.has-photo .scrim { opacity: 1; }
 
         /* บนรูป ตัวหนังสือต้องเข้มขึ้นและมีเงาบางๆ ถึงจะอ่านสบาย */
-        body.has-photo .welcome-card h2 { text-shadow: 0 1px 0 rgba(255,255,255,.85); }
+        body.has-photo .welcome-card h2 { text-shadow: 0 1px 2px rgba(255,255,255,.95), 0 0 22px rgba(255,255,255,.7); }
         body.has-photo .welcome-card p,
-        body.has-photo .eyebrow { color: #44546b; }
-        body.has-photo .menu-card { background: rgba(255,255,255,.93); backdrop-filter: blur(6px); }
-        body.has-photo .footer { background: rgba(240,244,249,.9); }
+        body.has-photo .eyebrow { color: #33415a; text-shadow: 0 1px 2px rgba(255,255,255,.9); }
+        body.has-photo .menu-card { background: rgba(255,255,255,.95); backdrop-filter: blur(8px);
+                                    border-color: rgba(255,255,255,.85); }
+        body.has-photo .footer { background: rgba(243,246,250,.92); }
 
         /* ชื่อผู้ใช้ในคำทักทาย — เว้นวรรคและแยกน้ำหนักให้อ่านเป็นชื่อ */
         #welcomeName { white-space: nowrap; }
