@@ -18,9 +18,10 @@
             --ink:       #16202e;
             --ink-soft:  #5b6b80;
             --ink-faint: #93a1b5;
-            --brand:     #1d4ed8;
-            --brand-lo:  #3b82f6;
+            --brand:     #16167f;   /* น้ำเงินจากโลโก้ สรพ. */
+            --brand-lo:  #3a3ab0;
             --gold:      #b7791f;
+            --hared:     #e01f1f;   /* แดงจากโลโก้ สรพ. */
             --green:     #047857;
             --violet:    #6d28d9;
             --shadow-sm: 0 1px 2px rgba(16,32,54,.05);
@@ -66,11 +67,25 @@
             pointer-events: none;
             background:
                 radial-gradient(420px circle at var(--mx, 50%) var(--my, 30%),
-                    rgba(59,130,246,.20), transparent 66%),
+                    rgba(38,38,150,.16), transparent 66%),
                 radial-gradient(760px circle at var(--mx, 50%) var(--my, 30%),
-                    rgba(183,121,31,.09), transparent 70%);
+                    rgba(224,31,31,.07), transparent 70%);
             transition: opacity .5s ease;
         }
+        /* ── ฉากโรงพยาบาลด้านล่าง ────────────────────────────
+           วาดเป็นเส้นบางสีน้ำเงินสถาบัน ความทึบต่ำมาก
+           อยู่หลังเนื้อหาและกดทะลุได้ ไม่รบกวนการอ่านหรือการกดปุ่ม */
+        .scene {
+            /* ยกขึ้นพ้น footer ไม่งั้นเส้นพื้นกับตัวคนจะถูกบังหมด */
+            position: fixed; left: 0; right: 0; bottom: 72px;
+            z-index: 0; pointer-events: none;
+            width: 100%; height: min(38vh, 268px);
+            opacity: .34;
+            -webkit-mask-image: linear-gradient(to bottom, transparent, #000 52%);
+                    mask-image: linear-gradient(to bottom, transparent, #000 52%);
+        }
+        .scene svg { width: 100%; height: 100%; display: block; }
+        @media (max-width: 720px) { .scene { opacity: .3; bottom: 84px; } }
         .page { position: relative; z-index: 1; display: flex; flex-direction: column; flex: 1; }
 
         /* ── หัวเว็บ ── */
@@ -88,12 +103,8 @@
         }
         .brand { display: flex; align-items: center; gap: 13px; min-width: 0; }
         .brand-mark {
-            width: 40px; height: 40px; border-radius: 11px; flex: 0 0 auto;
-            background: linear-gradient(145deg, var(--brand-lo), var(--brand));
-            display: grid; place-items: center;
-            box-shadow: 0 6px 16px -6px rgba(29,78,216,.6);
+            height: 44px; width: auto; flex: 0 0 auto; display: block;
         }
-        .brand-mark svg { width: 21px; height: 21px; color: #fff; }
         .brand h1 {
             font-size: 1.06rem; font-weight: 700; letter-spacing: -.015em;
             line-height: 1.25; white-space: nowrap;
@@ -169,7 +180,7 @@
             content: '';
             position: absolute; inset: 0; z-index: -1;
             background: radial-gradient(280px circle at var(--cx, 50%) var(--cy, 0%),
-                        rgba(59,130,246,.10), transparent 62%);
+                        rgba(38,38,150,.09), transparent 62%);
             opacity: 0; transition: opacity .25s ease;
         }
         .menu-card:hover {
@@ -218,9 +229,14 @@
 
         /* ── ท้ายเว็บ ── */
         .footer {
+            position: relative;
             margin-top: auto; padding: 26px 24px 30px;
-            text-align: center; font-size: .78rem; color: var(--ink-faint);
+            text-align: center; font-size: .78rem; color: var(--ink-soft);
             border-top: 1px solid var(--hairline);
+            /* ฉากอยู่หลัง footer พอดี ต้องรองพื้นให้ตัวหนังสืออ่านออก */
+            background: linear-gradient(to bottom, rgba(238,242,247,.72), rgba(238,242,247,.95));
+            backdrop-filter: blur(3px);
+            -webkit-backdrop-filter: blur(3px);
         }
         .footer strong { color: var(--gold); font-weight: 600; }
 
@@ -243,15 +259,76 @@
     <canvas id="bgfx" aria-hidden="true"></canvas>
     <div class="glow" aria-hidden="true"></div>
 
+    <div class="scene" aria-hidden="true">
+      <svg viewBox="0 0 1400 300" preserveAspectRatio="xMidYMax meet"
+           fill="none" stroke="#16167f" stroke-width="2.2"
+           stroke-linecap="round" stroke-linejoin="round">
+
+        <!-- เส้นคลื่นหัวใจ พาดผ่านฉาก -->
+        <path d="M0 176 H250 l14 -34 l16 66 l15 -50 l13 18 H520 l16 -40 l17 74
+                 l14 -54 l12 20 H900 l15 -30 l16 60 l14 -44 l12 14 H1400"
+              stroke="#e01f1f" stroke-width="1.8" opacity=".3"/>
+
+        <!-- พื้น -->
+        <path d="M0 292 H1400" stroke-width="2.6"/>
+
+        <!-- อาคาร A -->
+        <g opacity=".85">
+          <path d="M70 292 V150 H250 V292"/>
+          <g fill="#16167f" stroke="none" opacity=".5"><rect x="88" y="168" width="8" height="10" rx="1.5"/><rect x="105" y="168" width="8" height="10" rx="1.5"/><rect x="122" y="168" width="8" height="10" rx="1.5"/><rect x="139" y="168" width="8" height="10" rx="1.5"/><rect x="156" y="168" width="8" height="10" rx="1.5"/><rect x="173" y="168" width="8" height="10" rx="1.5"/><rect x="190" y="168" width="8" height="10" rx="1.5"/><rect x="207" y="168" width="8" height="10" rx="1.5"/><rect x="88" y="187" width="8" height="10" rx="1.5"/><rect x="105" y="187" width="8" height="10" rx="1.5"/><rect x="122" y="187" width="8" height="10" rx="1.5"/><rect x="139" y="187" width="8" height="10" rx="1.5"/><rect x="156" y="187" width="8" height="10" rx="1.5"/><rect x="173" y="187" width="8" height="10" rx="1.5"/><rect x="190" y="187" width="8" height="10" rx="1.5"/><rect x="207" y="187" width="8" height="10" rx="1.5"/><rect x="88" y="206" width="8" height="10" rx="1.5"/><rect x="105" y="206" width="8" height="10" rx="1.5"/><rect x="122" y="206" width="8" height="10" rx="1.5"/><rect x="139" y="206" width="8" height="10" rx="1.5"/><rect x="156" y="206" width="8" height="10" rx="1.5"/><rect x="173" y="206" width="8" height="10" rx="1.5"/><rect x="190" y="206" width="8" height="10" rx="1.5"/><rect x="207" y="206" width="8" height="10" rx="1.5"/><rect x="88" y="225" width="8" height="10" rx="1.5"/><rect x="105" y="225" width="8" height="10" rx="1.5"/><rect x="122" y="225" width="8" height="10" rx="1.5"/><rect x="139" y="225" width="8" height="10" rx="1.5"/><rect x="156" y="225" width="8" height="10" rx="1.5"/><rect x="173" y="225" width="8" height="10" rx="1.5"/><rect x="190" y="225" width="8" height="10" rx="1.5"/><rect x="207" y="225" width="8" height="10" rx="1.5"/><rect x="88" y="244" width="8" height="10" rx="1.5"/><rect x="105" y="244" width="8" height="10" rx="1.5"/><rect x="122" y="244" width="8" height="10" rx="1.5"/><rect x="139" y="244" width="8" height="10" rx="1.5"/><rect x="156" y="244" width="8" height="10" rx="1.5"/><rect x="173" y="244" width="8" height="10" rx="1.5"/><rect x="190" y="244" width="8" height="10" rx="1.5"/><rect x="207" y="244" width="8" height="10" rx="1.5"/></g>
+        </g>
+
+        <!-- อาคารหลัก มีป้ายกากบาท -->
+        <g>
+          <path d="M290 292 V92 H560 V292"/>
+          <path d="M290 92 L425 44 L560 92"/>
+          <!-- ป้ายกากบาทบนหลังคา -->
+          <path d="M410 74 h30 v-22 h22 v-30 h-22 v-22 h-30 v22 h-22 v30 h22 z"
+                fill="#e01f1f" stroke="none" opacity=".55"/>
+          <g fill="#16167f" stroke="none" opacity=".5"><rect x="308" y="112" width="8" height="10" rx="1.5"/><rect x="325" y="112" width="8" height="10" rx="1.5"/><rect x="342" y="112" width="8" height="10" rx="1.5"/><rect x="359" y="112" width="8" height="10" rx="1.5"/><rect x="376" y="112" width="8" height="10" rx="1.5"/><rect x="393" y="112" width="8" height="10" rx="1.5"/><rect x="410" y="112" width="8" height="10" rx="1.5"/><rect x="427" y="112" width="8" height="10" rx="1.5"/><rect x="444" y="112" width="8" height="10" rx="1.5"/><rect x="461" y="112" width="8" height="10" rx="1.5"/><rect x="478" y="112" width="8" height="10" rx="1.5"/><rect x="495" y="112" width="8" height="10" rx="1.5"/><rect x="512" y="112" width="8" height="10" rx="1.5"/><rect x="529" y="112" width="8" height="10" rx="1.5"/><rect x="308" y="131" width="8" height="10" rx="1.5"/><rect x="325" y="131" width="8" height="10" rx="1.5"/><rect x="342" y="131" width="8" height="10" rx="1.5"/><rect x="359" y="131" width="8" height="10" rx="1.5"/><rect x="376" y="131" width="8" height="10" rx="1.5"/><rect x="393" y="131" width="8" height="10" rx="1.5"/><rect x="410" y="131" width="8" height="10" rx="1.5"/><rect x="427" y="131" width="8" height="10" rx="1.5"/><rect x="444" y="131" width="8" height="10" rx="1.5"/><rect x="461" y="131" width="8" height="10" rx="1.5"/><rect x="478" y="131" width="8" height="10" rx="1.5"/><rect x="495" y="131" width="8" height="10" rx="1.5"/><rect x="512" y="131" width="8" height="10" rx="1.5"/><rect x="529" y="131" width="8" height="10" rx="1.5"/><rect x="308" y="150" width="8" height="10" rx="1.5"/><rect x="325" y="150" width="8" height="10" rx="1.5"/><rect x="342" y="150" width="8" height="10" rx="1.5"/><rect x="359" y="150" width="8" height="10" rx="1.5"/><rect x="376" y="150" width="8" height="10" rx="1.5"/><rect x="393" y="150" width="8" height="10" rx="1.5"/><rect x="410" y="150" width="8" height="10" rx="1.5"/><rect x="427" y="150" width="8" height="10" rx="1.5"/><rect x="444" y="150" width="8" height="10" rx="1.5"/><rect x="461" y="150" width="8" height="10" rx="1.5"/><rect x="478" y="150" width="8" height="10" rx="1.5"/><rect x="495" y="150" width="8" height="10" rx="1.5"/><rect x="512" y="150" width="8" height="10" rx="1.5"/><rect x="529" y="150" width="8" height="10" rx="1.5"/><rect x="308" y="169" width="8" height="10" rx="1.5"/><rect x="325" y="169" width="8" height="10" rx="1.5"/><rect x="342" y="169" width="8" height="10" rx="1.5"/><rect x="359" y="169" width="8" height="10" rx="1.5"/><rect x="376" y="169" width="8" height="10" rx="1.5"/><rect x="393" y="169" width="8" height="10" rx="1.5"/><rect x="410" y="169" width="8" height="10" rx="1.5"/><rect x="427" y="169" width="8" height="10" rx="1.5"/><rect x="444" y="169" width="8" height="10" rx="1.5"/><rect x="461" y="169" width="8" height="10" rx="1.5"/><rect x="478" y="169" width="8" height="10" rx="1.5"/><rect x="495" y="169" width="8" height="10" rx="1.5"/><rect x="512" y="169" width="8" height="10" rx="1.5"/><rect x="529" y="169" width="8" height="10" rx="1.5"/><rect x="308" y="188" width="8" height="10" rx="1.5"/><rect x="325" y="188" width="8" height="10" rx="1.5"/><rect x="342" y="188" width="8" height="10" rx="1.5"/><rect x="359" y="188" width="8" height="10" rx="1.5"/><rect x="376" y="188" width="8" height="10" rx="1.5"/><rect x="393" y="188" width="8" height="10" rx="1.5"/><rect x="410" y="188" width="8" height="10" rx="1.5"/><rect x="427" y="188" width="8" height="10" rx="1.5"/><rect x="444" y="188" width="8" height="10" rx="1.5"/><rect x="461" y="188" width="8" height="10" rx="1.5"/><rect x="478" y="188" width="8" height="10" rx="1.5"/><rect x="495" y="188" width="8" height="10" rx="1.5"/><rect x="512" y="188" width="8" height="10" rx="1.5"/><rect x="529" y="188" width="8" height="10" rx="1.5"/></g>
+          <!-- ทางเข้า -->
+          <path d="M392 292 V232 h66 v60"/>
+          <path d="M425 232 V292" stroke-width="1.6" opacity=".6"/>
+        </g>
+
+        <!-- อาคาร C -->
+        <g opacity=".85">
+          <path d="M600 292 V176 H746 V292"/>
+          <g fill="#16167f" stroke="none" opacity=".5"><rect x="616" y="194" width="8" height="10" rx="1.5"/><rect x="633" y="194" width="8" height="10" rx="1.5"/><rect x="650" y="194" width="8" height="10" rx="1.5"/><rect x="667" y="194" width="8" height="10" rx="1.5"/><rect x="684" y="194" width="8" height="10" rx="1.5"/><rect x="701" y="194" width="8" height="10" rx="1.5"/><rect x="616" y="213" width="8" height="10" rx="1.5"/><rect x="633" y="213" width="8" height="10" rx="1.5"/><rect x="650" y="213" width="8" height="10" rx="1.5"/><rect x="667" y="213" width="8" height="10" rx="1.5"/><rect x="684" y="213" width="8" height="10" rx="1.5"/><rect x="701" y="213" width="8" height="10" rx="1.5"/><rect x="616" y="232" width="8" height="10" rx="1.5"/><rect x="633" y="232" width="8" height="10" rx="1.5"/><rect x="650" y="232" width="8" height="10" rx="1.5"/><rect x="667" y="232" width="8" height="10" rx="1.5"/><rect x="684" y="232" width="8" height="10" rx="1.5"/><rect x="701" y="232" width="8" height="10" rx="1.5"/><rect x="616" y="251" width="8" height="10" rx="1.5"/><rect x="633" y="251" width="8" height="10" rx="1.5"/><rect x="650" y="251" width="8" height="10" rx="1.5"/><rect x="667" y="251" width="8" height="10" rx="1.5"/><rect x="684" y="251" width="8" height="10" rx="1.5"/><rect x="701" y="251" width="8" height="10" rx="1.5"/></g>
+        </g>
+
+        <!-- ต้นไม้ -->
+        <g opacity=".55">
+          <path d="M786 292 V262"/><circle cx="786" cy="248" r="17"/>
+          <path d="M1040 292 V266"/><circle cx="1040" cy="252" r="14"/>
+        </g>
+
+        <!-- บุคลากร: แพทย์และพยาบาล -->
+        <g fill="#16167f" stroke="none" opacity=".55">
+          <g><circle cx="880" cy="206" r="11"/><path d="M864 292 L864 246 C864 232 872 226 880 226 C888 226 896 232 896 246 L896 292 Z"/><path d="M872 232 C872 250 886 250 886 236" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="886" cy="239" r="3.2"/></g>
+          <g><circle cx="944" cy="206" r="11"/><path d="M934 197 L944 191 L954 191 Z"/><path d="M928 292 L928 246 C928 232 936 226 944 226 C952 226 960 232 960 246 L960 292 Z"/></g>
+        </g>
+
+        <!-- อาคาร D -->
+        <g opacity=".85">
+          <path d="M1120 292 V132 H1330 V292"/>
+          <g fill="#16167f" stroke="none" opacity=".5"><rect x="1140" y="152" width="8" height="10" rx="1.5"/><rect x="1157" y="152" width="8" height="10" rx="1.5"/><rect x="1174" y="152" width="8" height="10" rx="1.5"/><rect x="1191" y="152" width="8" height="10" rx="1.5"/><rect x="1208" y="152" width="8" height="10" rx="1.5"/><rect x="1225" y="152" width="8" height="10" rx="1.5"/><rect x="1242" y="152" width="8" height="10" rx="1.5"/><rect x="1259" y="152" width="8" height="10" rx="1.5"/><rect x="1276" y="152" width="8" height="10" rx="1.5"/><rect x="1140" y="171" width="8" height="10" rx="1.5"/><rect x="1157" y="171" width="8" height="10" rx="1.5"/><rect x="1174" y="171" width="8" height="10" rx="1.5"/><rect x="1191" y="171" width="8" height="10" rx="1.5"/><rect x="1208" y="171" width="8" height="10" rx="1.5"/><rect x="1225" y="171" width="8" height="10" rx="1.5"/><rect x="1242" y="171" width="8" height="10" rx="1.5"/><rect x="1259" y="171" width="8" height="10" rx="1.5"/><rect x="1276" y="171" width="8" height="10" rx="1.5"/><rect x="1140" y="190" width="8" height="10" rx="1.5"/><rect x="1157" y="190" width="8" height="10" rx="1.5"/><rect x="1174" y="190" width="8" height="10" rx="1.5"/><rect x="1191" y="190" width="8" height="10" rx="1.5"/><rect x="1208" y="190" width="8" height="10" rx="1.5"/><rect x="1225" y="190" width="8" height="10" rx="1.5"/><rect x="1242" y="190" width="8" height="10" rx="1.5"/><rect x="1259" y="190" width="8" height="10" rx="1.5"/><rect x="1276" y="190" width="8" height="10" rx="1.5"/><rect x="1140" y="209" width="8" height="10" rx="1.5"/><rect x="1157" y="209" width="8" height="10" rx="1.5"/><rect x="1174" y="209" width="8" height="10" rx="1.5"/><rect x="1191" y="209" width="8" height="10" rx="1.5"/><rect x="1208" y="209" width="8" height="10" rx="1.5"/><rect x="1225" y="209" width="8" height="10" rx="1.5"/><rect x="1242" y="209" width="8" height="10" rx="1.5"/><rect x="1259" y="209" width="8" height="10" rx="1.5"/><rect x="1276" y="209" width="8" height="10" rx="1.5"/><rect x="1140" y="228" width="8" height="10" rx="1.5"/><rect x="1157" y="228" width="8" height="10" rx="1.5"/><rect x="1174" y="228" width="8" height="10" rx="1.5"/><rect x="1191" y="228" width="8" height="10" rx="1.5"/><rect x="1208" y="228" width="8" height="10" rx="1.5"/><rect x="1225" y="228" width="8" height="10" rx="1.5"/><rect x="1242" y="228" width="8" height="10" rx="1.5"/><rect x="1259" y="228" width="8" height="10" rx="1.5"/><rect x="1276" y="228" width="8" height="10" rx="1.5"/><rect x="1140" y="247" width="8" height="10" rx="1.5"/><rect x="1157" y="247" width="8" height="10" rx="1.5"/><rect x="1174" y="247" width="8" height="10" rx="1.5"/><rect x="1191" y="247" width="8" height="10" rx="1.5"/><rect x="1208" y="247" width="8" height="10" rx="1.5"/><rect x="1225" y="247" width="8" height="10" rx="1.5"/><rect x="1242" y="247" width="8" height="10" rx="1.5"/><rect x="1259" y="247" width="8" height="10" rx="1.5"/><rect x="1276" y="247" width="8" height="10" rx="1.5"/></g>
+        </g>
+
+        <!-- สัญลักษณ์รับรองคุณภาพ: โล่พร้อมเครื่องหมายถูก -->
+        <g opacity=".4" transform="translate(1240,60)">
+          <path d="M0 0 L34 12 V44 C34 66 19 80 0 88 C-19 80 -34 66 -34 44 V12 Z"/>
+          <path d="M-14 42 L-4 54 L16 28" stroke-width="3.2"/>
+        </g>
+      </svg>
+    </div>
+
+
     <div class="page">
         <div class="topbar">
             <div class="topbar-in">
                 <div class="brand">
-                    <div class="brand-mark">
-                        <svg fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6zm5-1h2v-1.5h1c.55 0 1-.45 1-1v-3c0-.55-.45-1-1-1h-3v-1h4V10h-2V8.5h-2V10h-1c-.55 0-1 .45-1 1v3c0 .55.45 1 1 1h3v1H9v1.5h2V19z"/>
-                        </svg>
-                    </div>
+                    <img src="logo.png" alt="สถาบันรับรองคุณภาพสถานพยาบาล (องค์การมหาชน)" class="brand-mark">
                     <div class="logo-text">
                         <h1>Promt-Beark</h1>
                         <p>ระบบจัดการงบประมาณ v2.0</p>
@@ -275,7 +352,7 @@
 
         <div class="container">
             <div class="welcome-card">
-                <div class="eyebrow">ระบบเบิกค่าใช้จ่ายการเดินทาง</div>
+                <div class="eyebrow">สถาบันรับรองคุณภาพสถานพยาบาล (องค์การมหาชน)</div>
                 <h2>ยินดีต้อนรับ<span id="welcomeName"></span></h2>
                 <p id="welcomeSub">เลือกเมนูด้านล่างเพื่อเริ่มใช้งานระบบ</p>
             </div>
@@ -404,7 +481,7 @@
                 ctx.beginPath();
                 ctx.arc(d.x + d.ox, d.y + d.oy, Math.max(0.3, size), 0, 6.2832);
                 ctx.fillStyle = near > 0.06
-                    ? 'rgba(29,78,216,' + alpha.toFixed(3) + ')'
+                    ? 'rgba(22,22,127,' + alpha.toFixed(3) + ')'
                     : 'rgba(122,142,170,' + (alpha * 0.8).toFixed(3) + ')';
                 ctx.fill();
             }
