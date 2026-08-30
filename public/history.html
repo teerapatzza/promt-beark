@@ -1035,7 +1035,7 @@
                                 <!-- row 3: จาก/ถึง taxi 1 (ขาไป) -->
                                 <tr>
                                     <td style="border-top: none; border-bottom: none;">
-                                        <table style="width:100%;border-collapse:collapse;border:none;table-layout:fixed;"><tr><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">จาก</td><td style="border:none;padding:0 10px 0 0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;">${firstTaxiOut ? firstTaxiOut.from : ''}</td><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">ถึง</td><td style="border:none;padding:0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;">${firstTaxiOut ? firstTaxiOut.to : ''}</td></tr></table>
+                                        <table style="width:100%;border-collapse:collapse;border:none;table-layout:fixed;"><tr><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">จาก</td><td style="border:none;padding:0 10px 0 0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;">${wrapCell(firstTaxiOut ? firstTaxiOut.from : '', 28)}</td><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">ถึง</td><td style="border:none;padding:0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;">${wrapCell(firstTaxiOut ? firstTaxiOut.to   : '', 28)}</td></tr></table>
                                     </td>
                                     <td style="border-top: none; border-bottom: none; text-align: right; vertical-align: middle; white-space: nowrap;">
                                         ${taxiOutDisplayAmt > 0 ? formatNumber(taxiOutDisplayAmt) : ''}
@@ -1044,7 +1044,7 @@
                                 <!-- row 4: จาก/ถึง taxi 2 (ขากลับ — ถ้า ไป-กลับ ให้สลับทิศ) -->
                                 <tr>
                                     <td style="border-top: none; border-bottom: none;">
-                                        <table style="width:100%;border-collapse:collapse;border:none;table-layout:fixed;"><tr><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">จาก</td><td style="border:none;padding:0 10px 0 0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;">${firstTaxiRet ? (firstTaxiRet.direction === 'ไป-กลับ' ? firstTaxiRet.to : firstTaxiRet.from) : ''}</td><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">ถึง</td><td style="border:none;padding:0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;">${firstTaxiRet ? (firstTaxiRet.direction === 'ไป-กลับ' ? firstTaxiRet.from : firstTaxiRet.to) : ''}</td></tr></table>
+                                        <table style="width:100%;border-collapse:collapse;border:none;table-layout:fixed;"><tr><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">จาก</td><td style="border:none;padding:0 10px 0 0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;">${wrapCell(firstTaxiRet ? (firstTaxiRet.direction === 'ไป-กลับ' ? firstTaxiRet.to : firstTaxiRet.from) : '', 28)}</td><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">ถึง</td><td style="border:none;padding:0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;">${wrapCell(firstTaxiRet ? (firstTaxiRet.direction === 'ไป-กลับ' ? firstTaxiRet.from : firstTaxiRet.to) : '', 28)}</td></tr></table>
                                     </td>
                                     <td style="border-top: none; border-bottom: none; text-align: right; vertical-align: middle; white-space: nowrap;">
                                         ${taxiRetDisplayAmt > 0 ? formatNumber(taxiRetDisplayAmt) : ''}
@@ -1072,7 +1072,7 @@
                                 <!-- row 7: จาก/ถึง fuel 1 -->
                                 <tr>
                                     <td style="border-top: none; border-bottom: none;">
-                                        <table style="width:100%;border-collapse:collapse;border:none;table-layout:fixed;"><tr><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">จาก</td><td style="border:none;padding:0 10px 0 0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;">${carType === 'ขาไป' || carType === 'ไป-กลับ' ? tr.from : ''}</td><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">ถึง</td><td style="border:none;padding:0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;">${carType === 'ขาไป' || carType === 'ไป-กลับ' ? tr.to : ''}</td></tr></table>
+                                        <table style="width:100%;border-collapse:collapse;border:none;table-layout:fixed;"><tr><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">จาก</td><td style="border:none;padding:0 10px 0 0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;">${carType === 'ขาไป' || carType === 'ไป-กลับ' ? wrapCell(tr.from, 28) : ''}</td><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">ถึง</td><td style="border:none;padding:0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;">${carType === 'ขาไป' || carType === 'ไป-กลับ' ? wrapCell(tr.to, 28) : ''}</td></tr></table>
                                     </td>
                                 </tr>
                                 <!-- row 8: ระยะทาง fuel 1 -->
@@ -1086,7 +1086,7 @@
                                 <!-- row 9: จาก/ถึง fuel 2 -->
                                 <tr>
                                     <td style="border-top: none; border-bottom: none;">
-                                        <table style="width:100%;border-collapse:collapse;border:none;table-layout:fixed;"><tr><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">จาก</td><td style="border:none;padding:0 10px 0 0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;">${carType === 'ขากลับ' || carType === 'ไป-กลับ' ? retFrom : ''}</td><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">ถึง</td><td style="border:none;padding:0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;">${carType === 'ขากลับ' || carType === 'ไป-กลับ' ? retTo : ''}</td></tr></table>
+                                        <table style="width:100%;border-collapse:collapse;border:none;table-layout:fixed;"><tr><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">จาก</td><td style="border:none;padding:0 10px 0 0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;">${carType === 'ขากลับ' || carType === 'ไป-กลับ' ? wrapCell(retFrom, 28) : ''}</td><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">ถึง</td><td style="border:none;padding:0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;">${carType === 'ขากลับ' || carType === 'ไป-กลับ' ? wrapCell(retTo, 28) : ''}</td></tr></table>
                                     </td>
                                 </tr>
                                 <!-- row 10: ระยะทาง fuel 2 -->
@@ -1414,6 +1414,18 @@
             const element = document.getElementById('formal-doc');
             btn.innerHTML = '⏳ กำลังเตรียมเอกสาร...';
 
+            // รอให้ฟอนต์ Sarabun พร้อมก่อนเสมอ
+            // ถ้า html2canvas วัดความกว้างตอนฟอนต์ยังไม่มา มันจะคำนวณจุดตัดบรรทัด
+            // ด้วยฟอนต์สำรอง แล้ววาดจริงด้วย Sarabun -> ตัวอักษรกองทับกัน
+            // เดิมใช้ setTimeout 1000ms เดาเวลา ซึ่งไม่พอเมื่อเน็ตช้าหรือเปิดครั้งแรก
+            try {
+                if (document.fonts && document.fonts.ready) {
+                    await document.fonts.ready;
+                    await document.fonts.load('400 13.5px Sarabun');
+                    await document.fonts.load('700 13.5px Sarabun');
+                }
+            } catch (e) { /* เบราว์เซอร์เก่าไม่มี API นี้ ยังทำงานต่อได้ */ }
+
             setTimeout(() => {
                 btn.innerHTML = '⏳ กำลังสร้าง PDF...';
                 // ⭐️ เพิ่มโหมด pagebreak: css เข้าไปเพื่อให้ html2pdf ทำตามคำสั่ง avoid-break ที่เขียนไว้ใน CSS
@@ -1573,6 +1585,32 @@
                 try { if (map) map.remove(); } catch (_) {}
                 host.remove();
             }
+        }
+
+
+        /* ตัดข้อความยาวเป็นบรรทัดเอง แล้วส่งเป็น <br> ให้เอกสาร
+           เหตุผลเดียวกับที่แถวที่อยู่ทำไว้แล้ว: ข้อความไทยยาวๆ ที่ปล่อยให้เบราว์เซอร์
+           ตัดบรรทัดเองในตารางที่มี rowspan จะถูก html2canvas วางตำแหน่งผิดจนตัวอักษรทับกัน
+           กำหนดจุดตัดเองแล้วผลจะเหมือนกันทุกครั้ง ไม่ขึ้นกับว่าฟอนต์มาทันหรือไม่ */
+        function wrapCell(text, perLine) {
+            const t = String(text == null ? '' : text).trim();
+            if (!t) return '';
+            const max = perLine || 30;
+            const esc = x => String(x).replace(/[&<>"']/g,
+                c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+            if (t.length <= max) return esc(t);
+
+            const lines = [];
+            let rest = t;
+            while (rest.length > max) {
+                // ตัดที่ช่องว่างสุดท้ายก่อนถึงขีดจำกัด ถ้าไม่มีค่อยตัดตรงๆ
+                let cut = rest.lastIndexOf(' ', max);
+                if (cut < max * 0.55) cut = max;
+                lines.push(rest.slice(0, cut).trim());
+                rest = rest.slice(cut).trim();
+            }
+            if (rest) lines.push(rest);
+            return lines.map(esc).join('<br>');
         }
 
         /** สร้างหน้าแผนที่สำหรับแทรกในเอกสาร */
