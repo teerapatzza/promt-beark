@@ -948,8 +948,19 @@
     async function recalcRoute(userAsked) {
         if (document.getElementById('manualDistOverride')?.checked) return;
         if (!geoFrom || !geoTo) {
-            routeStatus(badge('bg-slate-50 border-slate-200 text-slate-500',
-                'เลือกจุดเริ่มต้นและจุดหมายก่อน ระบบจะคำนวณระยะทางให้อัตโนมัติ'));
+            // บอกให้ตรงว่าขาดจุดไหน ข้อความรวมๆ ทำให้ผู้ใช้ที่กรอกจุดหมายไปแล้วงงว่าทำไมยังไม่คำนวณ
+            const need = [];
+            if (!geoFrom) need.push('จุดเริ่มต้น');
+            if (!geoTo)   need.push('จุดหมาย');
+            const typed = document.getElementById('travelTo')?.value.trim();
+            routeStatus(
+                badge('bg-amber-50 border-amber-200 text-amber-800',
+                      'ยังไม่มีหมุด' + need.join('และ')) +
+                (typed && !geoTo
+                    ? '<div class="text-slate-500 mt-1">พิมพ์ "' + escHtml(typed) +
+                      '" ไว้แล้วแต่ยังไม่ได้เลือกจากรายการ — คลิกออกจากช่องแล้วระบบจะหาตำแหน่งให้</div>'
+                    : '<div class="text-slate-500 mt-1">พิมพ์ชื่อสถานที่แล้วเลือกจากรายการ ระบบจะคำนวณระยะทางให้เอง</div>')
+            );
             return;
         }
         routeStatus(badge('bg-blue-50 border-blue-200 text-blue-700', 'กำลังคำนวณเส้นทาง...'));
@@ -1095,7 +1106,69 @@
                 if (r.data.length || !sug.length)
                     renderPlaceResults(r, q, prov, box, input, which);
             }, 250);
+            markUnconfirmed(which);
         });
+
+        /* พิมพ์แล้วไม่ได้กดเลือกจากรายการ = ไม่มีหมุด = คำนวณระยะทางไม่ได้
+           ผู้ใช้ไม่มีทางรู้ เพราะหน้าจอไม่ได้บอกอะไรเลย
+           พอออกจากช่อง ให้ค้นหาแล้วเลือกผลอันดับแรกให้อัตโนมัติ
+           พร้อมบอกชัดว่าเลือกที่ไหนให้ และกดแก้ได้ถ้าไม่ใช่ */
+        input.addEventListener('blur', function () {
+            setTimeout(() => autoResolvePoint(which), 220);   // เผื่อเวลาให้คลิกรายการก่อน
+        });
+    }
+
+    /** ข้อความใต้ช่องกรอก บอกสถานะของหมุดตรงๆ */
+    function pointHint(which, html) {
+        const el = document.getElementById(
+            which === 'from' ? 'fromHint' : which === 'to' ? 'toHint' : 'returnToHint');
+        if (el) el.innerHTML = html;
+    }
+
+    function markUnconfirmed(which) {
+        const inp = document.getElementById(
+            which === 'from' ? 'travelFrom' : which === 'to' ? 'travelTo' : 'travelReturnTo');
+        const g = getGeo(which);
+        if (!inp) return;
+        const txt = inp.value.trim();
+        if (txt && (!g || (g.label || '').trim() !== txt)) {
+            pointHint(which, '<span class="text-amber-600">ยังไม่ได้ยืนยันสถานที่ — '
+                + 'กดเลือกจากรายการ หรือคลิกออกจากช่องแล้วระบบจะเลือกให้</span>');
+        }
+    }
+
+    /** ถ้ามีข้อความแต่ยังไม่มีหมุด ให้ค้นหาแล้วปักหมุดจากผลอันดับแรกให้เลย */
+    async function autoResolvePoint(which) {
+        const inp = document.getElementById(
+            which === 'from' ? 'travelFrom' : which === 'to' ? 'travelTo' : 'travelReturnTo');
+        if (!inp) return;
+        const txt = inp.value.trim();
+        if (txt.length < 2) return;
+        if (which === 'ret' && !returnIsDifferent()) return;
+
+        const g = getGeo(which);
+        if (g && (g.label || '').trim() === txt) return;      // ยืนยันแล้ว ตรงกับที่พิมพ์
+
+        pointHint(which, '<span class="text-slate-500">กำลังหาตำแหน่งของ "'
+            + escHtml(txt) + '"...</span>');
+
+        const prov = which === 'to' ? (document.getElementById('targetProv')?.value || '') : '';
+        let r = await placeSearch(txt + (prov && txt.indexOf(prov) < 0 ? ' ' + prov : ''));
+        if (!r.data.length) r = await placeSearch(txt);
+
+        const hit = (r.data || [])[0];
+        if (!hit) {
+            pointHint(which, '<span class="text-rose-600">หาตำแหน่งของ "' + escHtml(txt) + '" ไม่เจอ</span>'
+                + '<span class="block text-slate-500">ลากหมุดบนแผนที่เอง '
+                + 'หรือติ๊ก "ขอกรอกเอง" ด้านล่างเพื่อใส่ระยะทางเอง</span>');
+            return;
+        }
+        setPoint(which, parseFloat(hit.lat), parseFloat(hit.lon), hit.name, 'search', hit.source || 'auto');
+        rememberPlace(hit);
+        // บอกให้ชัดว่าระบบเลือกที่ไหนให้ ผู้ใช้จะได้ตรวจว่าถูกตัวไหม
+        pointHint(which, '<span class="text-emerald-700">เลือกให้อัตโนมัติ: <b>'
+            + escHtml(hit.name || txt) + '</b></span>'
+            + '<span class="block text-slate-500">ไม่ใช่ที่นี่? พิมพ์ใหม่แล้วกดเลือกจากรายการ หรือลากหมุดปรับเอง</span>');
     }
 
     async function placeSearch(q) {
