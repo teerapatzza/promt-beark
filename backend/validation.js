@@ -4,7 +4,7 @@
  * คืน array of errors: [{ field, level: 'error'|'warning', message }]
  */
 
-const TAXI_MAX_PER_TRIP = 300; // บาท/เที่ยว (ตั้งค่าได้จาก admin ในอนาคต)
+const TAXI_MAX_PER_TRIP = 300; // ค่าปริยายสุดท้าย ใช้เมื่อไม่มีทั้งค่าหมวดหมู่และค่ากลาง
 
 // ช่องระยะทางเป็นแบบอ่านอย่างเดียว ระบบคำนวณจากหมุดบนแผนที่
 // ถ้าค้นหาปลายทางไม่เจอ ระยะทางจะค้างที่ 0 แล้วบันทึกไม่ผ่าน
@@ -21,7 +21,7 @@ const DIST_HINT =
  * @param {Object} category - budget category object with attachmentRules
  * @returns {Array} errors - array of { field, level, message }
  */
-function validateExpense(expense, category) {
+function validateExpense(expense, category, globalTaxiMax) {
     const errors = [];
     const meta = expense.inputMetadata || {};
     const templates = meta._pdfTemplates || [];
@@ -94,6 +94,19 @@ function validateExpense(expense, category) {
         }
 
         // 3. Validate taxi entries
+        // วงเงิน Taxi ต้องมาจากที่แอดมินตั้งไว้ ไม่ใช่ค่าคงที่ในโค้ด
+        // ลำดับ: ค่าของหมวดหมู่ -> ค่ากลางของระบบ -> ค่าปริยาย
+        // ติ๊ก "ไม่จำกัด" ในหน้าแอดมินจะเก็บเป็น null/0 ซึ่งแปลว่าไม่ต้องตรวจ
+        const taxiCap = (function () {
+            const fromCat = category && category.taxiMaxPerTrip;
+            if (fromCat === null || fromCat === 0 || fromCat === '') return Infinity;   // ไม่จำกัด
+            const n = parseFloat(fromCat);
+            if (isFinite(n) && n > 0) return n;
+            const g = parseFloat(globalTaxiMax);
+            return (isFinite(g) && g > 0) ? g : TAXI_MAX_PER_TRIP;
+        })();
+        const capText = taxiCap === Infinity ? 'ไม่จำกัด' : taxiCap.toLocaleString();
+
         const taxiEntries = costs.taxiEntries || [];
         const travelStartDate = travel.startDate ? new Date(travel.startDate) : null;
         const travelEndDate = travel.endDate ? new Date(travel.endDate) : null;
@@ -127,32 +140,32 @@ function validateExpense(expense, category) {
 
             // Validate taxi amount limits
             if (entry.direction === 'ไป-กลับ') {
-                if ((entry.amountOut || 0) > TAXI_MAX_PER_TRIP) {
+                if ((entry.amountOut || 0) > taxiCap) {
                     errors.push({
                         field: `taxiEntry${index}`,
                         level: 'error',
                         message: `❌ ยอดค่า Taxi เกินวงเงินที่อนุมัติ!\n\n` +
                             `🚕 Taxi วันที่ ${entry.date} (ขาไป)\n` +
                             `💰 ยอดที่กรอก: ${entry.amountOut} บาท\n` +
-                            `📊 วงเงินสูงสุด: ${TAXI_MAX_PER_TRIP} บาท/เที่ยว\n\n` +
-                            `💡 กรุณาลดยอดเงินให้ไม่เกิน ${TAXI_MAX_PER_TRIP} บาท`
+                            `📊 วงเงินสูงสุด: ${capText} บาท/เที่ยว\n\n` +
+                            `💡 กรุณาลดยอดเงินให้ไม่เกิน ${capText} บาท`
                     });
                 }
-                if ((entry.amountRet || 0) > TAXI_MAX_PER_TRIP) {
+                if ((entry.amountRet || 0) > taxiCap) {
                     errors.push({
                         field: `taxiEntry${index}`,
                         level: 'error',
                         message: `❌ ยอดค่า Taxi เกินวงเงินที่อนุมัติ! (ขากลับ)\n` +
-                            `💰 ${entry.amountRet} บาท > ${TAXI_MAX_PER_TRIP} บาท`
+                            `💰 ${entry.amountRet} บาท > ${capText} บาท`
                     });
                 }
             } else {
-                if ((entry.amount || 0) > TAXI_MAX_PER_TRIP) {
+                if ((entry.amount || 0) > taxiCap) {
                     errors.push({
                         field: `taxiEntry${index}`,
                         level: 'error',
                         message: `❌ ยอดค่า Taxi เกินวงเงินที่อนุมัติ!\n` +
-                            `💰 ${entry.amount} บาท > ${TAXI_MAX_PER_TRIP} บาท`
+                            `💰 ${entry.amount} บาท > ${capText} บาท`
                     });
                 }
             }

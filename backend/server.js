@@ -367,7 +367,7 @@ app.post('/expenses', requireAuth, (req, res) => {
   }
 
   // Validate expense
-  const errors = validateExpense(expense, category);
+  const errors = validateExpense(expense, category, getSetting('taxiMaxPerTrip'));
   if (errors.length > 0) {
     return res.status(422).json({
       error: 'Validation failed',
@@ -404,7 +404,7 @@ app.put('/expenses/:id', requireAuth, (req, res) => {
   }
 
   // Validate expense
-  const errors = validateExpense(expense, category);
+  const errors = validateExpense(expense, category, getSetting('taxiMaxPerTrip'));
   if (errors.length > 0) {
     return res.status(422).json({
       error: 'Validation failed',
