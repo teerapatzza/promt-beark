@@ -69,7 +69,7 @@
         .solid-line { border-bottom: 1px solid #000; display: inline-block; text-align: center; }
         .dot-line { border-bottom: 1px dotted #000; display: inline-block; text-align: center; }
         .pdf-table { width: 100%; border-collapse: collapse; font-size: 13.5px; line-height: 1.5; }
-        .pdf-table th, .pdf-table td { border: 1px solid #000; padding: 5px 8px; }
+        .pdf-table th, .pdf-table td { border: 1px solid #000; padding: 4px 8px; }
         .no-border-bottom { border-bottom: none !important; }
         .no-border-top { border-top: none !important; }
         .avoid-break { page-break-inside: avoid; display: block; }
@@ -993,8 +993,8 @@
                     templateHtml += `
                     <div class="pdf-page">
                         <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
-                            <img src="/logo.png" style="height: 65px;" onerror="this.style.display='none'">
-                            <div style="text-align: right; font-size: 11px; line-height: 1.5; font-weight:bold;">
+                            <img src="logo.png" style="height: 65px;" onerror="this.style.visibility='hidden'">
+                            <div style="text-align: right; font-size: 11px; line-height: 1.5; font-weight:bold; margin-left: auto;">
                                 FM-SAM-095-00<br>
                                 ใบรับรองแทนใบเสร็จรับเงิน - ค่าพาหนะ<br>
                                 วันที่ประกาศใช้ 11/05/2569<br>
@@ -1035,7 +1035,7 @@
                                 <!-- row 3: จาก/ถึง taxi 1 (ขาไป) -->
                                 <tr>
                                     <td style="border-top: none; border-bottom: none;">
-                                        <table style="width:100%;border-collapse:collapse;border:none;table-layout:fixed;"><tr><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">จาก</td><td style="border:none;padding:0 10px 0 0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;">${wrapCell(firstTaxiOut ? firstTaxiOut.from : '', 28)}</td><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">ถึง</td><td style="border:none;padding:0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;">${wrapCell(firstTaxiOut ? firstTaxiOut.to   : '', 28)}</td></tr></table>
+                                        <table style="width:100%;border-collapse:collapse;border:none;table-layout:fixed;"><tr><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">จาก</td><td style="border:none;padding:0 10px 0 0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;font-size:11.5px;">${wrapCell(firstTaxiOut ? firstTaxiOut.from : '', 28)}</td><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">ถึง</td><td style="border:none;padding:0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;font-size:11.5px;">${wrapCell(firstTaxiOut ? firstTaxiOut.to   : '', 28)}</td></tr></table>
                                     </td>
                                     <td style="border-top: none; border-bottom: none; text-align: right; vertical-align: middle; white-space: nowrap;">
                                         ${taxiOutDisplayAmt > 0 ? formatNumber(taxiOutDisplayAmt) : ''}
@@ -1044,7 +1044,7 @@
                                 <!-- row 4: จาก/ถึง taxi 2 (ขากลับ — ถ้า ไป-กลับ ให้สลับทิศ) -->
                                 <tr>
                                     <td style="border-top: none; border-bottom: none;">
-                                        <table style="width:100%;border-collapse:collapse;border:none;table-layout:fixed;"><tr><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">จาก</td><td style="border:none;padding:0 10px 0 0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;">${wrapCell(firstTaxiRet ? (firstTaxiRet.direction === 'ไป-กลับ' ? firstTaxiRet.to : firstTaxiRet.from) : '', 28)}</td><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">ถึง</td><td style="border:none;padding:0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;">${wrapCell(firstTaxiRet ? (firstTaxiRet.direction === 'ไป-กลับ' ? firstTaxiRet.from : firstTaxiRet.to) : '', 28)}</td></tr></table>
+                                        <table style="width:100%;border-collapse:collapse;border:none;table-layout:fixed;"><tr><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">จาก</td><td style="border:none;padding:0 10px 0 0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;font-size:11.5px;">${wrapCell(firstTaxiRet ? (firstTaxiRet.direction === 'ไป-กลับ' ? firstTaxiRet.to : firstTaxiRet.from) : '', 28)}</td><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">ถึง</td><td style="border:none;padding:0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;font-size:11.5px;">${wrapCell(firstTaxiRet ? (firstTaxiRet.direction === 'ไป-กลับ' ? firstTaxiRet.from : firstTaxiRet.to) : '', 28)}</td></tr></table>
                                     </td>
                                     <td style="border-top: none; border-bottom: none; text-align: right; vertical-align: middle; white-space: nowrap;">
                                         ${taxiRetDisplayAmt > 0 ? formatNumber(taxiRetDisplayAmt) : ''}
@@ -1053,7 +1053,7 @@
                                 <!-- row 5: จาก/ถึง taxi 3 (ใหม่) -->
                                 <tr>
                                     <td style="border-top: none; border-bottom: 1px solid #000;">
-                                        <table style="width:100%;border-collapse:collapse;border:none;table-layout:fixed;"><tr><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">จาก</td><td style="border:none;padding:0 10px 0 0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;"></td><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">ถึง</td><td style="border:none;padding:0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;"></td></tr></table>
+                                        <table style="width:100%;border-collapse:collapse;border:none;table-layout:fixed;"><tr><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">จาก</td><td style="border:none;padding:0 10px 0 0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;font-size:11.5px;"></td><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">ถึง</td><td style="border:none;padding:0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;font-size:11.5px;"></td></tr></table>
                                     </td>
                                     <td style="border-top: none; border-bottom: 1px solid #000;"></td>
                                 </tr>
@@ -1072,7 +1072,7 @@
                                 <!-- row 7: จาก/ถึง fuel 1 -->
                                 <tr>
                                     <td style="border-top: none; border-bottom: none;">
-                                        <table style="width:100%;border-collapse:collapse;border:none;table-layout:fixed;"><tr><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">จาก</td><td style="border:none;padding:0 10px 0 0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;">${carType === 'ขาไป' || carType === 'ไป-กลับ' ? wrapCell(tr.from, 28) : ''}</td><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">ถึง</td><td style="border:none;padding:0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;">${carType === 'ขาไป' || carType === 'ไป-กลับ' ? wrapCell(tr.to, 28) : ''}</td></tr></table>
+                                        <table style="width:100%;border-collapse:collapse;border:none;table-layout:fixed;"><tr><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">จาก</td><td style="border:none;padding:0 10px 0 0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;font-size:11.5px;">${carType === 'ขาไป' || carType === 'ไป-กลับ' ? wrapCell(tr.from, 28) : ''}</td><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">ถึง</td><td style="border:none;padding:0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;font-size:11.5px;">${carType === 'ขาไป' || carType === 'ไป-กลับ' ? wrapCell(tr.to, 28) : ''}</td></tr></table>
                                     </td>
                                 </tr>
                                 <!-- row 8: ระยะทาง fuel 1 -->
@@ -1086,7 +1086,7 @@
                                 <!-- row 9: จาก/ถึง fuel 2 -->
                                 <tr>
                                     <td style="border-top: none; border-bottom: none;">
-                                        <table style="width:100%;border-collapse:collapse;border:none;table-layout:fixed;"><tr><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">จาก</td><td style="border:none;padding:0 10px 0 0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;">${carType === 'ขากลับ' || carType === 'ไป-กลับ' ? wrapCell(retFrom, 28) : ''}</td><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">ถึง</td><td style="border:none;padding:0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;">${carType === 'ขากลับ' || carType === 'ไป-กลับ' ? wrapCell(retTo, 28) : ''}</td></tr></table>
+                                        <table style="width:100%;border-collapse:collapse;border:none;table-layout:fixed;"><tr><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">จาก</td><td style="border:none;padding:0 10px 0 0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;font-size:11.5px;">${carType === 'ขากลับ' || carType === 'ไป-กลับ' ? wrapCell(retFrom, 28) : ''}</td><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">ถึง</td><td style="border:none;padding:0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;font-size:11.5px;">${carType === 'ขากลับ' || carType === 'ไป-กลับ' ? wrapCell(retTo, 28) : ''}</td></tr></table>
                                     </td>
                                 </tr>
                                 <!-- row 10: ระยะทาง fuel 2 -->
@@ -1161,12 +1161,12 @@
                             </tbody>
                         </table>
 
-                        <div class="avoid-break" style="margin-top: 15px;">
+                        <div class="avoid-break" style="margin-top: 10px;">
                             <div style="display: flex; align-items: baseline; margin-bottom: 8px;">
                                 ข้าพเจ้า <span class="solid-line" style="width: 250px; margin: 0 10px;">${data.requestedBy}</span>
                                 ตำแหน่ง <span class="solid-line" style="width: 180px; margin: 0 10px;">${position}</span>
                             </div>
-                            <div style="margin-top: 5px; line-height: 1.6; margin-bottom: 25px;">
+                            <div style="margin-top: 5px; line-height: 1.6; margin-bottom: 16px;">
                                 ขอรับรองว่า รายจ่ายข้างต้นนี้ข้าพเจ้าได้จ่ายไปในงานของสถาบันรับรองคุณภาพสถานพยาบาล และไม่อาจเรียก<br>
                                 ใบเสร็จรับเงินจากผู้รับเงิน
                             </div>
@@ -1221,8 +1221,8 @@
                 templateHtml += `
                 <div class="pdf-page">
                     <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
-                        <img src="/logo.png" style="height: 65px;" onerror="this.style.display='none'">
-                        <div style="text-align: right; font-size: 11px; line-height: 1.5; font-weight: bold;">
+                        <img src="logo.png" style="height: 65px;" onerror="this.style.visibility='hidden'">
+                        <div style="text-align: right; font-size: 11px; line-height: 1.5; font-weight: bold; margin-left: auto;">
                             FM-SAM-003-06<br>
                             วันที่ประกาศใช้ 11/05/2569<br>
                             รอบทบทวน 11/05/2571<br>
@@ -1296,7 +1296,7 @@
                 templateHtml = `
                 <div class="pdf-page">
                     <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
-                        <img src="/logo.png" alt="โลโก้" style="height: 85px; width: auto; object-fit: contain;" onerror="this.style.display='none'">
+                        <img src="logo.png" alt="โลโก้" style="height: 85px; width: auto; object-fit: contain;" onerror="this.style.visibility='hidden'">
                         <div class="text-right">
                             <h1 class="text-3xl font-black mb-1">บันทึกข้อความ</h1>
                             <p class="text-base">สถาบันรับรองคุณภาพสถานพยาบาล (องค์การมหาชน)</p>
@@ -1594,23 +1594,25 @@
            กำหนดจุดตัดเองแล้วผลจะเหมือนกันทุกครั้ง ไม่ขึ้นกับว่าฟอนต์มาทันหรือไม่ */
         function wrapCell(text, perLine) {
             const t = String(text == null ? '' : text).trim();
-            if (!t) return '';
-            const max = perLine || 30;
             const esc = x => String(x).replace(/[&<>"']/g,
                 c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+            if (!t) return '';
+            const max = perLine || 26;
             if (t.length <= max) return esc(t);
 
-            const lines = [];
-            let rest = t;
-            while (rest.length > max) {
-                // ตัดที่ช่องว่างสุดท้ายก่อนถึงขีดจำกัด ถ้าไม่มีค่อยตัดตรงๆ
-                let cut = rest.lastIndexOf(' ', max);
-                if (cut < max * 0.55) cut = max;
-                lines.push(rest.slice(0, cut).trim());
-                rest = rest.slice(cut).trim();
-            }
-            if (rest) lines.push(rest);
-            return lines.map(esc).join('<br>');
+            // ตัดที่ช่องว่างเท่านั้น ภาษาไทยไม่มีเว้นวรรคระหว่างคำ
+            // ถ้าหั่นตรงจำนวนตัวอักษรจะได้คำที่อ่านไม่รู้เรื่อง เช่น "สถาบันรับรองคุณภาพสถ|านพยาบาล"
+            // ท่อนที่ยาวเกินและไม่มีช่องว่าง ปล่อยให้เบราว์เซอร์ตัด
+            // ซึ่งปลอดภัยแล้วเพราะรอฟอนต์ก่อนเรนเดอร์
+            const out = [];
+            let line = '';
+            t.split(' ').forEach(w => {
+                if (!line) { line = w; return; }
+                if ((line + ' ' + w).length <= max) line += ' ' + w;
+                else { out.push(line); line = w; }
+            });
+            if (line) out.push(line);
+            return out.map(esc).join('<br>');
         }
 
         /** สร้างหน้าแผนที่สำหรับแทรกในเอกสาร */
@@ -1714,7 +1716,7 @@
 
         load();
     </script>
-    <script src="/auth-guard.js"></script>
+    <script src="auth-guard.js"></script>
     <script>initAuthGuard();</script>
 </body>
 </html>
