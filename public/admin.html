@@ -3,10 +3,9 @@
 <head>
     <script src="api-fetch.js"></script>
     <meta charset="UTF-8">
-    <parameter name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ตั้งค่าระบบ (Admin) - Prompt-Berk</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script>
         tailwind.config = {
@@ -554,7 +553,7 @@
                             <!-- Hotel Rate Override -->
                             <div>
                                 <label class="block text-[11px] font-bold text-slate-500 mb-2 uppercase tracking-wide">🏨 อัตราค่าที่พัก (Override)</label>
-                                <div class="grid grid-cols-2 gap-3">
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <div>
                                         <label class="block text-[10px] text-slate-600 mb-1">พักเดี่ยว</label>
                                         <div class="flex items-center gap-2 mb-1">
@@ -691,7 +690,7 @@
                             <option value="">ทุกจังหวัด</option>
                         </select>
                     </div>
-                    <div class="grid grid-cols-2 gap-2">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <div>
                             <label class="block text-[11px] font-bold text-slate-500 mb-1">ตั้งแต่</label>
                             <input id="logFrom" type="date" class="w-full border border-slate-200 rounded-lg px-2 py-2 text-sm outline-none focus:border-blue-500">
@@ -2326,7 +2325,7 @@
             : `<span class="px-3 py-1.5 text-sm text-slate-300">${label}</span>`;
         document.getElementById('logPager').innerHTML =
             `<div class="text-xs text-slate-400">หน้า ${d.page} จาก ${d.pages}</div>
-             <div class="flex gap-2">
+             <div class="flex flex-wrap gap-2">
                 ${btn('ก่อนหน้า', d.page - 1, d.page > 1)}
                 ${btn('ถัดไป',   d.page + 1, d.page < d.pages)}
              </div>`;

@@ -3,6 +3,7 @@
 <head>
     <script src="api-fetch.js"></script>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ประวัติการเบิกจ่าย - TUC Finance</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Prompt = หน้าจอ / Sarabun = เอกสาร PDF ราชการ (ห้ามเปลี่ยน) -->
@@ -359,14 +360,14 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             ${renderInput('ออกเดินทางจาก', tr.startFromType)}
-                            <div class="grid grid-cols-2 gap-2 mt-2">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
                                 ${renderInput('วันที่', formatDateDisplay(tr.startDate))}
                                 ${renderInput('เวลา', tr.startTime)}
                             </div>
                         </div>
                         <div>
                             ${renderInput('ปลายทาง (จังหวัด)', tr.toProv)}
-                            <div class="grid grid-cols-2 gap-2 mt-2">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
                                 ${renderInput('วันที่', formatDateDisplay(tr.endDate))}
                                 ${renderInput('เวลา', tr.endTime)}
                             </div>
@@ -391,7 +392,7 @@
                         ${renderInput('จุดเริ่มต้น', tr.from)}
                         ${renderInput('จุดหมาย', tr.to)}
                     </div>
-                    <div class="grid grid-cols-2 gap-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         ${renderInput('ระยะทางขาไป', tr.distOut + ' กม.')}
                         ${renderInput('ระยะทางขากลับ', tr.distRet + ' กม.')}
                     </div>
