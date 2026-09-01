@@ -870,6 +870,22 @@
 
             <div class="p-8">
                 <div class="max-w-4xl mx-auto">
+                    <!-- สถานะระบบ — ตอบคำถาม "ตอนนี้เปิดอะไรอยู่บ้าง และตรงกับอีกฝั่งไหม"
+                         เลขเวอร์ชันตรงกันไม่ได้แปลว่าตั้งค่าเหมือนกัน ต้องดูตรงนี้ด้วย -->
+                    <div class="premium-card rounded-3xl p-8 mb-6">
+                        <h3 class="text-base font-bold text-slate-700 mb-5 flex items-center gap-2">
+                            <span class="bg-slate-700 text-white w-7 h-7 rounded-lg inline-flex items-center justify-center text-sm">🩺</span>
+                            สถานะระบบ
+                        </h3>
+                        <div id="sysStatus" class="grid gap-3 sm:grid-cols-2 text-sm">
+                            <div class="text-slate-400">กำลังตรวจ…</div>
+                        </div>
+                        <p class="text-xs text-slate-400 mt-4 leading-relaxed">
+                            เปรียบเทียบหน้านี้ระหว่างเครื่องทดสอบกับระบบจริงได้เลย
+                            ถ้าตรงกันทุกบรรทัด = สองฝั่งทำงานเหมือนกันจริง
+                        </p>
+                    </div>
+
                     <!-- Settings Form -->
                     <div class="premium-card rounded-3xl p-8">
                         <h3 class="text-base font-bold text-slate-700 mb-5 flex items-center gap-2">
@@ -2493,6 +2509,42 @@
     showPanel('dashboard');
 </script>
 <script src="auth-guard.js"></script>
-<script>initAuthGuard({ adminOnly: true });</script>
+<script>
+initAuthGuard({ adminOnly: true });
+
+/* แผงสถานะระบบ
+   มีไว้เพราะ "เวอร์ชันตรงกัน" ไม่ได้แปลว่า "ทำงานเหมือนกัน"
+   ค่าตั้งค่าบางอย่าง (เช่น Microsoft 365) อยู่ในไฟล์ .env ของแต่ละเครื่อง
+   ไม่ได้เดินทางไปกับ git จึงต้องมีที่ให้ดูว่าตอนนี้แต่ละฝั่งเปิดอะไรอยู่ */
+(async function renderSystemStatus() {
+    const box = document.getElementById('sysStatus');
+    if (!box) return;
+
+    const get = async (u) => { try { const r = await fetch(u, { cache: 'no-store' }); return r.ok ? await r.json() : null; } catch (_) { return null; } };
+    const [ver, cfg] = await Promise.all([get('version.json'), get('/auth/config')]);
+
+    const row = (label, value, tone) => {
+        const colors = { ok: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                         off: 'bg-slate-100 text-slate-600 border-slate-200',
+                         warn: 'bg-amber-50 text-amber-700 border-amber-200' };
+        return `<div class="flex items-center justify-between gap-3 border border-slate-200 rounded-xl px-4 py-3">
+                  <span class="text-slate-600">${label}</span>
+                  <span class="font-bold px-2.5 py-1 rounded-lg border text-xs whitespace-nowrap ${colors[tone] || colors.off}">${value}</span>
+                </div>`;
+    };
+
+    const isProd = ver && String(ver.env).toUpperCase() === 'PROD';
+    const built = ver && ver.builtAt ? new Date(ver.builtAt).toLocaleString('th-TH') : '—';
+
+    box.innerHTML = [
+        row('ระบบนี้คือ', ver ? (isProd ? 'ระบบจริง (PROD)' : 'เครื่องทดสอบ (UAT)') : 'ไม่ทราบ', isProd ? 'ok' : 'warn'),
+        row('เวอร์ชัน', ver ? 'v' + ver.version : '—', 'off'),
+        row('อัปเดตล่าสุดเมื่อ', built, 'off'),
+        row('เข้าสู่ระบบด้วย Microsoft 365', cfg && cfg.microsoftEnabled ? 'เปิดใช้งาน' : 'ปิดอยู่', cfg && cfg.microsoftEnabled ? 'ok' : 'off'),
+        row('สมัครสมาชิกเอง', cfg && cfg.selfRegisterAllowed ? 'เปิดให้สมัครได้' : 'ปิด', cfg && cfg.selfRegisterAllowed ? 'warn' : 'ok'),
+        row('เข้าด้วยรหัสผ่านได้', cfg ? (cfg.passwordLoginFor === 'admin' ? 'เฉพาะผู้ดูแลระบบ' : 'ทุกคน') : '—', cfg && cfg.passwordLoginFor === 'admin' ? 'ok' : 'off')
+    ].join('');
+})();
+</script>
 </body>
 </html>
