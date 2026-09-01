@@ -595,6 +595,17 @@
 
                 <div id="dynamicInputs" class="mt-6 space-y-5"></div>
 
+                <!-- ไฟล์แนบเดิมตอนกดแก้ไขใบเก่า — ต้องบอกให้เห็นว่ายังอยู่
+                     ไม่งั้นผู้ใช้จะนึกว่าหายแล้วต้องแนบใหม่ทุกครั้ง -->
+                <div id="existingAttachBox" class="mt-8 pt-6 border-t border-dashed border-slate-200 hidden">
+                    <h3 class="text-xs font-black text-emerald-800 mb-3 uppercase tracking-wider">ไฟล์แนบเดิมของรายการนี้</h3>
+                    <p class="text-sm text-slate-600 mb-3">
+                        <span id="existingAttachCount" class="font-bold text-emerald-700"></span>
+                        — เก็บไว้ให้อัตโนมัติ ไม่ต้องแนบใหม่ ถ้าอยากเพิ่มไฟล์ค่อยเลือกด้านล่าง
+                    </p>
+                    <div id="existingAttachList" class="flex flex-wrap gap-3"></div>
+                </div>
+
                 <div id="evidenceBox" class="mt-8 pt-6 border-t border-dashed border-slate-200 hidden">
                     <h3 class="text-xs font-black text-blue-800 mb-4 uppercase tracking-wider">อัปโหลดหลักฐานประกอบ</h3>
                     <div id="evidenceInputs" class="space-y-4"></div>
@@ -2618,7 +2629,8 @@
 
             if (hasExpensesRequiringReceipt && adminRequiresAttachment) {
                 const attachmentInputs = document.querySelectorAll('.general-file-upload');
-                let hasAttachments = false;
+                // ไฟล์แนบเดิมนับเป็นการแนบแล้ว ไม่ต้องบังคับให้แนบซ้ำตอนแก้ไข
+                let hasAttachments = existingAttachments.length > 0;
                 for (const input of attachmentInputs) {
                     if (input.files && input.files.length > 0) {
                         hasAttachments = true;
@@ -2739,9 +2751,14 @@
             }
         }
 
-        const requiredFiles = document.querySelectorAll('.general-file-upload.required-file');
-        for (const input of requiredFiles) {
-            if (!input.files || input.files.length === 0) return alert("❌ ไม่สามารถบันทึกได้! \nกรุณาแนบไฟล์: " + input.dataset.label);
+        // ตอนแก้ไขใบเก่าที่มีไฟล์แนบอยู่แล้ว ไม่บังคับให้แนบซ้ำ
+        // ไฟล์ที่เก็บไว้เป็นอาร์เรย์รวม ไม่ได้แยกว่าเป็นไฟล์ประเภทไหน
+        // จึงบอกไม่ได้ว่าช่องไหนมีของแล้ว ถ้าบังคับต่อจะแก้ใบเก่าไม่ได้เลย
+        if (!(editingExpenseId && existingAttachments.length)) {
+            const requiredFiles = document.querySelectorAll('.general-file-upload.required-file');
+            for (const input of requiredFiles) {
+                if (!input.files || input.files.length === 0) return alert("❌ ไม่สามารถบันทึกได้! \nกรุณาแนบไฟล์: " + input.dataset.label);
+            }
         }
 
         const finalAmount = parseFloat(document.getElementById('totalAmount').dataset.value || 0);
@@ -2751,7 +2768,9 @@
         const originalText = btn.innerHTML;
         btn.innerHTML = '⏳ กำลังประมวลผลไฟล์...'; btn.disabled = true;
 
-        const uploadedImages = [];
+        // เริ่มจากไฟล์แนบเดิม (กรณีแก้ไขใบเก่า) แล้วค่อยต่อด้วยไฟล์ที่เพิ่งเลือก
+        // ถ้าเริ่มจากอาร์เรย์ว่าง ใบเสร็จเดิมจะถูกลบทิ้งทุกครั้งที่กดแก้ไข
+        const uploadedImages = existingAttachments.slice();
         imgStats = { before: 0, after: 0, n: 0, failed: [] };
 
         // ภาพแผนที่: ใช้ภาพที่ระบบสร้าง หรือภาพที่ผู้ใช้อัปโหลดเอง อย่างใดอย่างหนึ่ง
@@ -2848,8 +2867,44 @@
         btn.innerHTML = originalText;
         btn.disabled = false;
     }
+    /** ไฟล์แนบเดิมของใบที่กำลังแก้ไข — ต้องส่งกลับไปด้วยตอนบันทึก
+     *  ไม่งั้น PUT จะเขียนทับด้วย images:[] แล้วใบเสร็จเดิมหายหมด
+     *  (ช่องอัปโหลดว่างเปล่าเสมอตอนเปิดมาแก้ ใส่ไฟล์เดิมกลับเข้าไปไม่ได้) */
+    let existingAttachments = [];
+
+    /** โชว์ไฟล์แนบเดิมให้เห็นว่ายังอยู่ พร้อมปุ่มลบทีละไฟล์ */
+    function showExistingAttachments() {
+        const box  = document.getElementById('existingAttachBox');
+        const list = document.getElementById('existingAttachList');
+        const cnt  = document.getElementById('existingAttachCount');
+        if (!box || !list) return;
+
+        if (!existingAttachments.length) { box.classList.add('hidden'); return; }
+        box.classList.remove('hidden');
+        cnt.textContent = 'มีไฟล์แนบอยู่แล้ว ' + existingAttachments.length + ' ไฟล์';
+
+        list.innerHTML = existingAttachments.map((src, i) =>
+            `<div class="relative w-24 h-24 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
+               <img src="${src}" alt="ไฟล์แนบเดิม ${i + 1}" class="w-full h-full object-cover">
+               <button type="button" onclick="removeExistingAttachment(${i})"
+                 title="ลบไฟล์นี้ออกจากรายการ"
+                 class="absolute top-1 right-1 w-6 h-6 rounded-full bg-rose-600 text-white text-xs font-bold leading-none">×</button>
+             </div>`).join('');
+    }
+
+    window.removeExistingAttachment = function (i) {
+        if (!confirm('ลบไฟล์แนบนี้ออกจากรายการ?\nจะมีผลเมื่อกดบันทึกเท่านั้น')) return;
+        existingAttachments.splice(i, 1);
+        showExistingAttachments();
+    };
+
     async function prefillForm(expense) {
         const meta = expense.inputMetadata || {};
+
+        existingAttachments = (expense.attachments && Array.isArray(expense.attachments.images))
+            ? expense.attachments.images.slice() : [];
+        showExistingAttachments();
+
         document.getElementById('requestedBy').value = expense.requestedBy || '';
         document.getElementById('position').value     = meta._position     || '';
         document.getElementById('affiliation').value  = meta._affiliation  || '';
@@ -2900,6 +2955,23 @@
             document.getElementById('travelTo').value      = tr.to        || '';
             document.getElementById('distOutbound').value  = tr.distOut   || 0;
             document.getElementById('distReturn').value    = tr.distRet   || 0;
+
+            // ── คืนหมุดต้นทาง-ปลายทางและเส้นทาง ──
+            // เดิมคืนแค่ขากลับ ขาไปไม่ได้คืน ผู้ใช้จึงต้องค้นหาและปักหมุดใหม่ทุกครั้งที่กดแก้ไข
+            // ทั้งที่ข้อมูลเก็บไว้ครบอยู่แล้ว (PDF ในหน้าประวัติวาดแผนที่จากพิกัดชุดนี้ได้)
+            if (tr.fromGeo) geoFrom = tr.fromGeo;
+            if (tr.toGeo)   geoTo   = tr.toGeo;
+            if (tr.routePath) routePath = tr.routePath;
+            if (tr.route)     routeInfo = tr.route;
+            if (tr.fromAddr)  window.__fromAddrParts = tr.fromAddr;
+            // วางหมุดลงแผนที่จริงหลังกล่องแผนที่ถูกแสดงแล้ว ไม่งั้น Leaflet วัดขนาดไม่ได้
+            setTimeout(() => {
+                try {
+                    if (geoFrom) setPoint('from', geoFrom.lat, geoFrom.lng, geoFrom.label, geoFrom.precision, geoFrom.source);
+                    if (geoTo)   setPoint('to',   geoTo.lat,   geoTo.lng,   geoTo.label,   geoTo.precision,   geoTo.source);
+                    if (routeMap) { routeMap.invalidateSize(); fitRoute(); }
+                } catch (e) { console.warn('คืนหมุดบนแผนที่ไม่สำเร็จ:', e); }
+            }, 300);
 
             // ขากลับไปคนละที่ — คืนสถานะให้ครบตอนเปิดใบเดิมมาแก้
             const rdiff = document.getElementById('returnDiff');

@@ -433,6 +433,19 @@ app.put('/expenses/:id', requireAuth, (req, res) => {
 
   const original = JSON.parse(exists.data);
   if (original.createdAt) expense.createdAt = original.createdAt;
+
+  // ตาข่ายกันข้อมูลหาย: ใบเดิมมีไฟล์แนบ แต่ payload ไม่ส่งมาเลย = หน้าเว็บไม่ได้เอาของเดิมติดมา
+  // ไม่ใช่เจตนาลบ เพราะการลบต้องส่งรายการที่เหลือมาให้ (อาจเป็นอาร์เรย์ที่สั้นลง)
+  // เดิม UPDATE เขียนทับทั้งก้อน ใบเสร็จเดิมจึงหายทุกครั้งที่กดแก้ไข
+  const oldImgs = (original.attachments && Array.isArray(original.attachments.images))
+    ? original.attachments.images : [];
+  const newImgs = (expense.attachments && Array.isArray(expense.attachments.images))
+    ? expense.attachments.images : null;
+  if (oldImgs.length && (newImgs === null || newImgs.length === 0)) {
+    expense.attachments = Object.assign({}, expense.attachments, { images: oldImgs });
+    console.log('[expenses] #' + id + ' คืนไฟล์แนบเดิม ' + oldImgs.length + ' ไฟล์ (payload ไม่ได้ส่งมา)');
+  }
+
   db.prepare('UPDATE expenses SET data = ? WHERE id = ?').run(JSON.stringify(expense), id);
   expense.id = id;
   expense.userId = exists.user_id;
