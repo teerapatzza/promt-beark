@@ -107,7 +107,9 @@ function validateExpense(expense, category, globalTaxiMax) {
         })();
         const capText = taxiCap === Infinity ? 'ไม่จำกัด' : taxiCap.toLocaleString();
 
-        const taxiEntries = costs.taxiEntries || [];
+        // Taxi มีช่องอยู่บนใบรับรองค่าพาหนะ (FM-SAM-095-00) เท่านั้น
+        // ใบอื่นไม่มีช่องนี้ ถ้ามีค่าค้างมาก็ไม่ใช่สิ่งที่ผู้ใช้ตั้งใจเบิก
+        const taxiEntries = templates.includes('TRANSPORT_RECEIPT') ? (costs.taxiEntries || []) : [];
         const travelStartDate = travel.startDate ? new Date(travel.startDate) : null;
         const travelEndDate = travel.endDate ? new Date(travel.endDate) : null;
 
@@ -172,31 +174,57 @@ function validateExpense(expense, category, globalTaxiMax) {
         });
 
         // 4. Validate hotel fields (must fill both rate AND nights)
-        const hotel = costs.hotel || {};
-        const hotelRate = parseFloat(hotel.rate) || 0;
-        const hotelNights = parseFloat(hotel.nights) || 0;
+        // ค่าที่พักมีช่องอยู่บนใบรายงานการเดินทาง (FM-SAM-001-04) เท่านั้น
+        //
+        // รองรับสองรูปแบบ:
+        //   ใหม่  costs.hotelEntries = { name, entries:[{type,rate,nights}] }  <- หน้าเว็บส่งแบบนี้
+        //   เก่า  costs.hotel        = { rate, nights }                        <- ใบเก่าในฐานข้อมูล
+        // เดิมอ่านแค่แบบเก่า กฎที่พักทั้งหมดจึงไม่เคยทำงานกับใบใหม่เลย
+        // และค่าที่พักไม่เคยถูกนับเข้าเงื่อนไข "ต้องแนบใบเสร็จ" ด้วย
+        const onReport = templates.includes('REPORT');
+        const hotelRows = (function () {
+            if (!onReport) return [];
+            // ต้องเช็คว่า "มีรายการจริง" ไม่ใช่แค่ "เป็นอาร์เรย์"
+            // ฟอร์มส่ง entries:[] มาเสมอแม้ไม่ได้กรอก ถ้าเช็คแค่ Array.isArray
+            // ใบเก่าที่เก็บเป็น costs.hotel จะไม่มีวันถูกตรวจเลย
+            const he = costs.hotelEntries;
+            if (he && Array.isArray(he.entries) && he.entries.length) return he.entries;
+            const old = costs.hotel;
+            if (old && (old.rate != null || old.nights != null)) return [old];
+            return [];
+        })();
 
-        if (hotelRate > 0 && hotelNights === 0) {
-            errors.push({
-                field: 'hotelNights',
-                level: 'error',
-                message: `❌ กรอกข้อมูลที่พักไม่ครบ!\n\n` +
-                    `🏨 อัตราค่าที่พัก: ${hotelRate} บาท/คืน\n` +
-                    `🌙 จำนวนคืน: ไม่ได้กรอก\n\n` +
-                    `💡 กรุณากรอกจำนวนคืนที่พัก`
-            });
-        }
+        const totalHotelCost = hotelRows.reduce(function (sum, r) {
+            return sum + (parseFloat(r.rate) || 0) * (parseFloat(r.nights) || 0);
+        }, 0);
 
-        if (hotelNights > 0 && hotelRate === 0) {
-            errors.push({
-                field: 'hotelRate',
-                level: 'error',
-                message: `❌ กรอกข้อมูลที่พักไม่ครบ!\n\n` +
-                    `🌙 จำนวนคืน: ${hotelNights} คืน\n` +
-                    `🏨 อัตราค่าที่พัก: ไม่ได้กรอก\n\n` +
-                    `💡 กรุณากรอกอัตราค่าที่พัก (บาท/คืน)`
-            });
-        }
+        hotelRows.forEach(function (r, i) {
+            const rate = parseFloat(r.rate) || 0;
+            const nights = parseFloat(r.nights) || 0;
+            const which = hotelRows.length > 1 ? ` (รายการที่ ${i + 1})` : '';
+
+            if (rate > 0 && nights === 0) {
+                errors.push({
+                    field: 'hotelNights',
+                    level: 'error',
+                    message: `❌ กรอกข้อมูลที่พักไม่ครบ!${which}\n\n` +
+                        `🏨 อัตราค่าที่พัก: ${rate} บาท/คืน\n` +
+                        `🌙 จำนวนคืน: ไม่ได้กรอก\n\n` +
+                        `💡 กรุณากรอกจำนวนคืนที่พัก`
+                });
+            }
+
+            if (nights > 0 && rate === 0) {
+                errors.push({
+                    field: 'hotelRate',
+                    level: 'error',
+                    message: `❌ กรอกข้อมูลที่พักไม่ครบ!${which}\n\n` +
+                        `🌙 จำนวนคืน: ${nights} คืน\n` +
+                        `🏨 อัตราค่าที่พัก: ไม่ได้กรอก\n\n` +
+                        `💡 กรุณากรอกอัตราค่าที่พัก (บาท/คืน)`
+                });
+            }
+        });
 
         // 5. Validate expense amounts require receipts
         // ต้องฟังค่าที่แอดมินตั้งไว้ในหมวดหมู่ ไม่ใช่บังคับตายตัวจากโค้ด
@@ -208,9 +236,9 @@ function validateExpense(expense, category, globalTaxiMax) {
             : (Array.isArray(category && category.requiredFields) ? category.requiredFields : []);
         const adminRequiresAttachment = requiredAttach.length > 0;
 
-        const airAmount = parseFloat(costs.airAmount) || 0;
-        const tollAmount = parseFloat(costs.tollAmount) || 0;
-        const totalHotelCost = hotelRate * hotelNights;
+        // ค่าตั๋วเครื่องบินอยู่บนใบรายงานการเดินทางเท่านั้น เหมือนค่าที่พัก
+        const airAmount = onReport ? (parseFloat(costs.airAmount) || 0) : 0;
+        const tollAmount = parseFloat(costs.tollAmount) || 0;   // มีทั้งสองใบ
         const hasExpensesRequiringReceipt = totalHotelCost > 0 || airAmount > 0 || tollAmount > 0;
 
         if (hasExpensesRequiringReceipt && adminRequiresAttachment) {

@@ -1914,26 +1914,39 @@
         return entries;
     }
 
+    /* ── ช่องไหนถูกซ่อน = ไม่มีอยู่บนกระดาษ = ห้ามคิดเงิน ──
+       ค่าในช่องที่ซ่อนไม่ถูกล้าง มันค้างจากตอนเลือกหมวดอื่น
+       ถ้าเอามาบวกด้วย ยอดเบิกจะเกินจริงโดยที่เอกสารไม่มีบรรทัดรองรับ
+       ใช้ตัวช่วยชุดเดียวกันทั้งตอนคิดยอดและตอนบันทึก จะได้ไม่หลุดอีก */
+    function activeTemplates() { return window.currentPdfTemplates || []; }
+    function usesReport()  { return activeTemplates().includes('REPORT'); }
+    function usesReceipt() { return activeTemplates().includes('TRANSPORT_RECEIPT'); }
+    function usesTravel()  { return usesReport() || usesReceipt(); }
+
     window.calculateTravelTotal = function() {
-        const hotel = getHotelTotal();
+        const onReport  = usesReport();
+        const onReceipt = usesReceipt();
+        const onTravel  = usesTravel();
+
+        const hotel = onReport ? getHotelTotal() : 0;
         const fuelRate = parseFloat(document.getElementById('fuelRate').value)||0;
-        const out = parseFloat(document.getElementById('distOutbound').value)||0;
-        const ret = parseFloat(document.getElementById('distReturn').value)||0;
-        const carType = document.getElementById('carType')?.value;
-        
+        const out = onReceipt ? (parseFloat(document.getElementById('distOutbound').value)||0) : 0;
+        const ret = onReceipt ? (parseFloat(document.getElementById('distReturn').value)||0) : 0;
+        const carType = onReceipt ? document.getElementById('carType')?.value : 'ไม่ระบุ';
+
         let fuelDist = 0;
         if(carType === 'ขาไป') fuelDist = out;
         else if(carType === 'ขากลับ') fuelDist = ret;
         else if(carType === 'ไป-กลับ') fuelDist = out + ret;
 
         const fuelTotal = fuelRate * fuelDist;
-        
-        const taxiTotal = getTaxiTotal();
 
-        const air = parseFloat(document.getElementById('airfareCost').value)||0;
-        const toll = parseFloat(document.getElementById('tollCost').value)||0;
-        const other = parseFloat(document.getElementById('otherCost').value)||0;
-        
+        const taxiTotal = onReceipt ? getTaxiTotal() : 0;
+
+        const air = onReport ? (parseFloat(document.getElementById('airfareCost').value)||0) : 0;
+        const toll = onTravel ? (parseFloat(document.getElementById('tollCost').value)||0) : 0;
+        const other = onTravel ? (parseFloat(document.getElementById('otherCost').value)||0) : 0;
+
         const total = hotel + fuelTotal + taxiTotal + air + toll + other;
         document.getElementById('totalAmount').innerHTML = new Intl.NumberFormat('th-TH', { style: 'decimal', minimumFractionDigits: 2 }).format(total) + ' <span class="text-2xl">฿</span>';
         document.getElementById('totalAmount').dataset.value = total;
@@ -2484,14 +2497,18 @@
                 manualReason: document.getElementById('manualDistOverride')?.checked
                     ? (document.getElementById('manualDistReason')?.value || '') : '',
                 route: routeInfo,
-                distOut: document.getElementById('distOutbound')?.value || 0, distRet: document.getElementById('distReturn')?.value || 0
+                // ระยะทางมีอยู่บนใบรับรองค่าพาหนะเท่านั้น ใบอื่นไม่มีช่องนี้บนกระดาษ
+                distOut: needReceipt ? (document.getElementById('distOutbound')?.value || 0) : 0,
+                distRet: needReceipt ? (document.getElementById('distReturn')?.value   || 0) : 0
             };
+            // เก็บเฉพาะค่าของช่องที่แสดงอยู่จริง ให้ตรงกับที่ calculateTravelTotal คิดเงิน
+            // ค่าในช่องที่ซ่อนคือของค้างจากหมวดอื่น ไม่ใช่สิ่งที่ผู้ใช้ตั้งใจเบิกในใบนี้
             metadata._costs = {
-                hotelEntries: collectHotelEntries(),
-                fuelRate: document.getElementById('fuelRate')?.value || 0,
-                taxiEntries: collectTaxiEntries(),
-                airAmount: document.getElementById('airfareCost')?.value || 0,
-                tollAmount: document.getElementById('tollCost')?.value || 0,
+                hotelEntries: needReport  ? collectHotelEntries() : [],
+                fuelRate:     needReceipt ? (document.getElementById('fuelRate')?.value || 0) : 0,
+                taxiEntries:  needReceipt ? collectTaxiEntries() : [],
+                airAmount:    needReport  ? (document.getElementById('airfareCost')?.value || 0) : 0,
+                tollAmount:  document.getElementById('tollCost')?.value  || 0,
                 otherAmount: document.getElementById('otherCost')?.value || 0
             };
             // ประเภทรถอยู่ในใบรับรองค่าพาหนะเท่านั้น ถ้าหมวดนี้ไม่ได้ติ๊กใบนั้น
