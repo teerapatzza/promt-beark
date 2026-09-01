@@ -885,8 +885,15 @@
             const inputId = CB_FOR[id];
             if (!inputId || !window.Combobox) return;
             if (!_cb[id]) {
+                const isPos = id === 'positionOptions';
                 _cb[id] = Combobox.attach(inputId, {
-                    addLabel: id === 'positionOptions' ? 'ตำแหน่ง' : 'ส่วนงาน'
+                    addLabel: isPos ? 'ตำแหน่ง' : 'ส่วนงาน',
+                    // เพิ่มปุ๊บเก็บขึ้นเซิร์ฟเวอร์ปั๊บ ไม่ต้องรอกดบันทึกโปรไฟล์
+                    onCreate: (v) => rememberListValue(
+                        isPos ? 'positionList' : 'affiliationList',
+                        v,
+                        isPos ? knownPositions : knownAffils
+                    )
                 });
             }
             if (_cb[id]) _cb[id].setItems(items || []);

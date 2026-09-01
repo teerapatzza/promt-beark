@@ -126,13 +126,28 @@
       Array.prototype.forEach.call(list.querySelectorAll('.cb-opt'), function (b) {
         b.addEventListener('mousedown', function (e) {
           e.preventDefault();                       // กัน blur ก่อนคลิกติด
-          pick(b.dataset.new ? input.value.trim() : shown[+b.dataset.i]);
+          pick(b.dataset.new ? input.value.trim() : shown[+b.dataset.i], !!b.dataset.new);
         });
       });
     }
 
-    function pick(v) {
-      input.value = v || '';
+    /**
+     * @param {string}  v        ค่าที่เลือกหรือพิมพ์ใหม่
+     * @param {boolean} isNew    กดแถว "เพิ่ม …" มาใช่ไหม
+     *
+     * ค่าใหม่ต้องเข้ารายการทันทีที่กด ไม่ใช่รอจนกดบันทึกทั้งฟอร์ม
+     * เดิมกดแล้วแค่ใส่ค่าลงช่อง พอเปิดรายการดูอีกทีก็ยังไม่มี
+     * ดูเหมือนกดแล้วไม่เกิดอะไรขึ้น ทั้งที่ระบบออกแบบให้เพิ่มได้
+     */
+    function pick(v, isNew) {
+      v = (v || '').trim().replace(/\s+/g, ' ');
+      input.value = v;
+
+      if (isNew && v && items.indexOf(v) < 0) {
+        items.push(v);                                   // เห็นในรายการทันที
+        if (typeof opts.onCreate === 'function') opts.onCreate(v);   // เก็บขึ้นเซิร์ฟเวอร์ให้คนอื่นเห็นด้วย
+      }
+
       close();
       input.dispatchEvent(new Event('input',  { bubbles: true }));
       input.dispatchEvent(new Event('change', { bubbles: true }));
@@ -159,7 +174,13 @@
       else if (e.key === 'ArrowUp') { e.preventDefault(); move(-1); }
       else if (e.key === 'Enter') {
         if (open && cursor >= 0) { e.preventDefault(); list.querySelectorAll('.cb-opt')[cursor].dispatchEvent(new MouseEvent('mousedown')); }
-        else close();
+        else {
+          // พิมพ์ค่าใหม่แล้วกด Enter เลยโดยไม่ได้เลื่อนลงไปที่แถว "เพิ่ม …"
+          // ต้องนับเป็นการเพิ่มด้วย ไม่งั้นผู้ใช้จะงงว่าทำไมบางครั้งเพิ่มติดบางครั้งไม่ติด
+          var typed = input.value.trim().replace(/\s+/g, ' ');
+          if (typed && items.indexOf(typed) < 0) { e.preventDefault(); pick(typed, true); }
+          else close();
+        }
       } else if (e.key === 'Escape') { close(); }
     });
     caret.style.pointerEvents = 'auto';
