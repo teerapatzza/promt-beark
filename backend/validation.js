@@ -6,6 +6,66 @@
 
 const TAXI_MAX_PER_TRIP = 300; // ค่าปริยายสุดท้าย ใช้เมื่อไม่มีทั้งค่าหมวดหมู่และค่ากลาง
 
+/* ── วงเงินแท็กซี่จำกัดเฉพาะ กทม.และปริมณฑล ──────────────────────
+   นอกเขตนี้ไม่จำกัด เพราะระยะทางต่างจังหวัดต่างกันมาก ตั้งเพดานเดียวไม่ได้
+   ให้ผู้อนุมัติดูเอาเอง
+
+   ปัญหาคือข้อมูลที่มีไม่เท่ากันทุกใบ:
+     ต้นทาง  fromAddr.prov  มีเมื่อผู้ใช้เลือกจากโปรไฟล์ (ไม่เสมอไป)
+     ปลายทาง toProv         ช่องนี้อยู่บนใบรายงาน ไม่ใช่ใบพาหนะที่มีแท็กซี่
+                            ใบพาหนะอย่างเดียวจึงไม่มีค่านี้เลย
+     พิกัด    fromGeo/toGeo  มีเสมอเมื่อปักหมุดแล้ว  <- สัญญาณเดียวที่ใช้ได้ทุกใบ
+
+   จึงใช้สองชั้น: ถ้ารู้ชื่อจังหวัดชัดเจนให้เชื่อชื่อก่อน ไม่รู้ค่อยดูพิกัด
+   และเอนไปทาง "ไม่จำกัด" เมื่อไม่แน่ใจ — เพราะการตั้งเพดานผิดที่
+   จะบล็อกใบที่ถูกต้อง ส่วนการปล่อยผ่านยังมีผู้อนุมัติตรวจอีกชั้น           */
+const METRO_PROVINCES = [
+    'กรุงเทพมหานคร', 'กรุงเทพ', 'กทม', 'กทม.',
+    'นนทบุรี', 'ปทุมธานี', 'สมุทรปราการ', 'สมุทรสาคร', 'นครปฐม'
+];
+// กรอบพิกัดคร่าวๆ ของ กทม.+ปริมณฑล ใช้เมื่อไม่รู้ชื่อจังหวัด
+// ตรวจแล้วว่ากันจังหวัดข้างเคียงออกได้: อยุธยา(14.35) ฉะเชิงเทรา(101.07) ราชบุรี(99.81) ชลบุรี(100.98)
+const METRO_BOX = { latMin: 13.45, latMax: 14.20, lngMin: 99.90, lngMax: 100.95 };
+
+function normProv(s) {
+    return String(s || '').replace(/^จังหวัด/, '').replace(/\s+/g, '').trim();
+}
+function provIsMetro(s) {
+    const v = normProv(s);
+    return v ? METRO_PROVINCES.some(p => normProv(p) === v) : null;   // null = ไม่รู้
+}
+function geoInMetroBox(g) {
+    if (!g || typeof g.lat !== 'number' || typeof g.lng !== 'number') return null;
+    return g.lat >= METRO_BOX.latMin && g.lat <= METRO_BOX.latMax
+        && g.lng >= METRO_BOX.lngMin && g.lng <= METRO_BOX.lngMax;
+}
+
+/**
+ * การเดินทางครั้งนี้อยู่ใน กทม.ปริมณฑลทั้งต้นทางและปลายทางไหม
+ * @returns {{inMetro:boolean, reason:string}}
+ */
+function isMetroTrip(travel) {
+    const t = travel || {};
+    const fromProv = provIsMetro((t.fromAddr && t.fromAddr.prov) || '');
+    const toProv   = provIsMetro(t.toProv || '');
+
+    // รู้ชื่อจังหวัดแล้วว่าอยู่นอกเขต — จบเลย ไม่ต้องเดาจากพิกัด
+    if (fromProv === false || toProv === false)
+        return { inMetro: false, reason: 'จังหวัดอยู่นอก กทม.ปริมณฑล' };
+
+    const fromBox = geoInMetroBox(t.fromGeo);
+    const toBox   = geoInMetroBox(t.toGeo);
+
+    // ต้องมั่นใจทั้งสองฝั่งถึงจะจำกัดวงเงิน ไม่รู้ฝั่งใดฝั่งหนึ่ง = ไม่จำกัด
+    if (fromBox === true && toBox === true)
+        return { inMetro: true, reason: 'ต้นทางและปลายทางอยู่ใน กทม.ปริมณฑล' };
+
+    if (fromBox === null || toBox === null)
+        return { inMetro: false, reason: 'ยังไม่ได้ปักหมุดครบ จึงยังไม่จำกัดวงเงิน' };
+
+    return { inMetro: false, reason: 'เดินทางออกนอก กทม.ปริมณฑล' };
+}
+
 // ช่องระยะทางเป็นแบบอ่านอย่างเดียว ระบบคำนวณจากหมุดบนแผนที่
 // ถ้าค้นหาปลายทางไม่เจอ ระยะทางจะค้างที่ 0 แล้วบันทึกไม่ผ่าน
 // ผู้ใช้จะงงมากถ้าไม่บอกทางออก เพราะพิมพ์ใส่ช่องเองก็ไม่ได้
@@ -97,7 +157,10 @@ function validateExpense(expense, category, globalTaxiMax) {
         // วงเงิน Taxi ต้องมาจากที่แอดมินตั้งไว้ ไม่ใช่ค่าคงที่ในโค้ด
         // ลำดับ: ค่าของหมวดหมู่ -> ค่ากลางของระบบ -> ค่าปริยาย
         // ติ๊ก "ไม่จำกัด" ในหน้าแอดมินจะเก็บเป็น null/0 ซึ่งแปลว่าไม่ต้องตรวจ
+        // วงเงินจำกัดเฉพาะการเดินทางใน กทม.ปริมณฑล นอกเขตให้ผู้อนุมัติดูเอง
+        const metro = isMetroTrip(travel);
         const taxiCap = (function () {
+            if (!metro.inMetro) return Infinity;
             const fromCat = category && category.taxiMaxPerTrip;
             if (fromCat === null || fromCat === 0 || fromCat === '') return Infinity;   // ไม่จำกัด
             const n = parseFloat(fromCat);
@@ -344,5 +407,5 @@ function validateExpense(expense, category, globalTaxiMax) {
 
 // Export for both Node.js (backend) and browser (frontend)
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { validateExpense, TAXI_MAX_PER_TRIP };
+    module.exports = { validateExpense, TAXI_MAX_PER_TRIP, isMetroTrip, METRO_PROVINCES };
 }

@@ -959,6 +959,8 @@
 
     /** คำนวณระยะทางตามถนนจริงจาก /map-route */
     async function recalcRoute(userAsked) {
+        // หมุดเปลี่ยน = พื้นที่อาจเปลี่ยน = วงเงินแท็กซี่อาจเปลี่ยน ต้องคิดใหม่ทุกครั้ง
+        if (typeof recomputeTaxiCap === 'function') recomputeTaxiCap();
         if (document.getElementById('manualDistOverride')?.checked) return;
         if (!geoFrom || !geoTo) {
             // บอกให้ตรงว่าขาดจุดไหน ข้อความรวมๆ ทำให้ผู้ใช้ที่กรอกจุดหมายไปแล้วงงว่าทำไมยังไม่คำนวณ
@@ -1790,16 +1792,58 @@
 
     /** บอกวงเงิน Taxi ของหมวดนี้ตั้งแต่ยังไม่กรอก
         เดิมต้องกรอกเกินก่อนถึงจะขึ้นเตือน ซึ่งสายไปแล้ว ผู้ใช้กรอกเสร็จค่อยมารู้ */
-    function showTaxiCap() {
+    /* ── วงเงินแท็กซี่จำกัดเฉพาะ กทม.ปริมณฑล ────────────────────────
+       ⚠️ ตรรกะนี้ซ้ำกับ backend/validation.js (isMetroTrip)
+          backend เป็นตัวตัดสินจริง ตรงนี้มีไว้บอกผู้ใช้ล่วงหน้าเท่านั้น
+          แก้ที่ไหนต้องแก้อีกที่ด้วย — หน้าเว็บยังไม่ได้โหลด validation.js
+       นอกเขตไม่จำกัด เพราะระยะทางต่างจังหวัดต่างกันมาก ให้ผู้อนุมัติดูเอง  */
+    const METRO_PROVINCES_FE = ['กรุงเทพมหานคร','กรุงเทพ','กทม','กทม.','นนทบุรี','ปทุมธานี','สมุทรปราการ','สมุทรสาคร','นครปฐม'];
+    const METRO_BOX_FE = { latMin: 13.45, latMax: 14.20, lngMin: 99.90, lngMax: 100.95 };
+    const _np = s => String(s || '').replace(/^จังหวัด/, '').replace(/\s+/g, '').trim();
+    function _provMetro(s) { const v = _np(s); return v ? METRO_PROVINCES_FE.some(p => _np(p) === v) : null; }
+    function _inBox(g) {
+        if (!g || typeof g.lat !== 'number' || typeof g.lng !== 'number') return null;
+        return g.lat >= METRO_BOX_FE.latMin && g.lat <= METRO_BOX_FE.latMax
+            && g.lng >= METRO_BOX_FE.lngMin && g.lng <= METRO_BOX_FE.lngMax;
+    }
+    function isMetroTripFE() {
+        const fp = _provMetro((window.__fromAddrParts || {}).prov || '');
+        const tp = _provMetro(document.getElementById('targetProv')?.value || '');
+        if (fp === false || tp === false) return { inMetro: false, why: 'จังหวัดอยู่นอก กทม.ปริมณฑล' };
+        const fb = _inBox(geoFrom), tb = _inBox(geoTo);
+        if (fb === true && tb === true) return { inMetro: true,  why: 'อยู่ใน กทม.ปริมณฑล' };
+        if (fb === null || tb === null) return { inMetro: false, why: 'ยังปักหมุดไม่ครบ' };
+        return { inMetro: false, why: 'เดินทางออกนอก กทม.ปริมณฑล' };
+    }
+
+    /** วงเงินที่หมวดหมู่กำหนด (ยังไม่คิดเรื่องพื้นที่) */
+    let taxiCapCategory = Infinity;
+
+    /** คิดวงเงินที่ใช้จริงตอนนี้ แล้วอัปเดตหน้าจอ — เรียกทุกครั้งที่หมุดหรือหมวดเปลี่ยน */
+    function recomputeTaxiCap() {
+        const m = isMetroTripFE();
+        taxiMaxPerTrip = m.inMetro ? taxiCapCategory : Infinity;
+        showTaxiCap(m);
+    }
+
+    function showTaxiCap(metro) {
+        const m = metro || isMetroTripFE();
         const has  = taxiMaxPerTrip !== Infinity;
         const text = has ? 'ไม่เกิน ' + taxiMaxPerTrip.toLocaleString() + ' บาท' : '';
         const note = document.getElementById('taxiCapNote');
         if (note) {
             note.classList.toggle('hidden', !has);
             note.innerHTML = has
-                ? 'หมวดนี้กำหนดวงเงินค่า Taxi <b>ไม่เกิน ' + taxiMaxPerTrip.toLocaleString() +
-                  ' บาทต่อเที่ยว</b> — กรอกเกินจะบันทึกไม่ได้'
+                ? 'เดินทางใน กทม.ปริมณฑล — วงเงินค่า Taxi <b>ไม่เกิน ' + taxiMaxPerTrip.toLocaleString() +
+                  ' บาทต่อเที่ยว</b> กรอกเกินจะบันทึกไม่ได้'
                 : '';
+        }
+        // บอกด้วยว่าทำไมถึงไม่จำกัด ผู้ใช้จะได้ไม่สงสัยว่าระบบลืมตรวจ
+        const areaNote = document.getElementById('taxiAreaNote');
+        if (areaNote) {
+            const show = !has && taxiCapCategory !== Infinity;
+            areaNote.classList.toggle('hidden', !show);
+            areaNote.textContent = show ? 'ไม่จำกัดวงเงินค่า Taxi — ' + m.why : '';
         }
         document.querySelectorAll('.taxi-cap').forEach(el => {
             el.textContent = has ? '(ไม่เกิน ' + taxiMaxPerTrip.toLocaleString() + ')' : '';
@@ -2062,8 +2106,9 @@
 
         const rules = getAttachmentRules(category);
         const catTaxi = category.taxiMaxPerTrip;
-        taxiMaxPerTrip = (catTaxi != null && catTaxi > 0) ? catTaxi : Infinity;
-        showTaxiCap();
+        // เก็บวงเงินของหมวดไว้ก่อน ส่วนจะบังคับจริงไหมขึ้นกับว่าเดินทางใน กทม.ปริมณฑลหรือเปล่า
+        taxiCapCategory = (catTaxi != null && catTaxi > 0) ? catTaxi : Infinity;
+        recomputeTaxiCap();
         applyCategoryPdfTemplate(category);
 
         // Apply fuel rate from category (if defined by admin)
