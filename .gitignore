@@ -6,3 +6,27 @@ backend/data/
 *.db-wal
 .env
 .env.local
+
+# ── กันไฟล์ที่มีข้อมูลลับหลุดขึ้น git (repo นี้เป็น public) ──
+1-SETUP-KEY.cmd
+2-DEPLOY.cmd
+SETUP-SSH-KEY.bat
+DEPLOY-NOW.bat
+auto-deploy.ps1
+deploy-now.ps1
+*.secret
+.env
+.env.*
+!.env.example
+
+# ── ใบรับรอง SSL และกุญแจลับ (IT ส่งมา 31 ส.ค. 2026) ──
+# private.key หลุดเมื่อไหร่ = คนอื่นปลอมเป็น *.ha.or.th ได้ทุกโดเมนของสถาบัน
+*.key
+*.crt
+*.pem
+*.pfx
+*.p12
+*.cer
+*.7z
+ssl/
+certs/

@@ -147,6 +147,12 @@
         .brand-mark {
             height: 44px; width: auto; flex: 0 0 auto; display: block;
         }
+        /* โลโก้แอป วางคู่โลโก้สถาบัน คั่นด้วยเส้นบางๆ ให้อ่านออกว่าเป็นคนละตรา */
+        .app-mark {
+            height: 38px; border-radius: 8px;
+            padding-left: 12px; margin-left: 2px;
+            border-left: 1px solid var(--line, #e2e8f0);
+        }
         .brand h1 {
             font-size: 1.06rem; font-weight: 700; letter-spacing: -.015em;
             line-height: 1.25; white-space: nowrap;
@@ -362,6 +368,9 @@
             <div class="topbar-in">
                 <div class="brand">
                     <img src="logo.png" alt="สถาบันรับรองคุณภาพสถานพยาบาล (องค์การมหาชน)" class="brand-mark">
+                    <!-- โลโก้แอปคู่กับโลโก้สถาบัน — ถ้าไฟล์หาย ซ่อนไปเงียบๆ ไม่ให้หัวเว็บพัง -->
+                    <img src="app-logo.png" alt="พร้อมเบิก" class="brand-mark app-mark"
+                         onerror="this.style.display='none'">
                     <div class="logo-text">
                         <h1>พร้อมเบิก</h1>
                         <p>Promberk · ระบบเบิกค่าใช้จ่ายการเดินทาง</p>

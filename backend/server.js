@@ -6,6 +6,7 @@ const cookieParser = require('cookie-parser');
 const path = require('path');
 const fs = require('fs');
 const { validateExpense } = require('./validation');
+const { mountMicrosoftAuth, MICROSOFT_LOGIN_ENABLED, NO_PASSWORD } = require('./microsoft-auth');
 
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'data', 'prompt-berk.db');
 const PORT = process.env.PORT || 3000;
@@ -189,7 +190,15 @@ app.use(cookieParser());
 
 // ── Auth endpoints (public) ───────────────────────────────
 
+// เข้าสู่ระบบด้วย Microsoft 365 — เพิ่ม /auth/config, /auth/microsoft, /auth/microsoft/callback
+// ถ้ายังไม่ได้ตั้งค่า MS_* จะเพิ่มแค่ /auth/config แล้วทุกอย่างทำงานเหมือนเดิม
+mountMicrosoftAuth(app, { db, createSession, sessionTtlHours: SESSION_TTL_HOURS });
+
 app.post('/auth/register', (req, res) => {
+  // เปิด M365 เมื่อไหร่ = ปิดการสมัครเอง ผู้ใช้ใหม่เกิดจากการล็อกอินด้วยบัญชีองค์กรเท่านั้น
+  if (MICROSOFT_LOGIN_ENABLED)
+    return res.status(403).json({ error: 'กรุณาเข้าสู่ระบบด้วยบัญชี Microsoft 365 ขององค์กร' });
+
   const { email, password } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'email and password are required' });
   if (password.length < 6) return res.status(400).json({ error: 'password must be at least 6 characters' });
@@ -214,8 +223,18 @@ app.post('/auth/login', (req, res) => {
   if (!email || !password) return res.status(400).json({ error: 'email and password are required' });
 
   const user = db.prepare('SELECT id, email, password_hash, role FROM users WHERE email = ?').get(email.toLowerCase());
+
+  // บัญชีที่เกิดจาก M365 ไม่มีรหัสผ่าน — กันไว้ก่อนถึง bcrypt
+  if (user && user.password_hash === NO_PASSWORD)
+    return res.status(403).json({ error: 'บัญชีนี้ใช้เข้าสู่ระบบด้วย Microsoft 365 เท่านั้น' });
+
   if (!user || !bcrypt.compareSync(password, user.password_hash))
     return res.status(401).json({ error: 'Invalid email or password' });
+
+  // เปิด M365 แล้ว รหัสผ่านเหลือไว้เป็นทางเข้าสำรองของผู้ดูแลระบบเท่านั้น
+  // (เผื่อ Entra ล่มหรือตั้งค่าผิด จะได้ไม่ถูกล็อกออกจากระบบตัวเอง)
+  if (MICROSOFT_LOGIN_ENABLED && user.role !== 'admin')
+    return res.status(403).json({ error: 'กรุณาเข้าสู่ระบบด้วยบัญชี Microsoft 365 ขององค์กร' });
 
   const token = createSession(user.id);
   res.cookie('session', token, { httpOnly: true, sameSite: 'lax', maxAge: SESSION_TTL_HOURS * 3600 * 1000 });
@@ -568,7 +587,9 @@ app.delete('/profiles/:id', requireAuth, (req, res) => {
 
 // ── Longdo Proxy ──────────────────────────────────────────
 
-const LONGDO_API_KEY = '5528d1b402a5fd11be6eec82fd167c4b';
+// กุญแจมาจากไฟล์ .env เท่านั้น — repo นี้เป็น public ห้ามเขียนความลับลงโค้ด
+const LONGDO_API_KEY = process.env.LONGDO_API_KEY || '';
+if (!LONGDO_API_KEY) console.warn('[longdo] ไม่พบ LONGDO_API_KEY ใน .env — ค้นหาสถานที่ผ่าน Longdo จะใช้ไม่ได้');
 
 // ── แคชผลค้นหาพิกัด ────────────────────────────────────────
 // ตำบล/อำเภอ/จังหวัดไม่ย้ายที่ ถามครั้งเดียวเก็บไว้ใช้ตลอด

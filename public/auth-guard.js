@@ -2,16 +2,26 @@ window.__currentUser = null;
 
 async function initAuthGuard({ adminOnly = false } = {}) {
   try {
-    const r = await fetch('/auth/me');
-    if (!r.ok) { window.location.replace('/prompt/login.html'); return; }
+    const token = localStorage.getItem('token');
+    if (!token) { window.location.replace('login.html'); return; }
+
+    const r = await fetch('/auth/me', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    if (!r.ok) {
+      localStorage.removeItem('token');
+      window.location.replace('login.html');
+      return;
+    }
     const user = await r.json();
     window.__currentUser = user;
-    if (adminOnly && user.role !== 'admin') { window.location.replace('/prompt'); return; }
+    if (adminOnly && user.role !== 'admin') { window.location.replace('index.html'); return; }
     _renderUserBar(user);
     _renderChangePasswordModal();
     return user;
   } catch (_) {
-    window.location.replace('/prompt/login.html');
+    localStorage.removeItem('token');
+    window.location.replace('login.html');
   }
 }
 
@@ -35,7 +45,11 @@ function _renderUserBar(user) {
   ">${roleLabels[user.role] || user.role}</span>`;
 
   bar.innerHTML = `
-    <span style="flex:1;font-weight:600;">Prompt-Berk</span>
+    <span style="flex:1;display:flex;align-items:center;gap:8px;font-weight:600;">
+      <img src="app-logo.png" alt="" style="height:24px;width:24px;object-fit:contain;border-radius:5px;background:#fff"
+           onerror="this.style.display='none'">
+      พร้อมเบิก
+    </span>
     <button onclick="openChangePasswordModal()" style="
       background:none;border:none;color:rgba(255,255,255,.85);
       cursor:pointer;font-size:13px;padding:4px 6px;border-radius:6px;
@@ -55,6 +69,36 @@ function _renderUserBar(user) {
   const style = document.createElement('style');
   style.textContent = 'body { padding-top: 40px !important; }';
   document.head.appendChild(style);
+
+  _showVersionBadge(bar);
+}
+
+/**
+ * ป้ายบอกว่ากำลังใช้ระบบไหน เวอร์ชันอะไร
+ * ค่ามาจาก version.json ที่ถูกสร้างตอน build image (ดู Dockerfile)
+ * มีไว้เพื่อตอบคำถาม "UAT กับ production ตรงกันหรือยัง" ได้ในวินาทีเดียว
+ * โหลดไม่ได้ก็ไม่เป็นไร ไม่ทำให้หน้าเว็บพัง
+ */
+function _showVersionBadge(bar) {
+  fetch('version.json', { cache: 'no-store' })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (v) {
+      if (!v) return;
+      var isProd = String(v.env).toUpperCase() === 'PROD';
+      var tag = document.createElement('span');
+      tag.id = 'app-version-badge';
+      tag.title = 'เวอร์ชัน ' + v.version + '\nระบบ ' + v.env + '\nสร้างเมื่อ ' + (v.builtAt || '-');
+      tag.style.cssText =
+        'font-size:11px;font-weight:700;letter-spacing:.02em;' +
+        'padding:2px 8px;border-radius:9px;white-space:nowrap;cursor:default;' +
+        (isProd
+          ? 'background:rgba(255,255,255,.16);color:#e8eaf6;border:1px solid rgba(255,255,255,.28);'
+          : 'background:#f59e0b;color:#3b2600;border:1px solid #d97706;');
+      tag.textContent = (isProd ? 'PROD' : 'UAT') + ' v' + v.version;
+      var logout = bar.querySelector('button[onclick="doLogout()"]');
+      bar.insertBefore(tag, logout || null);
+    })
+    .catch(function () { /* ไม่มี version.json ก็ไม่ต้องแสดงอะไร */ });
 }
 
 function _renderChangePasswordModal() {
@@ -169,6 +213,7 @@ async function submitChangePassword() {
 }
 
 async function doLogout() {
+  localStorage.removeItem('token');
   await fetch('/auth/logout', { method: 'POST' });
-  window.location.replace('/prompt/login.html');
+  window.location.replace('login.html');
 }

@@ -311,21 +311,64 @@
   <div class="card">
     <!-- Logo -->
     <div class="logo">
-      <div class="logo-icon">
+      <!-- โลโก้แอปจริง มีคำว่า "พร้อมเบิก" อยู่ในรูปแล้ว จึงซ่อนหัวข้อข้างล่างไม่ให้ซ้ำ
+           ถ้าไฟล์หาย ถอยไปใช้ไอคอนเดิม + หัวข้อตัวหนังสือ ไม่ทิ้งช่องว่าง -->
+      <img id="appLogo" src="app-logo.png" alt="พร้อมเบิก"
+           style="width:104px;height:104px;object-fit:contain;display:block;margin:0 auto 6px"
+           onload="document.getElementById('appTitle').style.display='none'"
+           onerror="this.style.display='none';document.getElementById('logoFallback').style.display='flex'">
+      <div class="logo-icon" id="logoFallback" style="display:none">
         <!-- Document + Dollar Icon (Invoice/Receipt) -->
         <svg fill="currentColor" viewBox="0 0 24 24">
           <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6zm5-1h2v-1.5h1c.55 0 1-.45 1-1v-3c0-.55-.45-1-1-1h-3v-1h4V10h-2V8.5h-2V10h-1c-.55 0-1 .45-1 1v3c0 .55.45 1 1 1h3v1H9v1.5h2V19z"/>
         </svg>
       </div>
-      <h1>พร้อมเบิก</h1>
+      <h1 id="appTitle">พร้อมเบิก</h1>
       <p>Promberk · ระบบเบิกค่าใช้จ่ายการเดินทาง</p>
-      <div class="version">v2.0.0</div>
+      <!-- เลขเวอร์ชันจริงมาจาก version.json ที่สร้างตอน build ไม่ใช่เลขที่พิมพ์ค้างไว้ -->
+      <div class="version" id="versionBadge">…</div>
     </div>
 
     <!-- Tabs -->
-    <div class="tabs">
+    <div class="tabs" id="authTabs">
       <div class="tab active" onclick="switchTab('login')">เข้าสู่ระบบ</div>
-      <div class="tab" onclick="switchTab('register')">สมัครสมาชิก</div>
+      <div class="tab" id="tabRegister" onclick="switchTab('register')">สมัครสมาชิก</div>
+    </div>
+
+    <!-- เข้าสู่ระบบด้วยบัญชีองค์กร — แสดงเมื่อตั้งค่า Microsoft 365 แล้วเท่านั้น -->
+    <div id="msLoginBox" style="display:none">
+      <div id="msAlert" class="alert"></div>
+      <button type="button" id="msLoginBtn" onclick="loginWithMicrosoft()"
+        style="width:100%;display:flex;align-items:center;justify-content:center;gap:10px;
+               padding:13px 16px;border:1.5px solid #d1d5db;border-radius:10px;background:#fff;
+               color:#1f2937;font-size:.95rem;font-weight:600;cursor:pointer;
+               font-family:inherit;transition:background .15s,border-color .15s"
+        onmouseover="this.style.background='#f9fafb';this.style.borderColor='#9ca3af'"
+        onmouseout="this.style.background='#fff';this.style.borderColor='#d1d5db'">
+        <svg width="18" height="18" viewBox="0 0 23 23" aria-hidden="true">
+          <rect x="1"  y="1"  width="10" height="10" fill="#f25022"/>
+          <rect x="12" y="1"  width="10" height="10" fill="#7fba00"/>
+          <rect x="1"  y="12" width="10" height="10" fill="#00a4ef"/>
+          <rect x="12" y="12" width="10" height="10" fill="#ffb900"/>
+        </svg>
+        เข้าสู่ระบบด้วย Microsoft 365
+      </button>
+      <p style="text-align:center;color:#6b7280;font-size:.8rem;margin:10px 0 0">
+        ใช้บัญชีอีเมลขององค์กร (@ha.or.th)<br>
+        <a href="#" onclick="loginWithMicrosoft(true);return false"
+           style="color:#2563eb;text-decoration:none;font-size:.78rem">เข้าด้วยบัญชีอื่น</a>
+      </p>
+      <!-- ทางเข้าสำรองของผู้ดูแลระบบ ซ่อนไว้จนกว่าจะกด -->
+      <div id="adminDoor" style="text-align:center;margin-top:22px">
+        <a href="#" onclick="showAdminLogin();return false"
+           style="color:#9ca3af;text-decoration:none;font-size:.75rem">ผู้ดูแลระบบเข้าสู่ระบบด้วยรหัสผ่าน</a>
+      </div>
+
+      <div id="msDivider" style="display:none;align-items:center;gap:12px;margin:20px 0 4px">
+        <span style="flex:1;height:1px;background:#e5e7eb"></span>
+        <span style="color:#9ca3af;font-size:.78rem">สำหรับผู้ดูแลระบบเท่านั้น</span>
+        <span style="flex:1;height:1px;background:#e5e7eb"></span>
+      </div>
     </div>
 
     <!-- Login Form -->
@@ -410,6 +453,109 @@
   </div>
 
   <script>
+    /* ── เข้าสู่ระบบด้วย Microsoft 365 ──────────────────────────────
+       ถามเซิร์ฟเวอร์ก่อนว่าเปิดใช้หรือยัง แล้วค่อยจัดหน้าให้ตรงกับความจริง
+       ยังไม่ตั้งค่า -> หน้านี้ทำงานเหมือนเดิมทุกอย่าง                      */
+    let __authCfg = { microsoftEnabled: false, passwordLoginFor: 'all', selfRegisterAllowed: true, canonicalOrigin: '' };
+
+    async function initAuthOptions() {
+      let cfg = __authCfg;
+      try {
+        const r = await fetch('/auth/config');
+        if (r.ok) { cfg = await r.json(); __authCfg = cfg; }
+      } catch (_) { /* ต่อเซิร์ฟเวอร์ไม่ได้ — ใช้ค่าเดิมไปก่อน */ }
+
+      // ลำดับสำคัญ: จัดการแท็บให้เสร็จก่อน เพราะ switchTab() จะใส่ active
+      // กลับเข้า formLogin ถ้าเรียกทีหลังจะไปลบล้างการซ่อนฟอร์มด้านล่าง
+      if (!cfg.selfRegisterAllowed) {
+        // ปิดสมัครเองแล้วเหลือแท็บเดียว — ซ่อนแถบแท็บทั้งแถบ
+        // ไม่งั้นแท็บที่เหลือจะยืดเต็มความกว้างจนดูเหมือนปุ่ม แล้วชนกับปุ่มจริงด้านล่าง
+        switchTab('login');
+        const tabs = document.getElementById('authTabs');
+        if (tabs) tabs.style.display = 'none';
+      }
+
+      if (cfg.microsoftEnabled) {
+        document.getElementById('msLoginBox').style.display = 'block';
+        // เข้าผ่าน Microsoft อย่างเดียว — ซ่อนช่องอีเมล/รหัสผ่านออกจากสายตา
+        // แต่ไม่ตัดทิ้ง เพราะถ้า Entra ล่มหรือ client secret หมดอายุ
+        // นี่คือทางเดียวที่จะเข้าระบบได้โดยไม่ต้อง SSH เข้าฐานข้อมูล
+        document.getElementById('formLogin').classList.remove('active');
+        document.getElementById('loginEmail').placeholder = 'อีเมลผู้ดูแลระบบ';
+      }
+
+      // กลับมาจาก Microsoft สำเร็จ: #ms=<token> -> เก็บลง localStorage แล้วเข้าระบบ
+      const m = /^#ms=(.+)$/.exec(location.hash || '');
+      if (m) {
+        try { localStorage.setItem('token', decodeURIComponent(m[1])); } catch (_) {}
+        history.replaceState(null, '', location.pathname);
+        location.replace('index.html');
+        return;
+      }
+
+      // กลับมาจาก Microsoft ไม่สำเร็จ: ?error=...
+      const err = new URLSearchParams(location.search).get('error');
+      if (err) {
+        const box = document.getElementById('msAlert') || document.getElementById('loginAlert');
+        box.textContent = err;
+        box.className = 'alert error';
+        box.style.display = 'block';
+      }
+    }
+
+    /** เปิดช่องอีเมล/รหัสผ่านสำหรับผู้ดูแลระบบ (ปกติซ่อนไว้) */
+    function showAdminLogin() {
+      document.getElementById('adminDoor').style.display = 'none';
+      document.getElementById('msDivider').style.display = 'flex';
+      document.getElementById('formLogin').classList.add('active');
+      document.getElementById('loginEmail').focus();
+    }
+
+    /** @param {boolean} pickAccount ให้ Microsoft ถามว่าจะใช้บัญชีไหน แทนที่จะเข้าด้วยบัญชีที่ค้างอยู่ */
+    function loginWithMicrosoft(pickAccount) {
+      // เข้ามาผิดโดเมน (เช่นเข้าด้วยเลข IP) -> พาไปโดเมนที่ถูกต้องก่อน
+      // ไม่งั้นคุกกี้ state จะไม่ถูกส่งกลับมาตอน Microsoft redirect และจะล็อกอินไม่ผ่าน
+      const want = __authCfg.canonicalOrigin;
+      if (want && want !== location.origin) {
+        location.href = want + '/login.html?switched=1';
+        return;
+      }
+      const btn = document.getElementById('msLoginBtn');
+      btn.disabled = true;
+      btn.style.opacity = '.6';
+      btn.textContent = 'กำลังพาไปหน้า Microsoft…';
+      // ต้องเป็นการเปลี่ยนหน้าจริง ไม่ใช่ fetch — Microsoft ต้องแสดงหน้าล็อกอินของเขาเอง
+      location.href = 'auth/microsoft' + (pickAccount ? '?prompt=select_account' : '');
+    }
+
+    /* ป้ายเวอร์ชัน — ค่าจริงมาจาก version.json ที่สร้างตอน build image
+       บอกได้ทันทีว่ากำลังเปิด UAT หรือระบบจริง และเวอร์ชันตรงกันไหม */
+    function showVersion() {
+      fetch('version.json', { cache: 'no-store' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (v) {
+          var el = document.getElementById('versionBadge');
+          if (!el) return;
+          if (!v) { el.style.display = 'none'; return; }
+          var isProd = String(v.env).toUpperCase() === 'PROD';
+          el.textContent = (isProd ? '' : 'UAT · ') + 'v' + v.version;
+          el.title = 'ระบบ ' + v.env + '  ·  สร้างเมื่อ ' + (v.builtAt || '-');
+          if (!isProd) {
+            el.style.background = '#fef3c7';
+            el.style.color = '#92400e';
+            el.style.border = '1px solid #fbbf24';
+          }
+        })
+        .catch(function () {
+          var el = document.getElementById('versionBadge');
+          if (el) el.style.display = 'none';
+        });
+    }
+
+    if (document.readyState === 'loading')
+      document.addEventListener('DOMContentLoaded', function () { initAuthOptions(); showVersion(); });
+    else { initAuthOptions(); showVersion(); }
+
     // Tab switching
     function switchTab(tab) {
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));

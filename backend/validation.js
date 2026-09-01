@@ -199,12 +199,21 @@ function validateExpense(expense, category, globalTaxiMax) {
         }
 
         // 5. Validate expense amounts require receipts
+        // ต้องฟังค่าที่แอดมินตั้งไว้ในหมวดหมู่ ไม่ใช่บังคับตายตัวจากโค้ด
+        // หมวดที่แอดมินไม่ได้ติ๊ก "บังคับแนบ" ไว้เลย ต้องบันทึกได้โดยไม่ต้องแนบไฟล์
+        // (รูปแบบเดียวกับวงเงิน Taxi ที่เคยฝังค่า 300 ไว้ในโค้ดจนไม่ฟังค่าแอดมิน)
+        const attachRules = (category && category.attachmentRules) || null;
+        const requiredAttach = attachRules
+            ? Object.keys(attachRules).filter(k => attachRules[k] && attachRules[k].required)
+            : (Array.isArray(category && category.requiredFields) ? category.requiredFields : []);
+        const adminRequiresAttachment = requiredAttach.length > 0;
+
         const airAmount = parseFloat(costs.airAmount) || 0;
         const tollAmount = parseFloat(costs.tollAmount) || 0;
         const totalHotelCost = hotelRate * hotelNights;
         const hasExpensesRequiringReceipt = totalHotelCost > 0 || airAmount > 0 || tollAmount > 0;
 
-        if (hasExpensesRequiringReceipt) {
+        if (hasExpensesRequiringReceipt && adminRequiresAttachment) {
             const hasAttachments = expense.attachments &&
                 expense.attachments.images &&
                 expense.attachments.images.length > 0;
@@ -227,8 +236,14 @@ function validateExpense(expense, category, globalTaxiMax) {
         }
 
         // 6. Validate carType matches distance (only if not using taxi)
+        // ระยะทางกับประเภทรถอยู่ในแบบ TRANSPORT_RECEIPT (FM-SAM-095-00) เท่านั้น
+        // ตรวจจากโค้ดสร้าง PDF แล้ว: REPORT (FM-SAM-001-04) ใช้แค่ วัน-เวลา · ที่พัก · ที่อยู่
+        // ไม่มีช่องระยะทางหรือประเภทรถบนกระดาษเลย
+        // ถ้าหมวดติ๊กแค่ REPORT ฟอร์มจะซ่อนช่องพวกนี้ (travelDetailsBox) แต่ยังส่งค่าปริยายมา
+        // บังคับตรวจจะทำให้บันทึกไม่ได้ และผู้ใช้หาช่องที่ต้องแก้ไม่เจอเพราะมันถูกซ่อนอยู่
+        const needDistance = templates.includes('TRANSPORT_RECEIPT');
         const usingTaxi = taxiEntries.length > 0;
-        if (!usingTaxi) {
+        if (needDistance && !usingTaxi) {
             const distOut = parseFloat(travel.distOut) || 0;
             const distRet = parseFloat(travel.distRet) || 0;
             const carType = meta._carType || 'ไม่ระบุ';

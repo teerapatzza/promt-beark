@@ -9,6 +9,7 @@ RUN npm install --omit=dev
 
 COPY server.js .
 COPY validation.js .
+COPY microsoft-auth.js .
 RUN mkdir -p /app/data
 
 EXPOSE 3000

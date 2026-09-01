@@ -2494,7 +2494,12 @@
                 tollAmount: document.getElementById('tollCost')?.value || 0,
                 otherAmount: document.getElementById('otherCost')?.value || 0
             };
-            metadata._carType = document.getElementById('carType')?.value || 'ไม่ระบุ';
+            // ประเภทรถอยู่ในใบรับรองค่าพาหนะเท่านั้น ถ้าหมวดนี้ไม่ได้ติ๊กใบนั้น
+            // ช่องจะถูกซ่อน แต่ยังค้างค่าเดิมไว้จากตอนเลือกหมวดอื่น
+            // ส่งค่าค้างไปจะกลายเป็นข้อมูลขยะในใบที่ไม่มีช่องนี้บนกระดาษ
+            metadata._carType = needReceipt
+                ? (document.getElementById('carType')?.value || 'ไม่ระบุ')
+                : 'ไม่ระบุ';
             metadata._extraAddr = document.getElementById('extraAddrLine')?.value.trim() || '';
             metadata._extraActivities = [...document.querySelectorAll('.extra-act-text')]
                 .map(i => i.value.trim()).filter(Boolean);
@@ -2588,7 +2593,13 @@
 
             const hasExpensesRequiringReceipt = totalHotelCost > 0 || airAmount > 0 || tollAmount > 0;
 
-            if (hasExpensesRequiringReceipt) {
+            // ต้องฟังค่าที่แอดมินตั้งในหมวดหมู่ ไม่ใช่บังคับตายตัว
+            // หมวดที่ไม่ได้ติ๊ก "บังคับแนบ" ไว้เลย ต้องบันทึกได้โดยไม่ต้องแนบไฟล์
+            // (ช่องที่ติ๊กบังคับไว้ยังถูกตรวจแยกอีกชั้นด้วย .required-file ด้านล่าง)
+            const attachRulesNow = getAttachmentRules(categories.find(c => c.id === document.getElementById('categorySelect').value));
+            const adminRequiresAttachment = Object.keys(attachRulesNow).some(id => attachRulesNow[id] && attachRulesNow[id].required);
+
+            if (hasExpensesRequiringReceipt && adminRequiresAttachment) {
                 const attachmentInputs = document.querySelectorAll('.general-file-upload');
                 let hasAttachments = false;
                 for (const input of attachmentInputs) {
