@@ -187,13 +187,20 @@
                     <div id="profileMap" class="w-full h-64 rounded-xl border border-slate-200 shadow-inner"></div>
                 </div>
 
-                <!-- Global Profile Option (Admin Only) -->
-                <div id="globalProfileOption" class="hidden bg-blue-50 p-4 rounded-xl border border-blue-200 mb-4">
+                <!-- แชร์โปรไฟล์ให้เพื่อนร่วมงาน — ทุกคนติ๊กได้ ไม่ใช่แค่ผู้ดูแลระบบ -->
+                <div id="globalProfileOption" class="bg-blue-50 p-4 rounded-xl border border-blue-200 mb-4">
                     <label class="flex items-start gap-3 cursor-pointer">
                         <input type="checkbox" id="pIsGlobal" class="w-5 h-5 rounded border-blue-300 text-blue-600 focus:ring-2 focus:ring-blue-400 mt-0.5">
                         <div class="flex-1">
-                            <div class="text-sm font-bold text-blue-900">🌐 โปรไฟล์สาธารณะ (Global Profile)</div>
-                            <p class="text-xs text-blue-700 mt-1">ทำให้ผู้ใช้ทุกคนสามารถเห็นและเลือกใช้โปรไฟล์นี้ได้ (เฉพาะ Admin เท่านั้น)</p>
+                            <div class="text-sm font-bold text-blue-900">ให้เพื่อนร่วมงานใช้โปรไฟล์นี้ได้ด้วย</div>
+                            <p class="text-xs text-blue-800 mt-1 leading-relaxed">
+                                ปกติโปรไฟล์ที่สร้างจะเห็นอยู่คนเดียว —
+                                ติ๊กช่องนี้ถ้าอยากให้คนอื่นในองค์กรค้นเจอและเลือกใช้ได้
+                                เช่น ทำเรื่องเบิกแทนผู้บริหาร หรือทำให้เพื่อนในทีม
+                            </p>
+                            <p class="text-xs text-blue-600 mt-1.5">
+                                เปลี่ยนใจภายหลังได้ — เปิดโปรไฟล์นี้มาแก้แล้วเอาติ๊กออก
+                            </p>
                         </div>
                     </label>
                 </div>
@@ -433,16 +440,18 @@
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                         </button>
                     </div>`;
-                // โปรไฟล์ส่วนกลาง: ทุกคนแก้ได้ แต่ "ลบ" สงวนไว้ให้ admin เพราะย้อนกลับไม่ได้
+                // ลบของตัวเองได้เสมอ แม้จะตั้งให้ใช้ร่วมกันไว้ (เผื่อติ๊กผิด)
+                // ที่ล็อกไว้คือทะเบียนกลางเก่าที่ไม่มีเจ้าของ — ไม่รู้ว่าใครสร้างและอาจมีคนใช้อยู่
                 const isAdmin = window.__currentUser && window.__currentUser.role === 'admin';
+                const isOrphanShared = p.isGlobal && (p.ownerUserId === null || p.ownerUserId === undefined);
                 const bEdit = div.querySelector('.btn-edit');
                 const bDel  = div.querySelector('.btn-del');
 
                 bEdit.onclick = () => editProfile(p);
 
-                if (p.isGlobal && !isAdmin) {
-                    const why = 'โปรไฟล์ส่วนกลาง — ลบได้เฉพาะผู้ดูแลระบบ\n' +
-                                '(แก้ไขได้ตามปกติ เพราะการลบย้อนกลับไม่ได้)';
+                if (isOrphanShared && !isAdmin) {
+                    const why = 'โปรไฟล์นี้เป็นทะเบียนกลางของระบบ ลบได้เฉพาะผู้ดูแลระบบ\n' +
+                                '(แก้ไขข้อมูลได้ตามปกติ)';
                     bDel.disabled = true;
                     bDel.title = why;
                     bDel.classList.add('opacity-30', 'cursor-not-allowed');
@@ -505,11 +514,11 @@
             return !!(window.__currentUser && window.__currentUser.role === 'admin');
         }
 
-        /** เปิดกล่องติ๊ก "โปรไฟล์ส่วนกลาง" ให้เห็นเฉพาะผู้ดูแลระบบ
-         *  เดิมกล่องนี้ hidden ค้างไว้ตลอด ไม่มีโค้ดไหนเอาออก จึงไม่มีใครสร้างโปรไฟล์ส่วนกลางได้เลย */
+        /** กล่อง "ให้เพื่อนร่วมงานใช้ด้วย" แสดงให้ทุกคน
+         *  เดิม hidden ค้างไว้ตลอดและไม่มีโค้ดไหนเอาออก จึงไม่มีใครใช้ฟีเจอร์นี้ได้เลย */
         function setupGlobalProfileOption() {
             const box = document.getElementById('globalProfileOption');
-            if (box && isCurrentUserAdmin()) box.classList.remove('hidden');
+            if (box) box.classList.remove('hidden');
         }
 
         async function saveProfile() {
@@ -535,12 +544,8 @@
                 geo: { lat: pos.lat, lng: pos.lng, precision: geoPrecision, source: geoSource },
                 schemaVersion: 2
             };
-            // โปรไฟล์ส่วนกลาง: เฉพาะผู้ดูแลระบบเท่านั้นที่ตั้งได้ (backend ตรวจซ้ำอีกชั้น)
-            // เดิมกล่องติ๊กมีอยู่ใน HTML แต่ไม่มีใครอ่านค่า และไม่เคยถูกแสดงด้วย
-            // ทำให้สร้างโปรไฟล์ส่วนกลางผ่านหน้าเว็บไม่ได้เลย
-            if (isCurrentUserAdmin()) {
-                profileData.isGlobal = !!document.getElementById('pIsGlobal')?.checked;
-            }
+            // ทุกคนตั้งให้ใช้ร่วมกันได้ ไม่ใช่แค่ผู้ดูแลระบบ
+            profileData.isGlobal = !!document.getElementById('pIsGlobal')?.checked;
             try {
                 const method = editingId ? 'PUT' : 'POST';
                 const url    = editingId ? `/profiles/${editingId}` : '/profiles';
@@ -567,13 +572,14 @@
             const role = me ? me.role : '?';
 
             if (res.status === 403) {
-                if (/global/i.test(serverMsg)) {
-                    return `${action}ไม่ได้ — โปรไฟล์นี้เป็น "โปรไฟล์ส่วนกลาง"\n\n` +
-                           `เหตุผล: โปรไฟล์ส่วนกลางใช้ร่วมกันทั้งองค์กร จึงแก้ไข/ลบได้เฉพาะผู้ดูแลระบบ (admin)\n` +
+                if (/global|กลาง/i.test(serverMsg)) {
+                    return `${action}ไม่ได้ — โปรไฟล์นี้เป็นทะเบียนกลางของระบบ\n\n` +
+                           `เป็นรายชื่อที่นำเข้าระบบไว้ตั้งแต่ต้น ไม่มีผู้สร้างที่ระบุได้ และอาจมีคนอื่นใช้อยู่\n` +
+                           `จึงลบได้เฉพาะผู้ดูแลระบบ — แต่แก้ไขข้อมูลได้ตามปกติ\n\n` +
                            `บัญชีของคุณ: ${me ? me.email : '-'} (สิทธิ์: ${role})\n\n` +
                            `ทางแก้:\n` +
-                           `• ขอให้ผู้ดูแลระบบแก้ให้\n` +
-                           `• หรือกด "เพิ่มโปรไฟล์ใหม่" เพื่อสร้างโปรไฟล์ส่วนตัวที่คุณแก้เองได้`;
+                           `• แก้ไขข้อมูลในโปรไฟล์นี้ได้เลย ไม่ต้องลบ\n` +
+                           `• หรือกด "เพิ่มโปรไฟล์ใหม่" สร้างของตัวเองที่ลบเองได้`;
                 }
                 if (/approver/i.test(serverMsg)) {
                     return `${action}ไม่ได้ — บัญชีสิทธิ์ "ผู้อนุมัติ" แก้ไขโปรไฟล์ไม่ได้\n\n` +

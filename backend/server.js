@@ -538,18 +538,22 @@ app.post('/profiles', requireAuth, (req, res) => {
   const p = req.body;
   if (!p.profileName || !p.fullName) return res.status(400).json({ error: 'profileName and fullName are required' });
 
-  // admin can create global profiles (isGlobal: true), others own only
+  // ใครก็ตั้งเป็นโปรไฟล์ที่ใช้ร่วมกันได้ ไม่ใช่แค่ผู้ดูแลระบบ
+  // เหตุผลเดียวกับรายการตำแหน่ง/สังกัด: ไม่มีใครรู้ทุกชื่อตั้งแต่วันแรก
+  // ถ้าล็อกไว้ที่แอดมินคนเดียว งานจะติดคอขวดโดยไม่จำเป็น
+  //
+  // เก็บ owner ไว้เสมอแม้เป็นโปรไฟล์ร่วม (ต่างจากเดิมที่ตั้ง null)
+  // เพื่อให้คนที่สร้างลบของตัวเองได้ ถ้าติ๊กผิดจะได้ไม่ต้องรอแอดมิน
+  // ส่วนรายการเก่าที่ owner เป็น null ยังคงลบได้เฉพาะแอดมินเหมือนเดิม
   const ownerUserId = req.user.id;
-  const isGlobal = req.user.role === 'admin' && p.isGlobal === true ? 1 : 0;
+  const isGlobal = p.isGlobal === true ? 1 : 0;
 
   const result = db.prepare('INSERT INTO profiles (data, owner_user_id, is_global) VALUES (?, ?, ?)').run(
-    JSON.stringify(p),
-    isGlobal === 1 ? null : ownerUserId,
-    isGlobal
+    JSON.stringify(p), ownerUserId, isGlobal
   );
 
   p.id = result.lastInsertRowid;
-  p.ownerUserId = isGlobal === 1 ? null : ownerUserId;
+  p.ownerUserId = ownerUserId;
   p.isGlobal = isGlobal === 1;
   res.status(201).json(p);
 });
@@ -574,14 +578,11 @@ app.put('/profiles/:id', requireAuth, (req, res) => {
   p.lastEditedBy = req.user.email;
   p.lastEditedAt = new Date().toISOString();
 
-  // ผู้ดูแลระบบสลับโปรไฟล์ส่วนตัว <-> ส่วนกลางได้ คนอื่นเปลี่ยนไม่ได้
-  // ส่วนกลาง = ไม่มีเจ้าของ ทุกคนเห็น · ส่วนตัว = คืนเจ้าของเดิม (ถ้าไม่มีให้เป็นคนที่กดแก้)
+  // สลับ "ใช้ร่วมกัน" <-> "ส่วนตัว" ได้ ใครที่แก้โปรไฟล์นี้ได้ก็สลับได้
+  // (สิทธิ์แก้ถูกตรวจไปแล้วด้านบน) เก็บเจ้าของเดิมไว้เสมอเพื่อให้ยังลบของตัวเองได้
   let nextGlobal = exists.is_global;
-  let nextOwner  = exists.owner_user_id;
-  if (req.user.role === 'admin' && typeof p.isGlobal === 'boolean') {
-    nextGlobal = p.isGlobal ? 1 : 0;
-    nextOwner  = p.isGlobal ? null : (exists.owner_user_id ?? req.user.id);
-  }
+  const nextOwner = exists.owner_user_id;
+  if (typeof p.isGlobal === 'boolean') nextGlobal = p.isGlobal ? 1 : 0;
 
   db.prepare("UPDATE profiles SET data = ?, is_global = ?, owner_user_id = ?, updated_at = datetime('now') WHERE id = ?")
     .run(JSON.stringify(p), nextGlobal, nextOwner, id);
@@ -597,12 +598,13 @@ app.delete('/profiles/:id', requireAuth, (req, res) => {
   const exists = db.prepare('SELECT id, owner_user_id, is_global FROM profiles WHERE id = ?').get(id);
   if (!exists) return res.status(404).json({ error: 'Profile not found' });
 
-  // Global profiles can only be deleted by admin
-  if (exists.is_global === 1 && req.user.role !== 'admin')
-    return res.status(403).json({ error: 'Only admin can delete global profiles' });
-  // User profiles can only be deleted by owner or admin
-  if (exists.owner_user_id !== null && req.user.role !== 'admin' && exists.owner_user_id !== req.user.id)
-    return res.status(403).json({ error: 'Forbidden' });
+  // ลบได้เมื่อเป็นเจ้าของ หรือเป็นผู้ดูแลระบบ
+  // โปรไฟล์ที่ใช้ร่วมกันซึ่งไม่มีเจ้าของ (ทะเบียนเก่าที่ย้ายเข้าระบบ) สงวนให้แอดมิน
+  // เพราะไม่รู้ว่าใครสร้าง และคนอื่นอาจกำลังใช้อยู่
+  if (exists.owner_user_id === null && req.user.role !== 'admin')
+    return res.status(403).json({ error: 'โปรไฟล์กลางของระบบ ลบได้เฉพาะผู้ดูแลระบบ' });
+  if (req.user.role !== 'admin' && exists.owner_user_id !== req.user.id)
+    return res.status(403).json({ error: 'ลบได้เฉพาะโปรไฟล์ที่ตัวเองสร้าง' });
 
   db.prepare('DELETE FROM profiles WHERE id = ?').run(id);
   res.json({ ok: true });
