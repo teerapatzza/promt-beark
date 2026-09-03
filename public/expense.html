@@ -3045,7 +3045,14 @@
             document.getElementById('fuelRate').value  = c.fuelRate       || 4;
 
             // Load accommodation entries
-            const hotelData = c.hotelEntries || {};
+            // ใบเก่าเก็บที่พักเป็น c.hotel = {rate, nights} ใบใหม่เป็น c.hotelEntries
+            // ถ้าไม่ถอยไปอ่านของเก่า เปิดใบเก่ามาแก้แล้วกดบันทึก ค่าที่พักจะหายเงียบๆ
+            // และยอดเบิกจะลดลงโดยไม่มีอะไรเตือน
+            const hotelData = (c.hotelEntries && Array.isArray(c.hotelEntries.entries) && c.hotelEntries.entries.length)
+                ? c.hotelEntries
+                : (c.hotel && (c.hotel.rate || c.hotel.nights)
+                    ? { name: c.hotel.name || '', entries: [{ type: c.hotel.type || 'พักเดี่ยว', rate: c.hotel.rate, nights: c.hotel.nights }] }
+                    : (c.hotelEntries || {}));
             document.getElementById('hotelName').value = hotelData.name || '';
 
             const accommodationContainer = document.getElementById('accommodationEntriesContainer');
@@ -3069,8 +3076,16 @@
             // Taxi entries
             const taxiList = document.getElementById('taxiEntriesList');
             taxiList.innerHTML = '';
-            if (Array.isArray(c.taxiEntries)) {
-                for (const entry of c.taxiEntries) {
+            // ใบเก่าเก็บ Taxi เป็น taxiOutAmt/taxiRetAmt ก้อนเดียว ใบใหม่เป็น taxiEntries[]
+            // แปลงของเก่าให้เป็นรายการเดียวเพื่อไม่ให้ยอดหายตอนเปิดมาแก้
+            const taxiSrc = (Array.isArray(c.taxiEntries) && c.taxiEntries.length)
+                ? c.taxiEntries
+                : ((parseFloat(c.taxiOutAmt || 0) || parseFloat(c.taxiRetAmt || 0))
+                    ? [{ date: (meta._travel || {}).startDate || '', direction: 'ไป-กลับ',
+                         amountOut: c.taxiOutAmt || 0, amountRet: c.taxiRetAmt || 0 }]
+                    : []);
+            if (Array.isArray(taxiSrc)) {
+                for (const entry of taxiSrc) {
                     addTaxiEntry();
                     const row = taxiList.lastElementChild;
                     row.querySelector('.taxi-date').value = entry.date || '';
