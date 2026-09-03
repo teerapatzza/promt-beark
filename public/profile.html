@@ -467,6 +467,8 @@
             applyAddressToDropdowns(p);
             checkAddressSplit();
             if (p.lat && p.lng) { const ll = L.latLng(p.lat, p.lng); marker.setLatLng(ll); map.flyTo(ll, 15); }
+            const gchk = document.getElementById('pIsGlobal');
+            if (gchk) gchk.checked = !!p.isGlobal;
             document.getElementById('formTitle').textContent = 'แก้ไขโปรไฟล์';
             document.getElementById('formIconBg').className  = 'w-7 h-7 bg-amber-500 rounded-lg flex items-center justify-center';
             document.getElementById('formIcon').setAttribute('d', 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z');
@@ -486,6 +488,8 @@
             if (addrChoices.prov) { addrChoices.prov.setChoiceByValue(''); }
             document.getElementById('pAddrProv').value = '';
             onProvinceChange();
+            const gchk2 = document.getElementById('pIsGlobal');
+            if (gchk2) gchk2.checked = false;   // checkbox ไม่ถูกล้างโดยลูป input[type=text] ด้านบน
             geoPrecision = 'manual'; geoSource = 'none';
             document.getElementById('formTitle').textContent = 'เพิ่มโปรไฟล์ใหม่';
             document.getElementById('formIconBg').className  = 'w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center';
@@ -494,6 +498,18 @@
             document.getElementById('saveBtn').className = 'flex-1 bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 active:scale-[0.99] transition-all flex items-center justify-center gap-2 shadow-sm';
             document.getElementById('cancelBtn').classList.add('hidden');
             renderProfiles();
+        }
+
+        /** ผู้ใช้ปัจจุบันเป็นผู้ดูแลระบบไหม (auth-guard เก็บไว้ให้ที่ window.__currentUser) */
+        function isCurrentUserAdmin() {
+            return !!(window.__currentUser && window.__currentUser.role === 'admin');
+        }
+
+        /** เปิดกล่องติ๊ก "โปรไฟล์ส่วนกลาง" ให้เห็นเฉพาะผู้ดูแลระบบ
+         *  เดิมกล่องนี้ hidden ค้างไว้ตลอด ไม่มีโค้ดไหนเอาออก จึงไม่มีใครสร้างโปรไฟล์ส่วนกลางได้เลย */
+        function setupGlobalProfileOption() {
+            const box = document.getElementById('globalProfileOption');
+            if (box && isCurrentUserAdmin()) box.classList.remove('hidden');
         }
 
         async function saveProfile() {
@@ -519,6 +535,12 @@
                 geo: { lat: pos.lat, lng: pos.lng, precision: geoPrecision, source: geoSource },
                 schemaVersion: 2
             };
+            // โปรไฟล์ส่วนกลาง: เฉพาะผู้ดูแลระบบเท่านั้นที่ตั้งได้ (backend ตรวจซ้ำอีกชั้น)
+            // เดิมกล่องติ๊กมีอยู่ใน HTML แต่ไม่มีใครอ่านค่า และไม่เคยถูกแสดงด้วย
+            // ทำให้สร้างโปรไฟล์ส่วนกลางผ่านหน้าเว็บไม่ได้เลย
+            if (isCurrentUserAdmin()) {
+                profileData.isGlobal = !!document.getElementById('pIsGlobal')?.checked;
+            }
             try {
                 const method = editingId ? 'PUT' : 'POST';
                 const url    = editingId ? `/profiles/${editingId}` : '/profiles';
@@ -971,7 +993,7 @@
         // รอให้ยืนยันตัวตนเสร็จก่อน แล้วค่อยวาดรายชื่อ
         // เพราะการล็อกปุ่มแก้ไข/ลบ ต้องรู้ว่าผู้ใช้เป็น admin หรือไม่
         initAuthGuard()
-            .then(() => renderProfiles())
+            .then(() => { setupGlobalProfileOption(); renderProfiles(); })
             .catch(() => { /* auth-guard พาไปหน้า login เองแล้ว */ });
     </script>
 </body>

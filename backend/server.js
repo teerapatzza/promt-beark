@@ -574,10 +574,20 @@ app.put('/profiles/:id', requireAuth, (req, res) => {
   p.lastEditedBy = req.user.email;
   p.lastEditedAt = new Date().toISOString();
 
-  db.prepare("UPDATE profiles SET data = ?, updated_at = datetime('now') WHERE id = ?").run(JSON.stringify(p), id);
+  // ผู้ดูแลระบบสลับโปรไฟล์ส่วนตัว <-> ส่วนกลางได้ คนอื่นเปลี่ยนไม่ได้
+  // ส่วนกลาง = ไม่มีเจ้าของ ทุกคนเห็น · ส่วนตัว = คืนเจ้าของเดิม (ถ้าไม่มีให้เป็นคนที่กดแก้)
+  let nextGlobal = exists.is_global;
+  let nextOwner  = exists.owner_user_id;
+  if (req.user.role === 'admin' && typeof p.isGlobal === 'boolean') {
+    nextGlobal = p.isGlobal ? 1 : 0;
+    nextOwner  = p.isGlobal ? null : (exists.owner_user_id ?? req.user.id);
+  }
+
+  db.prepare("UPDATE profiles SET data = ?, is_global = ?, owner_user_id = ?, updated_at = datetime('now') WHERE id = ?")
+    .run(JSON.stringify(p), nextGlobal, nextOwner, id);
   p.id = id;
-  p.ownerUserId = exists.owner_user_id;
-  p.isGlobal = exists.is_global === 1;
+  p.ownerUserId = nextOwner;
+  p.isGlobal = nextGlobal === 1;
   res.json(p);
 });
 
