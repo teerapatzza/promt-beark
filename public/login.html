@@ -513,19 +513,25 @@
 
     /** @param {boolean} pickAccount ให้ Microsoft ถามว่าจะใช้บัญชีไหน แทนที่จะเข้าด้วยบัญชีที่ค้างอยู่ */
     function loginWithMicrosoft(pickAccount) {
-      // เข้ามาผิดโดเมน (เช่นเข้าด้วยเลข IP) -> พาไปโดเมนที่ถูกต้องก่อน
-      // ไม่งั้นคุกกี้ state จะไม่ถูกส่งกลับมาตอน Microsoft redirect และจะล็อกอินไม่ผ่าน
-      const want = __authCfg.canonicalOrigin;
-      if (want && want !== location.origin) {
-        location.href = want + '/login.html?switched=1';
-        return;
-      }
       const btn = document.getElementById('msLoginBtn');
       btn.disabled = true;
       btn.style.opacity = '.6';
       btn.textContent = 'กำลังพาไปหน้า Microsoft…';
+
+      const qs = pickAccount ? '?prompt=select_account' : '';
+
+      // ต้องเริ่มขั้นตอนที่โดเมนหลักเสมอ ไม่งั้นคุกกี้ state จะไม่ถูกส่งกลับมา
+      // ตอน Microsoft redirect กลับ แล้วจะล็อกอินไม่ผ่าน
+      //
+      // เข้ามาผิดโดเมน (เช่นเข้าด้วยเลข IP) ก็ให้ข้ามไปเริ่มที่โดเมนหลักเลย
+      // เดิมส่งกลับไปหน้า login เฉย ๆ ซึ่งหน้าตาเหมือนกันทุกอย่าง
+      // ผู้ใช้เลยเห็นเป็น "กดแล้วเด้งกลับที่เดิม" และต้องกดซ้ำโดยไม่รู้ตัว
+      const want = __authCfg && __authCfg.canonicalOrigin;
+      const base = (want && want !== location.origin) ? want : '';
+
       // ต้องเป็นการเปลี่ยนหน้าจริง ไม่ใช่ fetch — Microsoft ต้องแสดงหน้าล็อกอินของเขาเอง
-      location.href = 'auth/microsoft' + (pickAccount ? '?prompt=select_account' : '');
+      location.href = base ? (base + '/auth/microsoft' + qs)
+                           : ('auth/microsoft' + qs);
     }
 
     /* ป้ายเวอร์ชัน — ค่าจริงมาจาก version.json ที่สร้างตอน build image
