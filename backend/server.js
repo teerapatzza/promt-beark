@@ -163,13 +163,33 @@ function getSessionUser(token) {
   return row || null;
 }
 
-function readToken(req) {
+/**
+ * หลักฐานยืนยันตัวตนที่ผู้ใช้ส่งมา เรียงตามลำดับที่ควรเชื่อ
+ *
+ * Bearer มาก่อนคุกกี้ — token ใน header คือของที่หน้าเว็บเพิ่งได้จากการล็อกอิน
+ * ส่วนคุกกี้เป็นของที่ค้างอยู่ในเบราว์เซอร์เอง อาจเป็นเซสชันเก่าที่ถูกลบไปแล้ว
+ *
+ * เดิมให้คุกกี้ชนะ ผลคือใครที่มีคุกกี้ค้างจะล็อกอินใหม่ไม่ผ่านเลย
+ * เข้า 365 สำเร็จ ได้ token ใหม่มาแล้ว แต่ backend ไปหยิบคุกกี้เก่ามาตรวจ
+ * แล้วตอบ 401 หน้าเว็บจึงขึ้น "เซสชันหมดอายุ" แล้วเด้งกลับหน้าล็อกอิน
+ * ติดวนอยู่อย่างนั้นจนกว่าผู้ใช้จะล้างคุกกี้เอง ซึ่งไม่มีทางเดาได้
+ */
+function authCandidates(req) {
   const bearer = /^Bearer\s+(.+)$/i.exec(req.headers.authorization || '');
-  return req.cookies?.session || (bearer ? bearer[1].trim() : null);
+  return [bearer ? bearer[1].trim() : null, req.cookies?.session || null].filter(Boolean);
+}
+
+function readToken(req) {
+  return authCandidates(req)[0] || null;
 }
 
 function requireAuth(req, res, next) {
-  const user = getSessionUser(readToken(req));
+  // ลองทีละใบจนกว่าจะเจอใบที่ใช้ได้จริง ใบที่หมดอายุไม่ควรบังใบที่ยังดี
+  let user = null;
+  for (const token of authCandidates(req)) {
+    user = getSessionUser(token);
+    if (user) { req.authToken = token; break; }
+  }
   if (!user) return res.status(401).json({ error: 'Unauthorized' });
   req.user = user;
   next();
@@ -242,8 +262,10 @@ app.post('/auth/login', (req, res) => {
 });
 
 app.post('/auth/logout', (req, res) => {
-  const token = readToken(req);
-  if (token) db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
+  // ลบทุกใบที่เบราว์เซอร์ถืออยู่ ทั้งใน header และในคุกกี้
+  // ถ้าลบแค่ใบเดียว อีกใบจะค้างในฐานข้อมูลและยังใช้เข้าระบบได้
+  const del = db.prepare('DELETE FROM sessions WHERE token = ?');
+  for (const token of authCandidates(req)) del.run(token);
   res.clearCookie('session');
   res.json({ ok: true });
 });
@@ -265,7 +287,8 @@ app.put('/auth/change-password', requireAuth, (req, res) => {
   db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, req.user.id);
 
   // Invalidate all other sessions
-  db.prepare('DELETE FROM sessions WHERE user_id = ? AND token IS NOT ?').run(req.user.id, readToken(req));
+  // เก็บใบที่ใช้เข้ามาครั้งนี้ไว้ใบเดียว (req.authToken คือใบที่ผ่านการตรวจจริง)
+  db.prepare('DELETE FROM sessions WHERE user_id = ? AND token IS NOT ?').run(req.user.id, req.authToken);
   res.json({ ok: true });
 });
 
