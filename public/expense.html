@@ -196,8 +196,10 @@
                             class="hidden text-xs font-bold text-slate-400 hover:text-blue-600 underline">
                         กลับเป็นวันนี้
                     </button>
-                    <span class="text-xs text-slate-400 w-full sm:w-auto">
-                        วันที่นี้จะพิมพ์ลงทุกใบ ทั้งมุมบนและช่องวันที่ลงนาม — แก้เมื่อทำย้อนหลังหรือลงล่วงหน้า
+                    <!-- บอกตรง ๆ ว่าวันที่นี้ไปโผล่ตรงไหนของใบไหน เปลี่ยนตามหมวดที่เลือก
+                         เพราะพอออกสองใบพร้อมกันแล้วมีวันที่สามชุด ต้องรู้ว่าอันไหนคุมอะไร -->
+                    <span id="docDateWhere" class="text-xs text-slate-400 w-full">
+                        เลือกหมวดการเบิกก่อน แล้วระบบจะบอกว่าวันที่นี้จะไปพิมพ์ตรงไหนบ้าง
                     </span>
                 </div>
             </div>
@@ -1546,6 +1548,27 @@
         syncPeriodFromTrip();
     }
 
+    /** บอกว่าวันที่บนเอกสารจะไปพิมพ์ตรงไหนของใบไหนบ้าง ตามหมวดที่เลือกอยู่
+        เขียนไว้เพราะพอออกสองใบพร้อมกันจะมีวันที่สามชุดในฟอร์มเดียว
+        ถ้าไม่บอก ผู้ใช้จะเดาไม่ออกว่าช่องไหนคุมอะไร */
+    function describeDocDate(hasReport, hasReceipt, hasGeneral) {
+        const el = document.getElementById('docDateWhere');
+        if (!el) return;
+        const spots = [];
+        if (hasReport)  spots.push('ใบรายงานการเดินทาง: มุมบนขวา และวันที่ลงนาม');
+        if (hasReceipt) spots.push('ใบรับรองค่าพาหนะ: ช่อง “วัน เดือน ปี” และวันที่ลงนาม');
+        if (hasGeneral) spots.push('ใบสำคัญรับเงิน: วันที่บนใบและวันที่ลงนาม');
+
+        if (!spots.length) {
+            el.textContent = 'เลือกหมวดการเบิกก่อน แล้วระบบจะบอกว่าวันที่นี้จะไปพิมพ์ตรงไหนบ้าง';
+            return;
+        }
+        el.innerHTML = 'วันที่นี้จะพิมพ์ลงที่ &nbsp;·&nbsp; ' + spots.join(' &nbsp;·&nbsp; ') +
+            (hasReport
+                ? '<br><span class="text-slate-500">ส่วนช่วงวันเดินทางที่พิมพ์บนใบรายงาน ตั้งได้ที่ “ในระหว่างวันที่” ในกล่องกำหนดการเดินทาง</span>'
+                : '');
+    }
+
     function paintPeriodState() {
         const auto  = document.getElementById('periodAuto');
         const reset = document.getElementById('periodReset');
@@ -2181,6 +2204,7 @@
         // หมวดที่ออกแค่ใบรายงานจึงไม่ควรมีแผนที่ให้ปักหมุด ขอแค่ชื่อโรงแรมกับวันที่พัก
         show('travelDetailsBox', hasReceipt);            // แผนที่ · ระยะทาง · ประเภทรถ
         show('extraEntriesBox',  hasReceipt);            // กิจกรรมเพิ่มเติม
+        describeDocDate(hasReport, hasReceipt, hasGeneral);
         show('travelCostBox',    hasTravel);             // กล่องรวมค่าใช้จ่าย
         show('costHotelBox',     hasReport);             // ค่าที่พัก
         show('costAirBox',       hasReport);             // ค่าตั๋วเครื่องบิน
