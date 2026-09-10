@@ -184,6 +184,22 @@
             <div class="p-6">
                 <input type="text" id="activityName" placeholder="ระบุชื่อกิจกรรม (จะแสดงเฉพาะในใบรับรองแทนใบเสร็จฯ)" class="w-full border-2 border-slate-200 p-3.5 rounded-xl text-lg focus:border-blue-500 outline-none transition-all" oninput="syncActivityFromMainToExtra()">
                 <p class="text-xs text-slate-500 mt-2"><svg class="inline w-3.5 h-3.5 -mt-0.5 flex-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2Z"/></svg> หากไม่ระบุ ระบบจะเว้นว่างไว้ในเอกสาร PDF <span class="text-blue-600">🔄 ข้อมูลจะ sync กับกิจกรรมด้านล่างอัตโนมัติ</span></p>
+
+                <!-- วันที่ที่พิมพ์ลงเอกสาร — เดิมใช้วันที่กดบันทึกเสมอ แก้ไม่ได้
+                     ทำย้อนหลังหรือลงล่วงหน้าจึงได้วันผิด เติมวันนี้ให้ไว้ ปกติไม่ต้องแตะ -->
+                <div class="mt-5 pt-4 border-t border-slate-100 flex flex-wrap items-center gap-3">
+                    <label for="docDate" class="text-sm font-bold text-slate-600">วันที่บนเอกสาร</label>
+                    <input type="date" id="docDate" onchange="onDocDateChange()"
+                           class="border-2 border-slate-200 px-3 py-2 rounded-xl text-base focus:border-blue-500 outline-none transition-all">
+                    <span id="docDateThai" class="text-sm font-semibold text-blue-700"></span>
+                    <button type="button" id="docDateReset" onclick="resetDocDate()"
+                            class="hidden text-xs font-bold text-slate-400 hover:text-blue-600 underline">
+                        กลับเป็นวันนี้
+                    </button>
+                    <span class="text-xs text-slate-400 w-full sm:w-auto">
+                        วันที่นี้จะพิมพ์ลงทุกใบ ทั้งมุมบนและช่องวันที่ลงนาม — แก้เมื่อทำย้อนหลังหรือลงล่วงหน้า
+                    </span>
+                </div>
             </div>
         </div>
 
@@ -341,6 +357,26 @@
                                 <p id="dateWarn" class="hidden text-xs text-rose-600 font-semibold mt-1.5"></p>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- ช่อง "ในระหว่างวันที่" บนใบรายงาน — ปกติตามวันออกเดินทาง-กลับถึงข้างบน
+                         แต่บางกรณีช่วงที่เขียนในรายงานไม่ตรงกับวันเดินทางจริง จึงเปิดให้แก้แยกได้
+                         ตามค่าข้างบนอัตโนมัติจนกว่าจะแตะ แตะแล้วหยุดตาม กดปุ่มให้กลับมาตามได้ -->
+                    <div class="mt-4 pt-4 border-t border-slate-100">
+                        <div class="flex flex-wrap items-center gap-2.5">
+                            <label class="text-sm font-bold text-slate-600">ในระหว่างวันที่</label>
+                            <input type="date" id="periodStart" onchange="onPeriodEdited()" class="fld">
+                            <span class="text-slate-400 font-bold">–</span>
+                            <input type="date" id="periodEnd" onchange="onPeriodEdited()" class="fld">
+                            <span id="periodAuto" class="text-xs font-semibold text-emerald-600">ตามวันเดินทางด้านบน</span>
+                            <button type="button" id="periodReset" onclick="resetPeriod()"
+                                    class="hidden text-xs font-bold text-slate-400 hover:text-blue-600 underline">
+                                กลับไปตามวันเดินทาง
+                            </button>
+                        </div>
+                        <p class="text-xs text-slate-400 mt-1.5">
+                            คือช่วงวันที่ที่พิมพ์บนใบรายงาน แก้เมื่อช่วงในรายงานไม่ตรงกับวันเดินทางจริง
+                        </p>
                     </div>
                 </div>
 
@@ -1444,11 +1480,86 @@
         // ไฮไลต์ปุ่มลัดที่ตรงกับช่วงวันที่เลือกอยู่
         document.querySelectorAll('#quickDays .chip').forEach((c, i) =>
             c.classList.toggle('is-on', i === days));
+
+        syncPeriodFromTrip();
+    }
+
+    /* ══════════ วันที่บนเอกสาร และช่วงวันที่บนใบรายงาน ══════════
+       ทั้งสองช่องเติมให้อัตโนมัติ ผู้ใช้ปกติไม่ต้องแตะเลย
+       เปิดให้แก้เพราะบางครั้งทำเรื่องย้อนหลังหรือลงล่วงหน้า
+       และช่วงวันที่ในรายงานอาจไม่ตรงกับวันเดินทางจริง               */
+
+    /** ผู้ใช้แก้ช่วงวันที่เองแล้วหรือยัง — ถ้าแก้แล้วจะเลิกตามวันเดินทาง */
+    let periodTouched = false;
+
+    function todayISO() {
+        const d = new Date();
+        return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    }
+
+    const TH_MONTH_FULL = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
+                           'กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+
+    /** ช่องวันที่ของเบราว์เซอร์แสดงตามภาษาเครื่อง บางเครื่องขึ้น 09/10/2026
+        ซึ่งอ่านไม่ออกว่าวันหรือเดือนมาก่อน จึงเขียนวันที่ไทยกำกับไว้ */
+    function thaiDateText(iso) {
+        if (!iso) return '';
+        const [y, m, d] = iso.split('-').map(Number);
+        if (!y || !m || !d) return '';
+        return d + ' ' + TH_MONTH_FULL[m-1] + ' ' + (y + 543);
+    }
+
+    function onDocDateChange() {
+        const el = document.getElementById('docDate');
+        const hint = document.getElementById('docDateThai');
+        const reset = document.getElementById('docDateReset');
+        if (!el) return;
+        if (hint) hint.textContent = thaiDateText(el.value);
+        if (reset) reset.classList.toggle('hidden', el.value === todayISO());
+    }
+
+    function resetDocDate() {
+        const el = document.getElementById('docDate');
+        if (el) { el.value = todayISO(); onDocDateChange(); }
+    }
+
+    /** ให้ช่วงวันที่ตามวันเดินทาง จนกว่าผู้ใช้จะแก้เอง */
+    function syncPeriodFromTrip() {
+        if (periodTouched) return;
+        const a = document.getElementById('dateStart');
+        const b = document.getElementById('dateEnd');
+        const ps = document.getElementById('periodStart');
+        const pe = document.getElementById('periodEnd');
+        if (!ps || !pe) return;
+        if (a && a.value) ps.value = a.value;
+        if (b && b.value) pe.value = b.value;
+        paintPeriodState();
+    }
+
+    function onPeriodEdited() {
+        periodTouched = true;
+        paintPeriodState();
+    }
+
+    function resetPeriod() {
+        periodTouched = false;
+        syncPeriodFromTrip();
+    }
+
+    function paintPeriodState() {
+        const auto  = document.getElementById('periodAuto');
+        const reset = document.getElementById('periodReset');
+        if (auto)  auto.classList.toggle('hidden', periodTouched);
+        if (reset) reset.classList.toggle('hidden', !periodTouched);
     }
 
     async function init() {
         initTargetProvince().catch(e => console.warn('โหลดรายชื่อจังหวัดไม่สำเร็จ:', e));
         initStartFromSegment();
+        // เติมวันนี้ให้ก่อน ผู้ใช้ส่วนใหญ่ไม่ต้องแตะช่องนี้เลย
+        const dd = document.getElementById('docDate');
+        if (dd && !dd.value) dd.value = todayISO();
+        onDocDateChange();
         onTripDatesChange();
         lockAddressFields(true);      // ที่อยู่ล็อกไว้ก่อน ดึงจากโปรไฟล์
         initRouteMap();
@@ -2490,7 +2601,10 @@
         let metadata = {
             _pdfTemplates: templates, _budgetCategoryId: catId, _position: position,
             _activityName: document.getElementById('activityName')?.value || '',
-            _affiliation:  document.getElementById('affiliation')?.value || ''
+            _affiliation:  document.getElementById('affiliation')?.value || '',
+            // วันที่ที่พิมพ์ลงเอกสารทุกใบ เดิมใช้วันที่กดบันทึกซึ่งแก้ไม่ได้
+            // ใบเก่าไม่มีค่านี้ ตอนออกเอกสารจึงยังใช้วันที่กดบันทึกเหมือนเดิม
+            _docDate: document.getElementById('docDate')?.value || ''
         };
 
         // บังคับกรอกเฉพาะช่องที่เอกสารที่ติ๊กไว้ใช้จริง
@@ -2545,6 +2659,10 @@
                 startFromLocation: document.getElementById('startFromLocation')?.value || '',
                 startDate: document.getElementById('dateStart')?.value || '', startTime: getTime24('timeStart'),
                 endDate: document.getElementById('dateEnd')?.value || '', endTime: getTime24('timeEnd'),
+                // ช่วงวันที่ที่พิมพ์บรรทัด "ในระหว่างวันที่" บนใบรายงาน
+                // ปกติเท่ากับวันเดินทาง แก้แยกได้เมื่อรายงานเขียนคนละช่วงกับที่เดินทางจริง
+                periodStart: document.getElementById('periodStart')?.value || '',
+                periodEnd:   document.getElementById('periodEnd')?.value   || '',
                 from: travelFrom, to: travelTo,
                 toProv: document.getElementById('targetProv')?.value || '',
                 toProvCode: targetProvinceCode(),   // รหัสมาตรฐาน สำหรับส่งออก/เชื่อม API
@@ -2969,6 +3087,15 @@
         document.getElementById('affiliation').value  = meta._affiliation  || '';
         document.getElementById('activityName').value = meta._activityName || '';
 
+        // ใบเก่าไม่มี _docDate ใช้วันที่สร้างใบเหมือนที่เอกสารเคยพิมพ์ออกมา
+        // จะได้เปิดมาแก้แล้วออก PDF ใหม่ได้วันเดิม ไม่ใช่วันที่กดแก้
+        const ddEl = document.getElementById('docDate');
+        if (ddEl) {
+            ddEl.value = meta._docDate ||
+                (expense.createdAt ? new Date(expense.createdAt).toISOString().slice(0, 10) : todayISO());
+            onDocDateChange();
+        }
+
         const catSel = document.getElementById('categorySelect');
         catSel.value = meta._budgetCategoryId || '';
         generateInputs();
@@ -3009,6 +3136,18 @@
             setTime24('timeStart', tr.startTime || '');
             document.getElementById('dateEnd').value       = tr.endDate   || '';
             setTime24('timeEnd', tr.endTime || '');
+
+            // ช่วงวันที่บนใบรายงาน: ใบเก่าไม่มีค่านี้ ให้ตามวันเดินทางเหมือนเดิม
+            // ใบที่เคยแก้ไว้ต่างจากวันเดินทาง ต้องคงค่าที่แก้ไว้ ไม่ให้ถูกเขียนทับ
+            const ps = document.getElementById('periodStart');
+            const pe = document.getElementById('periodEnd');
+            if (ps && pe) {
+                ps.value = tr.periodStart || tr.startDate || '';
+                pe.value = tr.periodEnd   || tr.endDate   || '';
+                periodTouched = !!((tr.periodStart && tr.periodStart !== tr.startDate) ||
+                                   (tr.periodEnd   && tr.periodEnd   !== tr.endDate));
+                paintPeriodState();
+            }
             setTargetProvince(tr.toProv);
             document.getElementById('travelFrom').value    = tr.from      || '';
             document.getElementById('travelTo').value      = tr.to        || '';

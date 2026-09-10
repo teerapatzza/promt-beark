@@ -572,7 +572,10 @@
         }
 
         async function exportPDF(data) {
-            const dateObj = new Date(data.createdAt);
+            // วันที่บนเอกสาร: ใช้ค่าที่ผู้ใช้กรอก ถ้าไม่มี (ใบเก่า) ใช้วันที่สร้างใบเหมือนเดิม
+            // ตัวนี้พิมพ์ลงทุกใบ ทั้งมุมบนขวาและช่องวันที่ลงนาม
+            const _docDate = (data.inputMetadata || {})._docDate;
+            const dateObj = _docDate ? new Date(_docDate + 'T00:00:00') : new Date(data.createdAt);
             const dateStr = formatDateDisplay(dateObj);
             const formatAmt = data.amount.toLocaleString(undefined, {minimumFractionDigits: 2});
             const amtText = getThaiBahtText(data.amount);
@@ -789,7 +792,7 @@
                             </div>
                             
                             <div style="display: flex; align-items: baseline; margin-bottom: 5px;">
-                                <span style="white-space: nowrap;">ในระหว่างวันที่</span><span style="flex-grow: 1; border-bottom: 1px solid #000; text-align: center; margin: 0 10px;">${formatDateDisplay(tr.startDate)} - ${formatDateDisplay(tr.endDate)}</span>
+                                <span style="white-space: nowrap;">ในระหว่างวันที่</span><span style="flex-grow: 1; border-bottom: 1px solid #000; text-align: center; margin: 0 10px;">${formatDateDisplay(tr.periodStart || tr.startDate)} - ${formatDateDisplay(tr.periodEnd || tr.endDate)}</span>
                                 <span style="white-space: nowrap;">โดยออกเดินทางจาก ( <span style="font-family: Arial; font-size: 16px;">${startTypeHome}</span> ) ที่พัก &nbsp;&nbsp;( <span style="font-family: Arial; font-size: 16px;">${startTypeWork}</span> ) ที่ทำงาน</span>
                             </div>
                             
