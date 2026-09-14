@@ -30,3 +30,8 @@ deploy-now.ps1
 *.7z
 ssl/
 certs/
+
+# ตัวอย่างข้อมูลสำหรับทดสอบ — ดึงจากฐานข้อมูลจริง มีชื่อและที่อยู่ของคนจริง
+# repo นี้เป็นสาธารณะ ห้ามใส่เข้าไป สร้างใหม่ได้ด้วย scripts/dump-expenses-fixture.js
+expenses-input.json
+doc-baseline.json

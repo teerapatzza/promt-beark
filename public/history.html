@@ -26,6 +26,22 @@
         .pdf-page { width: 190mm; box-sizing: border-box; padding: 10px 20px; position: relative; font-family: 'Sarabun', sans-serif; background: white; font-size: 13.5px; color: black; page-break-inside: avoid; }
         .html2pdf__page-break { page-break-before: always; }
 
+        /* ── ตัวอย่างเอกสารในกล่องตรวจสอบ ──
+           เอกสารกว้าง 190mm ตายตัว จอแคบกว่านั้นจะย่อลงด้วย transform
+           ตัวคั่นหน้าที่มองไม่เห็นตอนพิมพ์ ทำให้เห็นรอยแบ่งหน้าชัดเจนบนจอ */
+        .doc-preview { overflow: hidden; }
+        .doc-preview-inner { display: inline-block; background: #fff; }
+        .doc-preview-inner .pdf-page {
+            box-shadow: 0 1px 3px rgba(15,23,42,.12), 0 8px 24px rgba(15,23,42,.08);
+            margin-bottom: 14px;
+            border: 1px solid #e2e8f0;
+        }
+        .doc-preview-inner .html2pdf__page-break {
+            height: 0; margin: 10px 0 24px;
+            border-top: 2px dashed #cbd5e1;
+        }
+        .doc-preview-inner img { max-width: 100%; }
+
           /* ── กันตัวหนังสือทับกันในเอกสาร PDF ──
              ข้อความไทยยาวๆ (ที่อยู่ ชื่อหน่วยงาน) เดิมล้นออกนอกช่องแล้วไปทับแถวอื่น */
           .pdf-page td, .pdf-page th {
@@ -156,7 +172,8 @@
     </div>
 
     <div id="detailsModal" class="fixed inset-0 z-[9999] bg-black/50 hidden flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh] border border-slate-200">
+        <!-- กว้างขึ้นเพราะตอนนี้แสดงเอกสารจริงซึ่งกว้าง 190mm ไม่ใช่ตารางสรุปข้อมูลแล้ว -->
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[92vh] border border-slate-200">
             <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
                 <div class="flex items-center gap-2">
                     <div class="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center">
@@ -164,12 +181,18 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
                         </svg>
                     </div>
-                    <h3 class="text-base font-bold text-slate-800">ตรวจสอบข้อมูลการกรอกฟอร์ม</h3>
+                    <h3 class="text-base font-bold text-slate-800">ตัวอย่างเอกสาร</h3>
+                <span class="text-xs text-slate-400 hidden sm:inline">หน้าตาเดียวกับไฟล์ PDF ที่จะได้</span>
                 </div>
                 <button onclick="closeDetailsModal()" class="text-slate-400 hover:text-slate-700 hover:bg-slate-100 w-8 h-8 rounded-lg flex items-center justify-center transition-colors text-xl font-bold outline-none">&times;</button>
             </div>
             <div class="p-5 overflow-y-auto bg-slate-50 space-y-4" id="detailsContent"></div>
-            <div class="px-5 py-3 border-t border-slate-100 bg-white flex justify-end">
+            <div class="px-5 py-3 border-t border-slate-100 bg-white flex justify-end gap-2">
+                <!-- ดูแล้วพอใจค่อยโหลด ไม่ต้องกลับไปหาปุ่มในตาราง -->
+                <button onclick="downloadPreviewPDF()"
+                    class="bg-blue-600 text-white px-5 py-2 rounded-xl text-sm font-bold hover:bg-blue-700 transition-colors">
+                    ดาวน์โหลด PDF
+                </button>
                 <button onclick="closeDetailsModal()"
                     class="bg-slate-700 text-white px-5 py-2 rounded-xl text-sm font-bold hover:bg-slate-800 transition-colors">
                     ปิดหน้าต่าง
@@ -282,7 +305,7 @@
                         <td class="p-4 text-center">${eviHtml}</td>
                         <td class="p-4">
                             <div class="flex items-center justify-center gap-1.5">
-                                <button onclick='openDetailsModal(${JSON.stringify(x).replace(/'/g, "\\'")})' title="ดูข้อมูล"
+                                <button onclick="openDetailsModal('${x.id}')" title="ดูข้อมูล"
                                     class="bg-white border border-slate-200 text-slate-600 hover:text-blue-600 hover:border-blue-200 px-2.5 py-1.5 rounded-lg transition-all text-xs font-semibold flex items-center gap-1 shadow-sm">
                                     <svg class='w-3.5 h-3.5' fill='none' stroke='currentColor' viewBox='0 0 24 24'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z'/></svg>
                                     ตรวจสอบ
@@ -298,7 +321,7 @@
                                     <svg class='w-3.5 h-3.5' fill='none' stroke='currentColor' viewBox='0 0 24 24'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16'/></svg>
                                     ลบ
                                 </button>` : ''}
-                                <button onclick='exportPDF(${JSON.stringify(x).replace(/'/g, "\\'")})'
+                                <button onclick="exportPDFById('${x.id}')"
                                     class="bg-blue-600 text-white hover:bg-blue-700 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1 shadow-sm active:scale-[0.97]">
                                     <svg class='w-3.5 h-3.5' fill='none' stroke='currentColor' viewBox='0 0 24 24'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4'/></svg>
                                     PDF
@@ -319,195 +342,76 @@
             `;
         }
 
-        function openDetailsModal(data) {
-            const meta = data.inputMetadata || {};
-            const templates = resolveTemplates(meta);
-            const hasTravel  = templates.some(t => ['REPORT', 'TRANSPORT_RECEIPT'].includes(t));
-            const hasGeneral = templates.includes('GENERAL_RECEIPT');
+        /* ══════════ ตัวอย่างเอกสาร ══════════
+           เดิมฟังก์ชันนี้ประกอบหน้าตาของตัวเองขึ้นมาอีกชุดหนึ่ง แยกจากเอกสารจริง
+           พอฟอร์มเพิ่มช่องใหม่ ตัวอย่างก็ตามไม่ทัน และพังเมื่อข้อมูลเปลี่ยนรูปแบบ
+           (อ่าน c.hotel.type ตรง ๆ ทั้งที่ใบใหม่เก็บเป็น hotelEntries — พัง 66 จาก 70 ใบ)
 
-            let html = ``;
+           ตอนนี้ใช้ตัวสร้างเอกสารตัวเดียวกับปุ่ม PDF ตัวอย่างกับของจริงจึงเพี้ยนจากกันไม่ได้
+           รับได้ทั้งเลขที่ใบและตัวข้อมูล เพื่อให้ลิงก์ ?id= ที่แอดมินใช้อยู่ยังทำงานเหมือนเดิม */
+        let previewingExpense = null;
 
-            if (hasTravel) {
-                const tr = meta._travel || {};
-                const c = meta._costs || { hotel:{} };
-                const addr = meta._addr || {};
+        async function openDetailsModal(which) {
+            const data = (which && typeof which === 'object')
+                ? which
+                : raw.find(x => String(x.id) === String(which));
 
-                html += `
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-                    <h4 class="font-bold text-slate-700 mb-3 border-b pb-2">ข้อมูลผู้ขอเบิก & กิจกรรม</h4>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        ${renderInput('ชื่อผู้ขอเบิก', data.requestedBy)}
-                        ${renderInput('สังกัด / กลุ่มงาน', meta._affiliation)}
-                        <div class="md:col-span-2">${renderInput('กิจกรรม', meta._activityName)}</div>
-                    </div>
-                </div>
-
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-                    <h4 class="font-bold text-slate-700 mb-3 border-b pb-2">ข้อมูลที่อยู่ผู้เดินทาง</h4>
-                    <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
-                        ${renderInput('เลขที่', addr.no)}
-                        ${renderInput('ซอย', addr.soi)}
-                        ${renderInput('ถนน', addr.road)}
-                        ${renderInput('ตำบล/แขวง', addr.sub)}
-                        ${renderInput('อำเภอ/เขต', addr.dist)}
-                        <div class="col-span-2">${renderInput('จังหวัด', addr.prov)}</div>
-                        ${renderInput('รหัสไปรษณีย์', addr.zip)}
-                    </div>
-                </div>
-
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-                    <h4 class="font-bold text-slate-700 mb-3 border-b pb-2">กำหนดการเดินทาง</h4>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            ${renderInput('ออกเดินทางจาก', tr.startFromType)}
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
-                                ${renderInput('วันที่', formatDateDisplay(tr.startDate))}
-                                ${renderInput('เวลา', tr.startTime)}
-                            </div>
-                        </div>
-                        <div>
-                            ${renderInput('ปลายทาง (จังหวัด)', tr.toProv)}
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
-                                ${renderInput('วันที่', formatDateDisplay(tr.endDate))}
-                                ${renderInput('เวลา', tr.endTime)}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-                    <h4 class="font-bold text-slate-700 mb-3 border-b pb-2">รูปแบบการเดินทาง (ระยะทาง)</h4>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        ${renderInput('🚕 การเดินทางด้วย Taxi', (() => {
-                            const ents = Array.isArray(c.taxiEntries) ? c.taxiEntries : [];
-                            if (ents.length > 0) {
-                                const dirs = [...new Set(ents.map(e => e.direction).filter(Boolean))];
-                                return dirs.join(', ') || 'มีรายการ Taxi';
-                            }
-                            return meta._taxiType || '-';
-                        })())}
-                        ${renderInput('🚘 การเดินทางด้วยรถส่วนตัว', meta._carType)}
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        ${renderInput('จุดเริ่มต้น', tr.from)}
-                        ${renderInput('จุดหมาย', tr.to)}
-                    </div>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        ${renderInput('ระยะทางขาไป', tr.distOut + ' กม.')}
-                        ${renderInput('ระยะทางขากลับ', tr.distRet + ' กม.')}
-                    </div>
-                </div>
-
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-                    <h4 class="font-bold text-slate-700 mb-3 border-b pb-2">รายละเอียดค่าใช้จ่าย</h4>
-                    
-                    <div class="bg-slate-50 p-3 rounded-lg border border-slate-100 mb-3">
-                        <div class="text-xs font-bold text-slate-700 mb-2">🏨 1. ค่าที่พัก</div>
-                        <div class="grid grid-cols-1 md:grid-cols-4 gap-2">
-                            ${renderInput('ประเภท', c.hotel.type)}
-                            ${renderInput('ชื่อโรงแรม', c.hotel.name)}
-                            ${renderInput('เรท/คืน', c.hotel.rate)}
-                            ${renderInput('จำนวนคืน', c.hotel.nights)}
-                        </div>
-                    </div>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        ${renderInput('🚘 ค่าน้ำมันรถ (บ./กม.)', c.fuelRate)}
-                        ${renderInput('🚕 ค่า Taxi รวม (บาท)', (() => {
-                            const ents = Array.isArray(c.taxiEntries) ? c.taxiEntries : [];
-                            const total = ents.length > 0
-                                ? ents.reduce((s, e) => s + (parseFloat(e.amount)||0), 0)
-                                : (parseFloat(c.taxiOutAmt||0) + parseFloat(c.taxiRetAmt||0));
-                            return total > 0 ? total.toLocaleString(undefined,{minimumFractionDigits:2}) : '-';
-                        })())}
-                        ${renderInput('✈️ ค่าตั๋วเครื่องบิน (บาท)', c.airAmount)}
-                        ${renderInput('🛣️ ค่าทางด่วน/ที่จอด (บาท)', c.tollAmount)}
-                        ${renderInput('🍔 ค่าเบี้ยเลี้ยง/อื่นๆ (บาท)', c.otherAmount)}
-                    </div>
-                    ${Array.isArray(c.taxiEntries) && c.taxiEntries.length > 0 ? `
-                    <div class="mt-2">
-                        <div class="text-xs font-bold text-slate-700 mb-1">รายการ Taxi</div>
-                        <table class="w-full text-xs border border-slate-200 rounded-lg overflow-hidden">
-                            <thead class="bg-slate-50 text-slate-500 font-bold">
-                                <tr>
-                                    <th class="px-2 py-1.5 text-left">วันที่</th>
-                                    <th class="px-2 py-1.5 text-left">ทิศทาง</th>
-                                    <th class="px-2 py-1.5 text-left">จาก → ถึง</th>
-                                    <th class="px-2 py-1.5 text-right">จำนวน</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-100">
-                                ${c.taxiEntries.map(e => `<tr>
-                                    <td class="px-2 py-1.5">${e.date ? formatDateDisplay(e.date) : '—'}</td>
-                                    <td class="px-2 py-1.5">${e.direction || '—'}</td>
-                                    <td class="px-2 py-1.5">${e.from || ''} → ${e.to || ''}</td>
-                                    <td class="px-2 py-1.5 text-right font-mono">${e.amount ? parseFloat(e.amount).toLocaleString(undefined,{minimumFractionDigits:2}) : '—'}</td>
-                                </tr>`).join('')}
-                            </tbody>
-                        </table>
-                    </div>` : ''}
-                </div>
-                `;
+            if (!data) {
+                alert('ไม่พบรายการนี้ อาจถูกลบไปแล้ว หรือบัญชีนี้ไม่มีสิทธิ์ดู');
+                return;
             }
+            previewingExpense = data;
 
-            if (hasGeneral) {
-                const grItems = Array.isArray(meta._generalReceiptItems) ? meta._generalReceiptItems : [];
-                const grTotal = grItems.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
-                html += `
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-                    <h4 class="font-bold text-slate-700 mb-3 border-b pb-2">ใบรับรองแทนใบเสร็จรับเงิน – ทั่วไป (FM-SAM-003-06)</h4>
-                    ${renderInput('ชื่อผู้ขอเบิก', data.requestedBy)}
-                    <div class="mt-2">${renderInput('ตำแหน่ง', meta._position)}</div>
-                    <div class="mt-3 overflow-x-auto">
-                        <table class="w-full text-xs border border-slate-200 rounded-lg overflow-hidden">
-                            <thead class="bg-slate-50 text-slate-500 font-bold">
-                                <tr>
-                                    <th class="px-3 py-2 text-left">วัน เดือน ปี</th>
-                                    <th class="px-3 py-2 text-left">รายละเอียด</th>
-                                    <th class="px-3 py-2 text-right">จำนวนเงิน</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-100">
-                                ${grItems.map(r => `<tr>
-                                    <td class="px-3 py-1.5">${r.date ? formatDateDisplay(r.date) : '—'}</td>
-                                    <td class="px-3 py-1.5">${r.description || '—'}</td>
-                                    <td class="px-3 py-1.5 text-right font-mono">${r.amount ? r.amount.toLocaleString(undefined, {minimumFractionDigits: 2}) : '—'}</td>
-                                </tr>`).join('')}
-                            </tbody>
-                        </table>
-                    </div>
-                    <div class="mt-2 text-right text-sm font-bold text-slate-700">รวม: ${grTotal.toLocaleString(undefined, {minimumFractionDigits: 2})} บาท</div>
+            const box = document.getElementById('detailsContent');
+            const modal = document.getElementById('detailsModal');
+            box.innerHTML = `
+                <div class="py-16 text-center text-slate-500">
+                    <div class="animate-pulse font-semibold" data-status>กำลังจัดเอกสาร…</div>
+                    <div class="text-xs text-slate-400 mt-2">ถ้ามีหน้าแผนที่จะใช้เวลาสักครู่</div>
                 </div>`;
+            modal.classList.remove('hidden');
+
+            try {
+                const built = await buildDocumentHtml(data, t => {
+                    const s = box.querySelector('[data-status]');
+                    if (s) s.textContent = t;
+                });
+                box.innerHTML = `<div class="doc-preview"><div class="doc-preview-inner">${built.html}</div></div>`;
+                fitPreview(box);
+            } catch (e) {
+                // พังต้องบอกว่าพังตรงไหน ไม่ใช่ค้างอยู่ที่ "กำลังจัดเอกสาร" ตลอดกาล
+                console.error('สร้างตัวอย่างเอกสารไม่สำเร็จ:', e);
+                box.innerHTML = `
+                    <div class="bg-rose-50 border-2 border-rose-200 text-rose-800 rounded-xl p-5">
+                        <div class="font-bold mb-1">แสดงตัวอย่างเอกสารไม่สำเร็จ</div>
+                        <div class="text-sm">${String(e && e.message ? e.message : e)}</div>
+                        <div class="text-xs mt-2 text-rose-600">ยังกดปุ่ม PDF เพื่อดาวน์โหลดเอกสารได้ตามปกติ</div>
+                    </div>`;
             }
+        }
 
-            if (!hasTravel && !hasGeneral) {
-                html += `
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-                    <h4 class="font-bold text-slate-700 mb-3 border-b pb-2">ข้อมูลการเบิกจ่ายทั่วไป</h4>
-                    ${renderInput('ชื่อผู้ขอเบิก', data.requestedBy)}
-                    <div class="mt-3">${renderInput('รายการ / กิจกรรม', data.description)}</div>
-                </div>
-                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-                    <h4 class="font-bold text-slate-700 mb-3 border-b pb-2">ตัวแปรที่ระบุ</h4>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                `;
-                for (const [key, value] of Object.entries(meta)) {
-                    if(!key.startsWith('_')) {
-                        html += renderInput(key, value);
-                    }
-                }
-                html += `</div></div>`;
-            }
+        /** เอกสารกว้าง 190mm ตายตัว จอแคบกว่านั้นต้องย่อลงให้พอดี ไม่ใช่ให้เลื่อนซ้ายขวา */
+        function fitPreview(box) {
+            const inner = box.querySelector('.doc-preview-inner');
+            if (!inner) return;
+            const avail = box.clientWidth - 4;
+            const natural = inner.scrollWidth || 1;
+            const scale = Math.min(1, avail / natural);
+            inner.style.transform = `scale(${scale})`;
+            inner.style.transformOrigin = 'top left';
+            // ตัวแม่ต้องหดตามด้วย ไม่งั้นจะเหลือที่ว่างด้านล่างเท่าส่วนที่ย่อไป
+            const wrap = box.querySelector('.doc-preview');
+            if (wrap) wrap.style.height = (inner.scrollHeight * scale) + 'px';
+        }
 
-            html += `
-                <div class="bg-emerald-50 border border-emerald-200 p-4 rounded-xl flex justify-between items-center">
-                    <span class="font-bold text-emerald-800 text-lg">ยอดเบิกสุทธิรวม</span>
-                    <span class="font-black text-emerald-600 text-2xl">${data.amount.toLocaleString()} ฿</span>
-                </div>
-            `;
+        window.addEventListener('resize', () => {
+            const box = document.getElementById('detailsContent');
+            if (box && !document.getElementById('detailsModal').classList.contains('hidden')) fitPreview(box);
+        });
 
-            document.getElementById('detailsContent').innerHTML = html;
-            document.getElementById('detailsModal').classList.remove('hidden');
+        /** ปุ่มดาวน์โหลดในกล่องตัวอย่าง — ใช้ใบที่กำลังดูอยู่ */
+        function downloadPreviewPDF() {
+            if (previewingExpense) exportPDF(previewingExpense);
         }
 
         function closeDetailsModal() {
@@ -571,7 +475,20 @@
             return ['NORMAL'];
         }
 
-        async function exportPDF(data) {
+        /* ══════════ สร้าง HTML ของเอกสาร ══════════
+           แยกออกมาจากขั้นตอนทำไฟล์ PDF เพื่อให้หน้า "ตรวจสอบ" ใช้ตัวสร้างตัวเดียวกันได้
+           ตัวอย่างบนจอกับเอกสารที่พิมพ์ออกมาจึงเพี้ยนจากกันไม่ได้อีก
+           onStatus ใช้รายงานความคืบหน้า จะไม่ส่งมาก็ได้ */
+        /** ปุ่ม PDF ในตาราง — รับเลขที่ใบแล้วไปหยิบข้อมูลเอง
+            เดิมฝังข้อมูลทั้งใบไว้ใน attribute ทำให้หน้าเว็บหนักและพังถ้าข้อมูลมีอัญประกาศ */
+        function exportPDFById(id) {
+            const data = raw.find(x => String(x.id) === String(id));
+            if (!data) { alert('ไม่พบรายการนี้ อาจถูกลบไปแล้ว'); return; }
+            return exportPDF(data);
+        }
+
+        async function buildDocumentHtml(data, onStatus) {
+            const say = t => { try { if (onStatus) onStatus(t); } catch (e) {} };
             // วันที่บนเอกสาร: ใช้ค่าที่ผู้ใช้กรอก ถ้าไม่มี (ใบเก่า) ใช้วันที่สร้างใบเหมือนเดิม
             // ตัวนี้พิมพ์ลงทุกใบ ทั้งมุมบนขวาและช่องวันที่ลงนาม
             const _docDate = (data.inputMetadata || {})._docDate;
@@ -1369,16 +1286,13 @@
                 });
             }
 
-            const btn = event.currentTarget;
-            const originalText = btn.innerHTML;
-            btn.disabled = true;
 
             // แผนที่: วาดตอนพิมพ์จากพิกัดที่บันทึกไว้ ไม่ได้เก็บรูปในฐานข้อมูล
             let mapPageHtml = '';
             const _tr = (data.inputMetadata && data.inputMetadata._travel) || null;
             if (_tr && _tr.fromGeo && _tr.toGeo) {
                 // ใบเบิกเก่าไม่มี useAppMap แต่มีพิกัดครบ ก็วาดแผนที่ให้ด้วย
-                btn.innerHTML = '⏳ กำลังวาดแผนที่...';
+                say('⏳ กำลังวาดแผนที่...');
                 const km = _tr.distOut || (_tr.route && _tr.route.km) || '-';
                 try {
                     const img = await renderRouteMapImage(_tr);
@@ -1407,6 +1321,20 @@
                 '<div class="html2pdf__page-break"></div>'
             ).replace(/^\s*<div class="html2pdf__page-break"><\/div>\s*/, '')
              .replace(/\s*<div class="html2pdf__page-break"><\/div>\s*$/, '');
+
+            return { html: docHtml, dateObj };
+        }
+
+
+        /** ทำไฟล์ PDF แล้วดาวน์โหลด — ตัวเอกสารมาจาก buildDocumentHtml */
+        async function exportPDF(data) {
+            const btn = event.currentTarget;
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+
+            const built = await buildDocumentHtml(data, t => { btn.innerHTML = t; });
+            const docHtml = built.html;
+            const dateObj = built.dateObj;
 
             const container = document.getElementById('pdf-container');
             container.innerHTML = `
