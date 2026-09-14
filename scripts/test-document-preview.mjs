@@ -153,6 +153,46 @@ try {
   check('ไม่เปิดกล่องเปล่าค้างไว้',
         (await ev(`return document.getElementById('detailsModal').classList.contains('hidden')`)) === true);
 
+  console.log('\n═══ 7. รูปแนบขนาดจริงต้องไม่ถูกตัด ═══');
+  // ตัวเทียบแทนรูปด้วยภาพ 1x1 ซึ่งโหลดทันที จับบั๊กนี้ไม่ได้
+  // ต้องใช้รูปสูงจริงแบบรูปถ่ายใบเสร็จ เพราะตอนวัดครั้งแรกรูปยังไม่มีความสูง
+  const withImg = records.find(r => r.attachments && r.attachments.images && r.attachments.images.length)
+                  || records[0];
+  await ev(`
+    const mk = (w,h,label) => {
+      const c=document.createElement('canvas'); c.width=w; c.height=h;
+      const x=c.getContext('2d');
+      x.fillStyle='#f1f5f9'; x.fillRect(0,0,w,h);
+      x.fillStyle='#0f172a'; x.font='bold 80px sans-serif';
+      x.fillText(label, 60, h-60);
+      return c.toDataURL('image/jpeg', 0.7);
+    };
+    const rec = JSON.parse(JSON.stringify(${JSON.stringify(withImg)}));
+    rec.id = 'BIGIMG';
+    rec.attachments = { images: [ mk(1200,1600,'ล่างสุดรูป1'), mk(1200,1600,'ล่างสุดรูป2') ] };
+    raw = [rec].concat(raw.filter(x => x.id !== 'BIGIMG'));
+    draw();
+    return 1;`);
+  await ev(`closeDetailsModal(); await openDetailsModal('BIGIMG'); return 1`);
+  await sleep(2000);
+  const clip = await ev(`
+    const box=document.getElementById('detailsContent');
+    const wrap=box.querySelector('.doc-preview');
+    const inner=box.querySelector('.doc-preview-inner');
+    const imgs=[...inner.querySelectorAll('img')];
+    const last=imgs[imgs.length-1];
+    const s=parseFloat((inner.style.transform.match(/[\d.]+/)||[1])[0]);
+    return JSON.stringify({
+      needH: Math.round(inner.scrollHeight*s),
+      wrapH: Math.round(wrap.getBoundingClientRect().height),
+      lastImgOverflow: Math.round(last.getBoundingClientRect().bottom - wrap.getBoundingClientRect().bottom),
+      imgs: imgs.length });`);
+  const C = JSON.parse(clip);
+  check('กรอบสูงพอกับเอกสารที่มีรูปแนบ', C.needH <= C.wrapH + 2,
+        'ต้องใช้ ' + C.needH + 'px  กรอบ ' + C.wrapH + 'px');
+  check('รูปสุดท้ายไม่ล้นออกนอกกรอบ', C.lastImgOverflow <= 0,
+        'ล้น ' + C.lastImgOverflow + 'px');
+
   const realErr = errors.filter(e => !/favicon|fonts\.g|ERR_|tile/i.test(e));
   check('ไม่มี JavaScript error ตลอดการทดสอบ', realErr.length===0, realErr.slice(0,2).join(' | '));
 

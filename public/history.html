@@ -378,6 +378,7 @@
                 });
                 box.innerHTML = `<div class="doc-preview"><div class="doc-preview-inner">${built.html}</div></div>`;
                 fitPreview(box);
+                watchPreviewSize(box);
             } catch (e) {
                 // พังต้องบอกว่าพังตรงไหน ไม่ใช่ค้างอยู่ที่ "กำลังจัดเอกสาร" ตลอดกาล
                 console.error('สร้างตัวอย่างเอกสารไม่สำเร็จ:', e);
@@ -404,6 +405,26 @@
             if (wrap) wrap.style.height = (inner.scrollHeight * scale) + 'px';
         }
 
+        /* รูปแนบยังไม่มีความสูงตอนที่เพิ่งใส่ HTML เข้าไป วัดตอนนั้นจึงได้ความสูงที่ขาดไป
+           พอรูปแสดงผลเสร็จเอกสารจะสูงขึ้น แต่กรอบยังค้างที่ความสูงเดิมแล้วตัดเนื้อหาทิ้ง
+           (ของจริงเคยขาดหายไป 1,659px) จึงต้องวัดใหม่ทุกครั้งที่เนื้อหาโตขึ้น */
+        let previewSizeWatcher = null;
+
+        function watchPreviewSize(box) {
+            const inner = box.querySelector('.doc-preview-inner');
+            if (!inner) return;
+
+            if (previewSizeWatcher) { previewSizeWatcher.disconnect(); previewSizeWatcher = null; }
+            if (window.ResizeObserver) {
+                previewSizeWatcher = new ResizeObserver(() => fitPreview(box));
+                previewSizeWatcher.observe(inner);
+            }
+            // เบราว์เซอร์ที่ไม่มี ResizeObserver ยังต้องได้ความสูงที่ถูก
+            inner.querySelectorAll('img').forEach(img => {
+                if (!img.complete) img.addEventListener('load', () => fitPreview(box), { once: true });
+            });
+        }
+
         window.addEventListener('resize', () => {
             const box = document.getElementById('detailsContent');
             if (box && !document.getElementById('detailsModal').classList.contains('hidden')) fitPreview(box);
@@ -416,6 +437,8 @@
 
         function closeDetailsModal() {
             document.getElementById('detailsModal').classList.add('hidden');
+            // เลิกเฝ้าขนาด ไม่งั้นตัวเฝ้าของใบเก่าจะค้างอยู่ทุกครั้งที่เปิดใบใหม่
+            if (previewSizeWatcher) { previewSizeWatcher.disconnect(); previewSizeWatcher = null; }
         }
 
         function getThaiBahtText(amount) {
