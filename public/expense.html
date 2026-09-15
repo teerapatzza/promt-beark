@@ -201,6 +201,29 @@
                     <span id="docDateWhere" class="text-xs text-slate-400 w-full">
                         เลือกหมวดการเบิกก่อน แล้วระบบจะบอกว่าวันที่นี้จะไปพิมพ์ตรงไหนบ้าง
                     </span>
+
+                    <!-- ปกติทุกใบใช้วันเดียวกัน แต่บางครั้งวันบนสองใบไม่ตรงกัน
+                         ซ่อนไว้เพราะถ้าโชว์ตลอดจะกลายเป็นต้องกรอกวันที่ 3-4 รอบทุกครั้ง
+                         ตามวันที่หลักให้เองจนกว่าจะแตะ แตะแล้วหยุดตาม กดคืนได้ -->
+                    <div class="w-full">
+                        <button type="button" id="docDateSplitToggle" onclick="toggleDocDateSplit()"
+                                class="hidden text-xs font-bold text-blue-600 hover:text-blue-800 underline">
+                            ตั้งวันที่แยกรายเอกสาร
+                        </button>
+                        <div id="docDateSplitBox" class="hidden mt-3 bg-slate-50 border border-slate-200 rounded-xl p-4">
+                            <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+                                <span class="text-sm font-bold text-slate-600">วันที่แยกรายเอกสาร</span>
+                                <button type="button" onclick="resetDocDateSplit()"
+                                        class="text-xs font-bold text-slate-400 hover:text-blue-600 underline">
+                                    ให้ทุกใบกลับไปใช้วันที่หลัก
+                                </button>
+                            </div>
+                            <div id="docDateSplitRows" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
+                            <p class="text-xs text-slate-400 mt-3">
+                                เว้นไว้เฉย ๆ ได้ ใบไหนไม่ตั้งจะใช้วันที่หลักด้านบน
+                            </p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1518,11 +1541,115 @@
         if (!el) return;
         if (hint) hint.textContent = thaiDateText(el.value);
         if (reset) reset.classList.toggle('hidden', el.value === todayISO());
+        syncDocDateSplit();   // ช่องแยกที่ยังไม่ถูกแตะ ต้องเดินตามวันที่หลัก
     }
 
     function resetDocDate() {
         const el = document.getElementById('docDate');
         if (el) { el.value = todayISO(); onDocDateChange(); }
+    }
+
+    /* ── วันที่แยกรายเอกสาร ──
+       ช่องพวกนี้ตามวันที่หลักไปเรื่อย ๆ จนกว่าผู้ใช้จะแตะ
+       คนที่ไม่ต้องใช้จะไม่เห็นด้วยซ้ำ เพราะพับเก็บไว้ */
+    const DOC_LABELS = {
+        REPORT:           'ใบรายงานการเดินทาง',
+        TRANSPORT_RECEIPT:'ใบรับรองค่าพาหนะ',
+        GENERAL_RECEIPT:  'ใบสำคัญรับเงิน',
+        NORMAL:           'ใบขออนุมัติเบิกจ่าย'
+    };
+    let docDateSplitOpen = false;
+    /* เปิดใบเก่ามาแก้: ค่าที่เคยตั้งไว้มาก่อนที่ช่องจะถูกสร้าง เก็บพักไว้ตรงนี้ก่อน */
+    let __pendingDocDates = null;
+
+    function toggleDocDateSplit() {
+        docDateSplitOpen = !docDateSplitOpen;
+        const box = document.getElementById('docDateSplitBox');
+        const btn = document.getElementById('docDateSplitToggle');
+        if (box) box.classList.toggle('hidden', !docDateSplitOpen);
+        if (btn) btn.textContent = docDateSplitOpen ? 'ซ่อนวันที่แยกรายเอกสาร' : 'ตั้งวันที่แยกรายเอกสาร';
+    }
+
+    /** สร้างช่องเฉพาะเอกสารที่หมวดนี้ออกจริง ไม่ใช่โชว์ครบทุกชนิดให้งง */
+    function buildDocDateSplit(list) {
+        const rows = document.getElementById('docDateSplitRows');
+        const btn  = document.getElementById('docDateSplitToggle');
+        if (!rows) return;
+
+        // ออกใบเดียวก็ไม่ต้องมีให้แยก วันที่หลักพอแล้ว
+        const show = list.length > 1;
+        if (btn) btn.classList.toggle('hidden', !show);
+        if (!show) {
+            docDateSplitOpen = false;
+            const box = document.getElementById('docDateSplitBox');
+            if (box) box.classList.add('hidden');
+            rows.innerHTML = '';
+            return;
+        }
+
+        // เก็บทั้งค่าและสถานะ "ผู้ใช้แก้เอง" ไว้ข้ามการสร้างใหม่
+        // เก็บแค่ค่าอย่างเดียวไม่พอ พอสถานะหาย ช่องจะกลับไปเดินตามวันที่หลักแล้วทับค่าที่ตั้งไว้
+        const keep = {};
+        rows.querySelectorAll('[data-doc]').forEach(i => {
+            keep[i.dataset.doc] = { v: i.value, touched: !!i.dataset.touched };
+        });
+
+        rows.innerHTML = list.map(t => `
+            <label class="block">
+                <span class="block text-xs font-bold text-slate-500 mb-1">${DOC_LABELS[t] || t}</span>
+                <input type="date" data-doc="${t}" onchange="onDocDateSplitChange()"
+                       class="w-full border-2 border-slate-200 px-3 py-2 rounded-lg text-sm focus:border-blue-500 outline-none">
+                <span class="block text-xs text-slate-400 mt-1" data-doc-thai="${t}"></span>
+            </label>`).join('');
+
+        rows.querySelectorAll('[data-doc]').forEach(i => {
+            const k = keep[i.dataset.doc];
+            if (k) { i.value = k.v; if (k.touched) i.dataset.touched = '1'; }
+        });
+
+        // ใบเก่าที่เคยตั้งวันแยกไว้ ต้องได้ค่าเดิมคืนและถือว่าถูกแตะแล้ว
+        if (__pendingDocDates) {
+            let used = false;
+            rows.querySelectorAll('[data-doc]').forEach(i => {
+                const v = __pendingDocDates[i.dataset.doc];
+                if (v) { i.value = v; i.dataset.touched = '1'; used = true; }
+            });
+            __pendingDocDates = null;
+            if (used && !docDateSplitOpen) toggleDocDateSplit();   // กางให้เห็นว่ามีการตั้งไว้
+        }
+        syncDocDateSplit();
+    }
+
+    /** ช่องที่ยังไม่ถูกแตะ ให้เดินตามวันที่หลัก */
+    function syncDocDateSplit() {
+        const main = document.getElementById('docDate')?.value || '';
+        document.querySelectorAll('#docDateSplitRows [data-doc]').forEach(i => {
+            if (!i.dataset.touched) i.value = main;
+            const hint = document.querySelector(`[data-doc-thai="${i.dataset.doc}"]`);
+            if (hint) hint.textContent = i.value ? thaiDateText(i.value) : '';
+        });
+    }
+
+    function onDocDateSplitChange() {
+        document.querySelectorAll('#docDateSplitRows [data-doc]').forEach(i => {
+            if (i.value && i.value !== (document.getElementById('docDate')?.value || '')) i.dataset.touched = '1';
+        });
+        syncDocDateSplit();
+    }
+
+    function resetDocDateSplit() {
+        document.querySelectorAll('#docDateSplitRows [data-doc]').forEach(i => { delete i.dataset.touched; });
+        syncDocDateSplit();
+    }
+
+    /** เก็บเฉพาะใบที่ตั้งวันต่างจากวันที่หลักจริง ๆ ใบที่เท่ากันไม่ต้องเก็บ */
+    function collectDocDates() {
+        const main = document.getElementById('docDate')?.value || '';
+        const out = {};
+        document.querySelectorAll('#docDateSplitRows [data-doc]').forEach(i => {
+            if (i.value && i.value !== main) out[i.dataset.doc] = i.value;
+        });
+        return out;
     }
 
     /** ให้ช่วงวันที่ตามวันเดินทาง จนกว่าผู้ใช้จะแก้เอง */
@@ -1558,6 +1685,13 @@
         if (hasReport)  spots.push('ใบรายงานการเดินทาง: มุมบนขวา และวันที่ลงนาม');
         if (hasReceipt) spots.push('ใบรับรองค่าพาหนะ: ช่อง “วัน เดือน ปี” และวันที่ลงนาม');
         if (hasGeneral) spots.push('ใบสำคัญรับเงิน: วันที่บนใบและวันที่ลงนาม');
+
+        // สร้างช่องวันที่แยก เฉพาะชนิดเอกสารที่หมวดนี้ออกจริง
+        const active = [];
+        if (hasReport)  active.push('REPORT');
+        if (hasReceipt) active.push('TRANSPORT_RECEIPT');
+        if (hasGeneral) active.push('GENERAL_RECEIPT');
+        buildDocDateSplit(active);
 
         if (!spots.length) {
             el.textContent = 'เลือกหมวดการเบิกก่อน แล้วระบบจะบอกว่าวันที่นี้จะไปพิมพ์ตรงไหนบ้าง';
@@ -2628,7 +2762,9 @@
             _affiliation:  document.getElementById('affiliation')?.value || '',
             // วันที่ที่พิมพ์ลงเอกสารทุกใบ เดิมใช้วันที่กดบันทึกซึ่งแก้ไม่ได้
             // ใบเก่าไม่มีค่านี้ ตอนออกเอกสารจึงยังใช้วันที่กดบันทึกเหมือนเดิม
-            _docDate: document.getElementById('docDate')?.value || ''
+            _docDate: document.getElementById('docDate')?.value || '',
+            // เก็บเฉพาะใบที่ตั้งวันต่างจากวันที่หลัก ใบที่ไม่ได้ตั้งจะใช้วันที่หลักตอนออกเอกสาร
+            _docDates: collectDocDates()
         };
 
         // บังคับกรอกเฉพาะช่องที่เอกสารที่ติ๊กไว้ใช้จริง
@@ -3119,6 +3255,8 @@
                 (expense.createdAt ? new Date(expense.createdAt).toISOString().slice(0, 10) : todayISO());
             onDocDateChange();
         }
+        // เก็บวันที่แยกรายเอกสารไว้ก่อน ช่องยังไม่ถูกสร้างจนกว่าจะรู้ว่าหมวดนี้ออกใบอะไรบ้าง
+        __pendingDocDates = meta._docDates || {};
 
         const catSel = document.getElementById('categorySelect');
         catSel.value = meta._budgetCategoryId || '';

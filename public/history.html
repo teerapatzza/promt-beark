@@ -517,6 +517,14 @@
             const _docDate = (data.inputMetadata || {})._docDate;
             const dateObj = _docDate ? new Date(_docDate + 'T00:00:00') : new Date(data.createdAt);
             const dateStr = formatDateDisplay(dateObj);
+
+            /* เอกสารแต่ละใบตั้งวันที่ของตัวเองได้ เผื่อกรณีที่วันบนสองใบไม่ตรงกัน
+               ไม่ได้ตั้งก็ใช้วันที่หลักเหมือนเดิม ใบเก่าที่ไม่มีค่านี้จึงออกมาเท่าเดิมทุกประการ */
+            const _docDates = (data.inputMetadata || {})._docDates || {};
+            const dateStrFor = t => {
+                const v = _docDates[t];
+                return v ? formatDateDisplay(new Date(v + 'T00:00:00')) : dateStr;
+            };
             const formatAmt = data.amount.toLocaleString(undefined, {minimumFractionDigits: 2});
             const amtText = getThaiBahtText(data.amount);
             const meta = data.inputMetadata || {};
@@ -709,7 +717,7 @@
 
                         <div style="text-align: right; margin-bottom: 10px;">
                             <span style="margin-right: 10px;">วันที่</span>
-                            <span style="display: inline-block; width: 150px; border-bottom: 1px solid #000; text-align: center;">${dateStr}</span>
+                            <span style="display: inline-block; width: 150px; border-bottom: 1px solid #000; text-align: center;">${dateStrFor('REPORT')}</span>
                         </div>
 
                         <div style="line-height: 1.8;">
@@ -911,7 +919,7 @@
                             <div style="text-align: center; margin-left: 45%;">
                                 ลงชื่อ <span class="solid-line" style="width: 200px;"></span> ผู้เดินทาง<br>
                                 ( <span class="solid-line" style="width: 180px; border-bottom: none; font-weight:bold;">${data.requestedBy}</span> )<br>
-                                <span class="solid-line" style="width: 180px; border-bottom: none;">${dateStr}</span>
+                                <span class="solid-line" style="width: 180px; border-bottom: none;">${dateStrFor('REPORT')}</span>
                             </div>
                         </div>
                         
@@ -960,7 +968,7 @@
                             <tbody>
                                 <!-- row 1: กิจกรรม -->
                                 <tr>
-                                    <td style="border-bottom: none; text-align: center; vertical-align: top; padding-left:6px; padding-right:6px; white-space:nowrap;" rowspan="16">${dateStr}</td>
+                                    <td style="border-bottom: none; text-align: center; vertical-align: top; padding-left:6px; padding-right:6px; white-space:nowrap;" rowspan="16">${dateStrFor('TRANSPORT_RECEIPT')}</td>
                                     <td style="border-bottom: 1px solid #000;">
                                         <b>กิจกรรม</b> &nbsp;&nbsp;&nbsp; <span class="free-text" style="display:inline">${actName}</span>
                                     </td>
@@ -1124,7 +1132,7 @@
                             <div style="text-align: center; margin-top: 4px;">
                                 ลงชื่อ <span class="solid-line" style="width: 200px;"></span>
                                 <div style="margin-top: 8px;">( <span class="solid-line" style="width: 160px; border: none; font-weight: bold;">${data.requestedBy}</span> )</div>
-                                <div style="margin-top: 4px;">วันที่ <span class="solid-line" style="width: 160px; border: none;">${dateStr}</span></div>
+                                <div style="margin-top: 4px;">วันที่ <span class="solid-line" style="width: 160px; border: none;">${dateStrFor('TRANSPORT_RECEIPT')}</span></div>
                             </div>
                         </div>
                     </div>`;
@@ -1222,7 +1230,7 @@
                             </div>
                             <div style="display: flex; align-items: baseline; gap: 8px;">
                                 <span>วันที่</span>
-                                <span class="solid-line" style="width: 220px;">${dateStr}</span>
+                                <span class="solid-line" style="width: 220px;">${dateStrFor('GENERAL_RECEIPT')}</span>
                             </div>
                         </div>
                     </div>
@@ -1257,7 +1265,7 @@
                     <div class="border-b-2 border-black pb-5 mb-8 text-lg">
                         <div class="flex gap-4 mb-3">
                             <div class="w-2/3"><span class="font-bold">ส่วนราชการ:</span> สถาบันรับรองคุณภาพสถานพยาบาล (องค์การมหาชน)</div>
-                            <div class="w-1/3"><span class="font-bold">วันที่:</span> <span class="solid-line" style="width: 150px;">${dateStr}</span></div>
+                            <div class="w-1/3"><span class="font-bold">วันที่:</span> <span class="solid-line" style="width: 150px;">${dateStrFor('NORMAL')}</span></div>
                         </div>
                         <div><span class="font-bold">เรื่อง:</span> ขออนุมัติเบิกจ่ายงบประมาณโครงการ</div>
                     </div>
