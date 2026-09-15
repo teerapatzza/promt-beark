@@ -23,7 +23,7 @@
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         
         /* ⭐️ เพิ่ม page-break-inside: avoid; บังคับไม่ให้ PDF หั่นครึ่งเนื้อหาในหน้านี้เด็ดขาด */
-        .pdf-page { width: 190mm; box-sizing: border-box; padding: 10px 20px; position: relative; font-family: 'Sarabun', sans-serif; background: white; font-size: 13.5px; color: black; page-break-inside: avoid; }
+        .pdf-page { width: 190mm; box-sizing: border-box; padding: 6px 20px; position: relative; font-family: 'Sarabun', sans-serif; background: white; font-size: 13.5px; color: black; page-break-inside: avoid; }
         .html2pdf__page-break { page-break-before: always; }
 
         /* ── ตัวอย่างเอกสารในกล่องตรวจสอบ ──
@@ -1105,19 +1105,26 @@
                             </tbody>
                         </table>
 
-                        <div class="avoid-break" style="margin-top: 10px;">
-                            <div style="display: flex; align-items: baseline; margin-bottom: 8px;">
+                        <!-- บล็อกลงนาม: บีบช่องว่างลงราว 45px
+                             หน้านี้เคยสูง 1,118px ขณะที่ A4 ใส่ได้ 1,085px เกินอยู่ 33px
+                             ส่วนลงนามซึ่งอยู่ท้ายสุดจึงถูกดันตกไปอยู่อีกหน้าหนึ่ง
+                             (เกิดกับใบที่ที่อยู่ยาวจนตัดเป็นสองบรรทัด)
+                             เดิมเว้นสองบรรทัดทั้งใต้เส้นลงชื่อและใต้วงเล็บชื่อ เหลือบรรทัดเดียวก็ยังเซ็นได้สบาย -->
+                        <div class="avoid-break" style="margin-top: 6px;">
+                            <div style="display: flex; align-items: baseline; margin-bottom: 4px;">
                                 ข้าพเจ้า <span class="solid-line" style="width: 250px; margin: 0 10px;">${data.requestedBy}</span>
                                 ตำแหน่ง <span class="solid-line" style="width: 180px; margin: 0 10px;">${position}</span>
                             </div>
-                            <div style="margin-top: 5px; line-height: 1.6; margin-bottom: 16px;">
+                            <div style="line-height: 1.6; margin-bottom: 6px;">
                                 ขอรับรองว่า รายจ่ายข้างต้นนี้ข้าพเจ้าได้จ่ายไปในงานของสถาบันรับรองคุณภาพสถานพยาบาล และไม่อาจเรียก<br>
                                 ใบเสร็จรับเงินจากผู้รับเงิน
                             </div>
-                            <div style="text-align: center; margin-top: 10px;">
-                                ลงชื่อ <span class="solid-line" style="width: 200px;"></span><br><br>
-                                ( <span class="solid-line" style="width: 160px; border: none; font-weight: bold;">${data.requestedBy}</span> )<br><br>
-                                วันที่ <span class="solid-line" style="width: 160px; border: none;">${dateStr}</span>
+                            <!-- ใช้ระยะห่างที่กำหนดเป็นตัวเลข แทนการเว้นบรรทัดด้วย <br>
+                                 เพราะ <br> ผูกกับขนาดฟอนต์ คุมความสูงไม่ได้แน่นอนเท่า -->
+                            <div style="text-align: center; margin-top: 4px;">
+                                ลงชื่อ <span class="solid-line" style="width: 200px;"></span>
+                                <div style="margin-top: 8px;">( <span class="solid-line" style="width: 160px; border: none; font-weight: bold;">${data.requestedBy}</span> )</div>
+                                <div style="margin-top: 4px;">วันที่ <span class="solid-line" style="width: 160px; border: none;">${dateStr}</span></div>
                             </div>
                         </div>
                     </div>`;
