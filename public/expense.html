@@ -405,16 +405,35 @@
                     </div>
                 </div>
 
-                <div id="travelDetailsBox" class="hidden mt-6 bg-blue-50/50 p-5 rounded-xl border border-blue-200 shadow-inner animate-fade-in">
-                    <label class="block text-sm font-bold text-blue-900 mb-4 border-b border-blue-200 pb-2">
-                        รูปแบบการเดินทาง และระยะทาง
-                    </label>
+                <!-- ลำดับต่อจากนี้เรียงตามเอกสาร PDF: 1 ค่าที่พัก · 2 ค่าพาหนะ · 3 ค่าใช้จ่ายอื่นๆ
+                     เดิมเอาแผนที่กับค่า Taxi ขึ้นก่อนค่าที่พัก และซ่อน Taxi ไว้ในกล่องแผนที่
+                     ทำให้คนกรอกไล่ตามกระดาษไม่ได้ ทุกกล่องยังใช้ id เดิม โค้ดส่วนอื่นจึงไม่ต้องแก้ -->
+                <div id="secHotel" class="hidden mt-6 bg-slate-50 p-5 rounded-xl border border-slate-200 animate-fade-in">
+                    <h3 class="text-sm font-bold text-blue-900 mb-4 border-b pb-2">1. ค่าที่พัก</h3>
+                    <div id="costHotelBox" class="mb-4 bg-white p-3 rounded-lg border border-slate-200">
+                        <label class="block text-xs font-bold text-slate-700 mb-2">รายละเอียดที่พัก</label>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
-                        <!-- ค่า Taxi: ใช้เฉพาะ "ใบรับรองค่าพาหนะ" -->
+                        <!-- Hotel Name (Single field) -->
+                        <div class="mb-3">
+                            <label class="block text-xs text-slate-600 mb-1">ชื่อโรงแรม</label>
+                            <input type="text" id="hotelName" placeholder="เช่น โรงแรม A / โรงแรม B (ถ้าหลายโรงแรม ใช้ / คั่น)" class="w-full border p-2 rounded text-sm outline-none focus:border-blue-500">
+                            <p class="text-[10px] text-slate-400 mt-1"><svg class="inline w-3.5 h-3.5 -mt-0.5 flex-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2Z"/></svg> ถ้าพักหลายโรงแรม ให้ใช้ "/" คั่น เช่น โรงแรม A / โรงแรม B</p>
+                        </div>
+
+                        <!-- Accommodation Entries -->
+                        <div class="flex justify-between items-center mb-2">
+                            <label class="block text-xs text-slate-600">รายการที่พัก</label>
+                            <button type="button" onclick="addAccommodationEntry()" class="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 font-medium">+ เพิ่มรายการ</button>
+                        </div>
+                        <div id="accommodationEntriesContainer"></div>
+                    </div>
+                </div>
+
+                <div id="secVehicle" class="hidden mt-6 bg-slate-50 p-5 rounded-xl border border-slate-200 animate-fade-in">
+                    <h3 class="text-sm font-bold text-blue-900 mb-4 border-b pb-2">2. ค่าพาหนะ</h3>
                         <div id="costTaxiBox" class="bg-white p-3 rounded-lg border border-blue-100 shadow-sm">
                             <div class="flex items-center justify-between mb-2">
-                                <label class="text-xs font-bold text-slate-500">การเดินทางด้วยรถ Taxi</label>
+                                <label class="text-xs font-bold text-slate-500">2.1 ค่าพาหนะรับจ้าง (Taxi)</label>
                                 <button type="button" onclick="addTaxiEntry()"
                                     class="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition-colors">
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -429,6 +448,13 @@
                                 <!-- entries added by addTaxiEntry() -->
                             </div>
                         </div>
+
+                <div id="travelDetailsBox" class="hidden mt-6 bg-blue-50/50 p-5 rounded-xl border border-blue-200 shadow-inner animate-fade-in">
+                    <label class="block text-sm font-bold text-blue-900 mb-4 border-b border-blue-200 pb-2">
+                        2.2 ค่าน้ำมันรถ — เส้นทางและระยะทาง
+                    </label>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
 
                         <div class="bg-white p-3 rounded-lg border border-blue-100 shadow-sm">
                             <label class="block text-xs font-bold text-slate-500 mb-2">🚘 การเดินทางด้วยรถส่วนตัว (ค่าน้ำมัน)</label>
@@ -547,46 +573,27 @@
                     </p>
                 </div>
 
-                <div id="travelCostBox" class="hidden mt-6 bg-slate-50 p-5 rounded-xl border border-slate-200 animate-fade-in">
-                    <h3 class="text-sm font-bold text-blue-900 mb-4 border-b pb-2">รายละเอียดค่าใช้จ่ายเพิ่มเติม</h3>
-
-                    
-                    <!-- ค่าที่พัก: ใช้เฉพาะ "ใบรายงานการเดินทาง" -->
-                    <div id="costHotelBox" class="mb-4 bg-white p-3 rounded-lg border border-slate-200">
-                        <label class="block text-xs font-bold text-slate-700 mb-2">1. ค่าที่พัก</label>
-
-                        <!-- Hotel Name (Single field) -->
-                        <div class="mb-3">
-                            <label class="block text-xs text-slate-600 mb-1">ชื่อโรงแรม</label>
-                            <input type="text" id="hotelName" placeholder="เช่น โรงแรม A / โรงแรม B (ถ้าหลายโรงแรม ใช้ / คั่น)" class="w-full border p-2 rounded text-sm outline-none focus:border-blue-500">
-                            <p class="text-[10px] text-slate-400 mt-1"><svg class="inline w-3.5 h-3.5 -mt-0.5 flex-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2Z"/></svg> ถ้าพักหลายโรงแรม ให้ใช้ "/" คั่น เช่น โรงแรม A / โรงแรม B</p>
-                        </div>
-
-                        <!-- Accommodation Entries -->
-                        <div class="flex justify-between items-center mb-2">
-                            <label class="block text-xs text-slate-600">รายการที่พัก</label>
-                            <button type="button" onclick="addAccommodationEntry()" class="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 font-medium">+ เพิ่มรายการ</button>
-                        </div>
-                        <div id="accommodationEntriesContainer"></div>
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <!-- ค่าตั๋วเครื่องบิน: ใช้เฉพาะ "ใบรายงานการเดินทาง" -->
                         <div id="costAirBox" class="bg-white p-3 rounded-lg border border-slate-200">
-                            <label class="block text-xs font-bold text-slate-700 mb-2">2. ค่าตั๋วเครื่องบิน (บาท)</label>
+                            <label class="block text-xs font-bold text-slate-700 mb-2">2.3 ค่าตั๋วเครื่องบิน (บาท)</label>
                             <input type="number" id="airfareCost" placeholder="จำนวนเงิน" class="w-full border p-2 rounded text-sm outline-none focus:border-blue-500" oninput="calculateTravelTotal()">
                         </div>
-                        <!-- ค่าทางด่วน และ ค่าอื่นๆ: ใช้ทั้งสองเอกสาร -->
+                </div>
+
+                <div id="secOther" class="hidden mt-6 bg-slate-50 p-5 rounded-xl border border-slate-200 animate-fade-in">
+                    <h3 class="text-sm font-bold text-blue-900 mb-4 border-b pb-2">3. ค่าใช้จ่ายอื่นๆ</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div id="costTollBox" class="bg-white p-3 rounded-lg border border-slate-200">
-                            <label class="block text-xs font-bold text-slate-700 mb-2">3. ค่าทางด่วน/ที่จอดรถ</label>
+                            <label class="block text-xs font-bold text-slate-700 mb-2">3.1 ค่าทางด่วน/ที่จอดรถ</label>
                             <input type="number" id="tollCost" placeholder="จำนวนเงิน" class="w-full border p-2 rounded text-sm outline-none focus:border-blue-500" oninput="calculateTravelTotal()">
                         </div>
                         <div id="costOtherBox" class="bg-white p-3 rounded-lg border border-slate-200">
-                            <label class="block text-xs font-bold text-slate-700 mb-2">4. ค่าเบี้ยเลี้ยง/อื่นๆ</label>
+                            <label class="block text-xs font-bold text-slate-700 mb-2">3.2 ค่าเบี้ยเลี้ยง/อื่นๆ</label>
                             <input type="number" id="otherCost" placeholder="จำนวนเงิน" class="w-full border p-2 rounded text-sm outline-none focus:border-blue-500" oninput="calculateTravelTotal()">
                         </div>
                     </div>
                 </div>
+
+
 
                 <div id="extraEntriesBox" class="hidden mt-6 bg-slate-50 p-5 rounded-xl border border-slate-200 animate-fade-in">
                     <h3 class="text-sm font-bold text-blue-900 mb-1 border-b pb-2">
@@ -2339,7 +2346,10 @@
         show('travelDetailsBox', hasReceipt);            // แผนที่ · ระยะทาง · ประเภทรถ
         show('extraEntriesBox',  hasReceipt);            // กิจกรรมเพิ่มเติม
         describeDocDate(hasReport, hasReceipt, hasGeneral);
-        show('travelCostBox',    hasTravel);             // กล่องรวมค่าใช้จ่าย
+        // กล่องหัวข้อตามเลขข้อใน PDF — แสดงเมื่อมีอะไรอยู่ข้างในให้กรอกจริง
+        show('secHotel',   hasReport);                   // 1. ค่าที่พัก (มีเฉพาะใบรายงาน)
+        show('secVehicle', hasTravel);                   // 2. ค่าพาหนะ (Taxi/ระยะทาง/เครื่องบิน)
+        show('secOther',   hasTravel);                   // 3. ค่าใช้จ่ายอื่นๆ (ทางด่วน/เบี้ยเลี้ยง)
         show('costHotelBox',     hasReport);             // ค่าที่พัก
         show('costAirBox',       hasReport);             // ค่าตั๋วเครื่องบิน
         show('costTaxiBox',      hasReceipt);            // ค่า Taxi
