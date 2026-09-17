@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>ปิดปรับปรุงชั่วคราว — พร้อมเบิก</title>
+
+<!-- หน้านี้ต้องขึ้นได้แม้ตอนที่ทุกอย่างอื่นปิดอยู่
+     จึงไม่พึ่ง Tailwind หรือสคริปต์ใดๆ มีแค่ CSS ในไฟล์กับโลโก้
+     ฟอนต์ถ้าโหลดไม่ทันก็ยังอ่านออกด้วย fallback -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --ink:      #0f172a;
+    --body:     #475569;
+    --muted:    #64748b;
+    --brand:    #1e3a8a;
+    --brand-lt: #dbeafe;
+    --card:     #ffffff;
+    --ground:   #eef3fa;
+    --line:     #e2e8f0;
+    --safe:     #047857;
+    --safe-bg:  #ecfdf5;
+    --safe-ln:  #a7f3d0;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: linear-gradient(170deg, var(--ground) 0%, #f8fafc 55%, var(--ground) 100%);
+    color: var(--ink);
+    font-family: 'IBM Plex Sans Thai', 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .card {
+    width: 100%;
+    max-width: 520px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 44px 40px 36px;
+    text-align: center;
+    box-shadow: 0 1px 2px rgba(15,23,42,.04), 0 12px 32px -12px rgba(15,23,42,.14);
+  }
+
+  .logo {
+    width: 88px;
+    height: 88px;
+    object-fit: contain;
+    margin-bottom: 22px;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 5px 14px;
+    margin-bottom: 18px;
+    border-radius: 999px;
+    background: var(--brand-lt);
+    color: var(--brand);
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: .02em;
+  }
+
+  h1 {
+    margin: 0 0 14px;
+    font-size: 27px;
+    font-weight: 700;
+    line-height: 1.4;
+    text-wrap: balance;
+  }
+
+  p {
+    margin: 0 0 14px;
+    color: var(--body);
+  }
+
+  /* ตัดบรรทัดเองตรงรอยต่อประโยค เบราว์เซอร์ตัดคำไทยเองแล้วได้ "ใช้/งาน" คาบเกี่ยวกัน */
+  .lead { text-wrap: pretty; }
+
+  /* คนที่เห็นหน้านี้จะกังวลเรื่องเดียวคือข้อมูลที่กรอกไว้หาย จึงตอบให้ชัดตรงนี้ */
+  .safe {
+    display: flex;
+    gap: 11px;
+    align-items: flex-start;
+    margin: 26px 0 28px;
+    padding: 15px 17px;
+    text-align: left;
+    border: 1px solid var(--safe-ln);
+    border-radius: 13px;
+    background: var(--safe-bg);
+    color: #065f46;
+    font-size: 14.5px;
+    line-height: 1.65;
+  }
+  .safe svg { flex: none; margin-top: 3px; }
+  .safe strong { font-weight: 600; }
+
+  button {
+    width: 100%;
+    padding: 13px 20px;
+    border: 0;
+    border-radius: 12px;
+    background: var(--brand);
+    color: #fff;
+    font-family: inherit;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  button:hover  { background: #1d4ed8; }
+  button:focus-visible { outline: 3px solid #93c5fd; outline-offset: 2px; }
+
+  .foot {
+    margin: 22px 0 0;
+    font-size: 13.5px;
+    color: var(--muted);
+  }
+
+  @media (max-width: 480px) {
+    .card { padding: 34px 24px 28px; border-radius: 16px; }
+    h1 { font-size: 23px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+  <main class="card">
+    <img class="logo" src="/app-logo.png" alt="พร้อมเบิก">
+
+    <div class="badge">ปิดปรับปรุงชั่วคราว</div>
+
+    <h1>ขณะนี้ระบบพร้อมเบิก<br>ปิดปรับปรุงชั่วคราว</h1>
+
+    <p class="lead">เรากำลังปรับปรุงระบบให้ใช้งานได้ดีขึ้น<br>
+       จะเปิดให้ใช้งานอีกครั้งเร็ว ๆ นี้</p>
+
+    <div class="safe">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2.1"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+        <path d="m9 12 2 2 4-4"></path>
+      </svg>
+      <span><strong>ข้อมูลของท่านอยู่ครบถ้วน</strong> —
+            ใบเบิก โปรไฟล์ และไฟล์แนบทั้งหมดยังอยู่เหมือนเดิม
+            ไม่มีอะไรสูญหาย เมื่อเปิดระบบจะใช้งานต่อได้ทันที</span>
+    </div>
+
+    <button type="button" onclick="location.reload()">ลองเข้าใหม่อีกครั้ง</button>
+
+    <p class="foot">หากมีข้อสงสัย กรุณาติดต่อผู้ดูแลระบบ</p>
+  </main>
+
+</body>
+</html>

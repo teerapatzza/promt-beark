@@ -25,9 +25,16 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
+    volumes:
+      # สวิตช์ปิดปรับปรุง: มีไฟล์ maint/ON = ปิด, ไม่มี = เปิด
+      # ผูกเป็น bind mount เพื่อให้สลับได้จากโฮสต์ทันที ไม่ต้อง build ไม่ต้อง restart
+      - ./maint:/maint:ro
     environment:
       - BACKEND_HOST=backend
       - BACKEND_PORT=3000
+      # ลิงก์ลับให้ทีมงานเข้าใช้ระหว่างปิดปรับปรุง มาจาก .env (ไม่อยู่ใน git)
+      # ค่าสำรองด้านล่างเป็นค่าที่เดาไม่ได้ กันไม่ให้กลายเป็นค่าว่างแล้วใครก็ผ่านด่านได้
+      - MAINT_TOKEN=${MAINT_TOKEN:-no-bypass-token-configured}
 
 volumes:
   db_data:

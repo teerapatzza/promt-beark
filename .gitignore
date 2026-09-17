@@ -35,3 +35,6 @@ certs/
 # repo นี้เป็นสาธารณะ ห้ามใส่เข้าไป สร้างใหม่ได้ด้วย scripts/dump-expenses-fixture.js
 expenses-input.json
 doc-baseline.json
+
+# สวิตช์ปิดปรับปรุง เป็นสถานะของแต่ละเครื่อง ไม่ใช่ของโปรเจกต์
+maint/ON
