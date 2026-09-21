@@ -377,6 +377,8 @@
                     if (s) s.textContent = t;
                 });
                 box.innerHTML = `<div class="doc-preview"><div class="doc-preview-inner">${built.html}</div></div>`;
+                // รอฟอนต์ก่อนวัดขนาด ไม่งั้นย่อจากความสูงที่ยังเปลี่ยนได้อีก
+                await waitForDocumentFonts();
                 fitPreview(box);
                 watchPreviewSize(box);
             } catch (e) {
@@ -573,7 +575,7 @@
 
             if (hasTravel) {
                 const tr = meta._travel || {};
-                const c = meta._costs || { hotel:{}, fuelRate:0, taxiOutAmt:0, taxiRetAmt:0, airAmount:0, tollAmount:0, otherAmount:0 };
+                const c = meta._costs || { hotel:{}, fuelRate:0, taxiOutAmt:0, taxiRetAmt:0, airAmount:0, tollAmount:0, parkingAmount:0, otherAmount:0 };
                 const addr = meta._addr || {};
                 
                 const distOut = parseFloat(tr.distOut || 0);
@@ -647,6 +649,8 @@
                 const fuelTotal = fuelDist * fRate;
 
                 const tollTotal = parseFloat(c.tollAmount || 0);
+                // ใบเก่าไม่มีคีย์นี้ ได้ 0 เอกสารจึงออกมาเหมือนเดิมทุกตัวอักษร
+                const parkingTotal = parseFloat(c.parkingAmount || 0);
                 const otherTotal = parseFloat(c.otherAmount || 0);
                 const airTotal = parseFloat(c.airAmount || 0);
 
@@ -662,7 +666,7 @@
                     }, 0);
                 }
                 
-                const receiptTotal = taxiTotal + fuelTotal + tollTotal + otherTotal;
+                const receiptTotal = taxiTotal + fuelTotal + tollTotal + parkingTotal + otherTotal;
                 const receiptAmtText = getThaiBahtText(receiptTotal);
                 
                 const date1 = new Date(`${tr.startDate}T${tr.startTime||'00:00'}`);
@@ -883,9 +887,9 @@
                             <tr><td colspan="5" style="border: none; padding: 0;"><b>3. ค่าใช้จ่ายอื่นๆ (ระบุรายการ)</b></td></tr>
                             <tr>
                                 <td style="border: none; padding: 0;"></td>
-                                <td style="border: none; padding: 0; padding-left: 5px;">3.1 &nbsp;&nbsp; <span class="solid-line" style="width: 300px; text-align:left;">${(tollTotal+otherTotal) > 0 ? 'ค่าเบี้ยเลี้ยง / ค่าทางด่วน / อื่นๆ' : ''}</span></td>
+                                <td style="border: none; padding: 0; padding-left: 5px;">3.1 &nbsp;&nbsp; <span class="solid-line" style="width: 300px; text-align:left;">${(tollTotal+parkingTotal+otherTotal) > 0 ? 'ค่าเบี้ยเลี้ยง / ค่าทางด่วน / อื่นๆ' : ''}</span></td>
                                 <td style="text-align: right; border: none; padding: 0;">เป็นเงิน</td>
-                                <td style="border-bottom: 1px solid #000; text-align: right; padding: 0 5px;">${(tollTotal+otherTotal) > 0 ? formatNumber(tollTotal+otherTotal) : ''}</td>
+                                <td style="border-bottom: 1px solid #000; text-align: right; padding: 0 5px;">${(tollTotal+parkingTotal+otherTotal) > 0 ? formatNumber(tollTotal+parkingTotal+otherTotal) : ''}</td>
                                 <td style="text-align: right; border: none; padding: 0;">บาท</td>
                             </tr>
                             <tr>
@@ -1058,12 +1062,16 @@
                                         ${tollTotal > 0 ? formatNumber(tollTotal) : ''}
                                     </td>
                                 </tr>
-                                <!-- row 12: ค่าที่จอดรถ (แยกแถว) -->
+                                <!-- row 12: ค่าที่จอดรถ (แยกแถว)
+                                     เดิมบรรทัดนี้ว่างเสมอ เพราะฟอร์มมีช่องรวม "ค่าทางด่วน/ที่จอดรถ" ช่องเดียว
+                                     ค่าที่จอดรถจึงไปโผล่ในบรรทัดค่าทางด่วน ตอนนี้ฟอร์มแยกช่องแล้ว -->
                                 <tr>
                                     <td style="border-top: none; border-bottom: 1px solid #000;">
-                                        <span style="font-family: Arial; font-size: 18px; vertical-align: middle;">&#9711;</span> ค่าที่จอดรถ
+                                        <span style="font-family: Arial; font-size: 18px; vertical-align: middle;">${parkingTotal > 0 ? '&#9673;' : '&#9711;'}</span> ค่าที่จอดรถ
                                     </td>
-                                    <td style="border-top: none; border-bottom: 1px solid #000;"></td>
+                                    <td style="border-top: none; border-bottom: 1px solid #000; text-align: right;">
+                                        ${parkingTotal > 0 ? formatNumber(parkingTotal) : ''}
+                                    </td>
                                 </tr>
                                 <!-- row 13: ค่าใช้จ่ายอื่นๆ -->
                                 <tr>
@@ -1365,6 +1373,41 @@
 
 
         /** ทำไฟล์ PDF แล้วดาวน์โหลด — ตัวเอกสารมาจาก buildDocumentHtml */
+        /* ══════════ รอให้ฟอนต์ของเอกสารพร้อมจริง ก่อนแปลงเป็น PDF ══════════
+           html2canvas วัดความกว้างข้อความรอบหนึ่ง แล้ววาดจริงอีกรอบ
+           ถ้าฟอนต์เปลี่ยนคั่นกลางสองจังหวะนั้น จุดตัดบรรทัดจะไม่ตรงกัน
+           ผลคือข้อความชุดเดียวถูกวาดสองแบบทับกันจนอ่านไม่ออก
+
+           ของเดิมเรียก document.fonts.load('400 13.5px Sarabun') เฉยๆ ซึ่งไม่พอ
+           Google Fonts แบ่งไฟล์ตาม unicode-range เป็นชุดละติน ไทย เวียดนาม แยกไฟล์กัน
+           และ load() ถ้าไม่ระบุข้อความ จะใช้ข้อความทดสอบภาษาอังกฤษ
+           คำสั่งเดิมจึงดึงมาแค่ชุดละติน ส่วนชุดอักษรไทยยังไม่ถูกขอ
+
+           ซ้ำร้าย หน้าเว็บทั้งหน้าใช้ IBM Plex Sans Thai ส่วนเอกสารใช้ Sarabun
+           ชุดอักษรไทยของ Sarabun จึงไม่เคยถูกโหลดเลยตลอดอายุหน้าเว็บ
+           จนกว่าจะแทรกเอกสารลงไป แล้วมันก็มาไม่ทัน html2canvas
+
+           ต้องส่งอักษรไทยเข้าไปด้วย เบราว์เซอร์ถึงจะรู้ว่าต้องไปเอาไฟล์ชุดไหน */
+        async function waitForDocumentFonts() {
+            if (!document.fonts || !document.fonts.load) return false;
+            try {
+                // 'ก' แทนชุดอักษรไทย  'A' แทนชุดละติน (ตัวเลขและคำอังกฤษในเอกสาร)
+                await Promise.all([
+                    document.fonts.load('400 13.5px Sarabun', 'ก'),
+                    document.fonts.load('700 13.5px Sarabun', 'ก'),
+                    document.fonts.load('400 13.5px Sarabun', 'A'),
+                    document.fonts.load('700 13.5px Sarabun', 'A')
+                ]);
+                await document.fonts.ready;
+            } catch (e) {
+                // โหลดฟอนต์ไม่สำเร็จก็ยังออกเอกสารได้ด้วยฟอนต์สำรอง
+                console.warn('โหลดฟอนต์เอกสารไม่ครบ เอกสารอาจหน้าตาเพี้ยนเล็กน้อย', e);
+                return false;
+            }
+            return document.fonts.check('400 13.5px Sarabun', 'ก')
+                && document.fonts.check('700 13.5px Sarabun', 'ก');
+        }
+
         async function exportPDF(data) {
             const btn = event.currentTarget;
             const originalText = btn.innerHTML;
@@ -1384,17 +1427,9 @@
             const element = document.getElementById('formal-doc');
             btn.innerHTML = '⏳ กำลังเตรียมเอกสาร...';
 
-            // รอให้ฟอนต์ Sarabun พร้อมก่อนเสมอ
-            // ถ้า html2canvas วัดความกว้างตอนฟอนต์ยังไม่มา มันจะคำนวณจุดตัดบรรทัด
-            // ด้วยฟอนต์สำรอง แล้ววาดจริงด้วย Sarabun -> ตัวอักษรกองทับกัน
-            // เดิมใช้ setTimeout 1000ms เดาเวลา ซึ่งไม่พอเมื่อเน็ตช้าหรือเปิดครั้งแรก
-            try {
-                if (document.fonts && document.fonts.ready) {
-                    await document.fonts.ready;
-                    await document.fonts.load('400 13.5px Sarabun');
-                    await document.fonts.load('700 13.5px Sarabun');
-                }
-            } catch (e) { /* เบราว์เซอร์เก่าไม่มี API นี้ ยังทำงานต่อได้ */ }
+            // ต้องรอฟอนต์ให้ครบ "ทุกชุดอักษร" ก่อน ไม่ใช่แค่ชุดละติน
+            // ดูคำอธิบายเต็มที่ waitForDocumentFonts()
+            await waitForDocumentFonts();
 
             setTimeout(() => {
                 btn.innerHTML = '⏳ กำลังสร้าง PDF...';

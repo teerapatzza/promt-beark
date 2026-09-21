@@ -182,7 +182,12 @@
                 </h2>
             </div>
             <div class="p-6">
-                <input type="text" id="activityName" placeholder="ระบุชื่อกิจกรรม (จะแสดงเฉพาะในใบรับรองแทนใบเสร็จฯ)" class="w-full border-2 border-slate-200 p-3.5 rounded-xl text-lg focus:border-blue-500 outline-none transition-all" oninput="syncActivityFromMainToExtra()">
+                <!-- เพดาน 200 ตัวอักษร ได้มาจากการวัดจริง ไม่ใช่ตัวเลขที่ตั้งลอยๆ
+                     ชื่อกิจกรรมถูกพิมพ์ลงเอกสารสองที่ (ช่องกิจกรรม กับ กิจกรรมเพิ่มเติม)
+                     วัดแล้วหน้าเริ่มล้น A4 ที่ราว 250 ตัวอักษร ที่ 200 ยังเหลือที่ว่าง 6px
+                     ใบที่ยาวที่สุดที่ใช้งานจริงอยู่ที่ 158 ตัวอักษร -->
+                <input type="text" id="activityName" maxlength="200" placeholder="ระบุชื่อกิจกรรม (จะแสดงเฉพาะในใบรับรองแทนใบเสร็จฯ)" class="w-full border-2 border-slate-200 p-3.5 rounded-xl text-lg focus:border-blue-500 outline-none transition-all" oninput="syncActivityFromMainToExtra(); updateActivityCounter()">
+                <div id="activityCounter" class="hidden text-xs mt-1.5 text-right"></div>
                 <p class="text-xs text-slate-500 mt-2"><svg class="inline w-3.5 h-3.5 -mt-0.5 flex-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2Z"/></svg> หากไม่ระบุ ระบบจะเว้นว่างไว้ในเอกสาร PDF <span class="text-blue-600">🔄 ข้อมูลจะ sync กับกิจกรรมด้านล่างอัตโนมัติ</span></p>
 
                 <!-- วันที่ที่พิมพ์ลงเอกสาร — เดิมใช้วันที่กดบันทึกเสมอ แก้ไม่ได้
@@ -582,12 +587,18 @@
                 <div id="secOther" class="hidden mt-6 bg-slate-50 p-5 rounded-xl border border-slate-200 animate-fade-in">
                     <h3 class="text-sm font-bold text-blue-900 mb-4 border-b pb-2">3. ค่าใช้จ่ายอื่นๆ</h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- เอกสารมีบรรทัด "ค่าทางด่วน" กับ "ค่าที่จอดรถ" แยกกันอยู่แล้ว
+                             เดิมฟอร์มมีช่องรวมช่องเดียว ค่าที่จอดรถจึงไปโผล่ในบรรทัดค่าทางด่วนเสมอ -->
                         <div id="costTollBox" class="bg-white p-3 rounded-lg border border-slate-200">
-                            <label class="block text-xs font-bold text-slate-700 mb-2">3.1 ค่าทางด่วน/ที่จอดรถ</label>
+                            <label class="block text-xs font-bold text-slate-700 mb-2">3.1 ค่าทางด่วน</label>
                             <input type="number" id="tollCost" placeholder="จำนวนเงิน" class="w-full border p-2 rounded text-sm outline-none focus:border-blue-500" oninput="calculateTravelTotal()">
                         </div>
+                        <div id="costParkingBox" class="bg-white p-3 rounded-lg border border-slate-200">
+                            <label class="block text-xs font-bold text-slate-700 mb-2">3.2 ค่าที่จอดรถ</label>
+                            <input type="number" id="parkingCost" placeholder="จำนวนเงิน" class="w-full border p-2 rounded text-sm outline-none focus:border-blue-500" oninput="calculateTravelTotal()">
+                        </div>
                         <div id="costOtherBox" class="bg-white p-3 rounded-lg border border-slate-200">
-                            <label class="block text-xs font-bold text-slate-700 mb-2">3.2 ค่าเบี้ยเลี้ยง/อื่นๆ</label>
+                            <label class="block text-xs font-bold text-slate-700 mb-2">3.3 ค่าเบี้ยเลี้ยง/อื่นๆ</label>
                             <input type="number" id="otherCost" placeholder="จำนวนเงิน" class="w-full border p-2 rounded text-sm outline-none focus:border-blue-500" oninput="calculateTravelTotal()">
                         </div>
                     </div>
@@ -716,6 +727,10 @@
                         <div id="breakdownToll" class="hidden flex justify-between items-center py-1">
                             <span class="text-slate-600">🛣️ ค่าทางด่วน</span>
                             <span class="font-bold text-slate-800" id="breakdownTollAmount">0</span>
+                        </div>
+                        <div id="breakdownParking" class="hidden flex justify-between items-center py-1">
+                            <span class="text-slate-600">🅿️ ค่าที่จอดรถ</span>
+                            <span class="font-bold text-slate-800" id="breakdownParkingAmount">0</span>
                         </div>
                         <div id="breakdownOther" class="hidden flex justify-between items-center py-1">
                             <span class="text-slate-600">📦 ค่าใช้จ่ายอื่นๆ</span>
@@ -2011,6 +2026,25 @@
     }
 
     // Activity Sync Functions
+    /* ตัวนับตัวอักษรของชื่อกิจกรรม
+       เงียบไว้ตอนยังสั้น แล้วค่อยเตือนเมื่อเข้าใกล้เพดาน
+       เลข 200 มาจากการวัดความสูงหน้าเอกสารจริง ดูคอมเมนต์ที่ช่องกรอก */
+    const ACTIVITY_MAX = 200;
+    function updateActivityCounter() {
+        const input = document.getElementById('activityName');
+        const box = document.getElementById('activityCounter');
+        if (!input || !box) return;
+        const n = input.value.length;
+        if (n < 150) { box.className = 'hidden'; return; }
+        // ใบเก่าบางใบถูกบันทึกไว้ก่อนมีเพดานนี้ และยาวเกินจริง
+        // ต้องบอกให้ย่อ ไม่ใช่ตัดทิ้งเงียบๆ เพราะเป็นข้อมูลที่ผู้ใช้ตั้งใจกรอก
+        box.textContent = n + ' / ' + ACTIVITY_MAX + ' ตัวอักษร'
+            + (n > ACTIVITY_MAX ? '  — ยาวเกินเพดาน เอกสารจะล้นหน้า กรุณาย่อให้สั้นลง'
+             : n === ACTIVITY_MAX ? '  — พิมพ์ได้เท่านี้ ยาวกว่านี้เอกสารจะล้นหน้า' : '');
+        box.className = 'text-xs mt-1.5 text-right '
+            + (n >= ACTIVITY_MAX ? 'text-rose-600 font-semibold' : 'text-amber-600');
+    }
+
     function syncActivityFromMainToExtra() {
         const mainActivity = document.getElementById('activityName')?.value || '';
         const extraActivities = document.querySelectorAll('.extra-act-text');
@@ -2038,6 +2072,7 @@
             }
         });
         document.getElementById('activityName').value = activities.join(' / ');
+        updateActivityCounter();
     }
 
     function addExtraActivity() {
@@ -2047,7 +2082,7 @@
         const div = document.createElement('div');
         div.className = 'extra-activity flex gap-2 items-center';
         div.innerHTML = `
-            <input type="text" class="extra-act-text flex-1 border border-slate-200 px-2.5 py-1.5 rounded-lg text-sm outline-none focus:border-blue-400" placeholder="ระบุกิจกรรม..." oninput="syncActivityFromExtraToMain()">
+            <input type="text" maxlength="200" class="extra-act-text flex-1 border border-slate-200 px-2.5 py-1.5 rounded-lg text-sm outline-none focus:border-blue-400" placeholder="ระบุกิจกรรม..." oninput="syncActivityFromExtraToMain()">
             <button type="button" onclick="removeExtraActivity(this)" class="text-slate-300 hover:text-rose-500 transition-colors p-1 flex-shrink-0">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
@@ -2278,9 +2313,10 @@
 
         const air = onReport ? (parseFloat(document.getElementById('airfareCost').value)||0) : 0;
         const toll = onTravel ? (parseFloat(document.getElementById('tollCost').value)||0) : 0;
+        const parking = onTravel ? (parseFloat(document.getElementById('parkingCost')?.value)||0) : 0;
         const other = onTravel ? (parseFloat(document.getElementById('otherCost').value)||0) : 0;
 
-        const total = hotel + fuelTotal + taxiTotal + air + toll + other;
+        const total = hotel + fuelTotal + taxiTotal + air + toll + parking + other;
         document.getElementById('totalAmount').innerHTML = new Intl.NumberFormat('th-TH', { style: 'decimal', minimumFractionDigits: 2 }).format(total) + ' <span class="text-2xl">฿</span>';
         document.getElementById('totalAmount').dataset.value = total;
 
@@ -2305,6 +2341,7 @@
         updateBreakdownItem('breakdownTaxi', 'breakdownTaxiAmount', taxiTotal);
         updateBreakdownItem('breakdownAir', 'breakdownAirAmount', air);
         updateBreakdownItem('breakdownToll', 'breakdownTollAmount', toll);
+        updateBreakdownItem('breakdownParking', 'breakdownParkingAmount', parking);
         updateBreakdownItem('breakdownOther', 'breakdownOtherAmount', other);
 
         // Show/hide breakdown container
@@ -2354,6 +2391,7 @@
         show('costAirBox',       hasReport);             // ค่าตั๋วเครื่องบิน
         show('costTaxiBox',      hasReceipt);            // ค่า Taxi
         show('costTollBox',      hasTravel);             // ค่าทางด่วน  (ทั้งสองใบ)
+        show('costParkingBox',   hasTravel);             // ค่าที่จอดรถ (ทั้งสองใบ)
         show('costOtherBox',     hasTravel);             // ค่าอื่นๆ    (ทั้งสองใบ)
         if (hasTravel) {
             setTimeout(autoFillExtraEntries, 100);
@@ -2865,8 +2903,9 @@
                 fuelRate:     needTravel  ? (document.getElementById('fuelRate')?.value || 0) : 0,
                 taxiEntries:  needReceipt ? collectTaxiEntries() : [],
                 airAmount:    needReport  ? (document.getElementById('airfareCost')?.value || 0) : 0,
-                tollAmount:  document.getElementById('tollCost')?.value  || 0,
-                otherAmount: document.getElementById('otherCost')?.value || 0
+                tollAmount:    document.getElementById('tollCost')?.value    || 0,
+                parkingAmount: document.getElementById('parkingCost')?.value || 0,
+                otherAmount:   document.getElementById('otherCost')?.value   || 0
             };
             // ประเภทรถอยู่ในใบรับรองค่าพาหนะเท่านั้น ถ้าหมวดนี้ไม่ได้ติ๊กใบนั้น
             // ช่องจะถูกซ่อน แต่ยังค้างค่าเดิมไว้จากตอนเลือกหมวดอื่น
@@ -2964,9 +3003,11 @@
             // Warn if has expenses but no attachments
             const airAmount = parseFloat(document.getElementById('airfareCost')?.value) || 0;
             const tollAmount = parseFloat(document.getElementById('tollCost')?.value) || 0;
+            const parkingAmount = parseFloat(document.getElementById('parkingCost')?.value) || 0;
             const totalHotelCost = getHotelTotal();
 
-            const hasExpensesRequiringReceipt = totalHotelCost > 0 || airAmount > 0 || tollAmount > 0;
+            const hasExpensesRequiringReceipt = totalHotelCost > 0 || airAmount > 0
+                                             || tollAmount > 0 || parkingAmount > 0;
 
             // ต้องฟังค่าที่แอดมินตั้งในหมวดหมู่ ไม่ใช่บังคับตายตัว
             // หมวดที่ไม่ได้ติ๊ก "บังคับแนบ" ไว้เลย ต้องบันทึกได้โดยไม่ต้องแนบไฟล์
@@ -2990,6 +3031,7 @@
                     if (totalHotelCost > 0) expenseList.push("ค่าที่พัก " + totalHotelCost.toLocaleString() + " บาท");
                     if (airAmount > 0) expenseList.push("ค่าตั๋วเครื่องบิน " + airAmount.toLocaleString() + " บาท");
                     if (tollAmount > 0) expenseList.push("ค่าทางด่วน " + tollAmount.toLocaleString() + " บาท");
+                    if (parkingAmount > 0) expenseList.push("ค่าที่จอดรถ " + parkingAmount.toLocaleString() + " บาท");
 
                     return alert(
                         "❌ ยังไม่ได้แนบใบเสร็จ!\n\n" +
@@ -3256,6 +3298,7 @@
         document.getElementById('position').value     = meta._position     || '';
         document.getElementById('affiliation').value  = meta._affiliation  || '';
         document.getElementById('activityName').value = meta._activityName || '';
+        updateActivityCounter();   // เปิดใบเก่าที่ชื่อยาว ต้องเห็นตัวนับทันที
 
         // ใบเก่าไม่มี _docDate ใช้วันที่สร้างใบเหมือนที่เอกสารเคยพิมพ์ออกมา
         // จะได้เปิดมาแก้แล้วออก PDF ใหม่ได้วันเดิม ไม่ใช่วันที่กดแก้
@@ -3386,6 +3429,7 @@
 
             document.getElementById('airfareCost').value = c.airAmount  || '';
             document.getElementById('tollCost').value    = c.tollAmount || '';
+            document.getElementById('parkingCost').value = c.parkingAmount || '';
             document.getElementById('otherCost').value   = c.otherAmount || '';
 
             // Taxi entries

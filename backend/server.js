@@ -1023,7 +1023,8 @@ function costBreakdown(md) {
   return {
     fuel, hotel, taxi,
     air:   num(c.airAmount),
-    toll:  num(c.tollAmount),
+    toll:    num(c.tollAmount),
+    parking: num(c.parkingAmount),
     other: num(c.otherAmount),
     km
   };
@@ -1047,7 +1048,7 @@ app.get('/stats', requireAdmin, (_req, res) => {
   };
 
   const byAffil = {}, byMonth = {}, byProv = {}, byPerson = {};
-  const cost = { fuel: 0, hotel: 0, taxi: 0, air: 0, toll: 0, other: 0 };
+  const cost = { fuel: 0, hotel: 0, taxi: 0, air: 0, toll: 0, parking: 0, other: 0 };
   let grand = 0, totalKm = 0;
 
   exps.forEach(e => {
@@ -1095,7 +1096,8 @@ app.get('/stats', requireAdmin, (_req, res) => {
     byCostType: Object.entries(cost)
       .map(([k, v]) => ({
         type: { fuel: 'ค่าน้ำมัน', hotel: 'ค่าที่พัก', taxi: 'ค่าแท็กซี่',
-                air: 'ค่าเครื่องบิน', toll: 'ค่าทางด่วน', other: 'อื่นๆ' }[k],
+                air: 'ค่าเครื่องบิน', toll: 'ค่าทางด่วน', parking: 'ค่าที่จอดรถ',
+                other: 'อื่นๆ' }[k],
         key: k,
         total: Math.round(v * 100) / 100,
         pct: grand ? Math.round((v / grand) * 1000) / 10 : 0
