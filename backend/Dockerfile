@@ -7,9 +7,10 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install --omit=dev
 
-COPY server.js .
-COPY validation.js .
-COPY microsoft-auth.js .
+# คัดลอกไฟล์ .js ทั้งหมด ไม่ไล่ทีละชื่อ
+# เดิมไล่ชื่อทีละไฟล์ พอเพิ่มโมดูลใหม่แล้วลืมเติมตรงนี้ backend จะพังตอนเริ่มทำงาน
+# ด้วย MODULE_NOT_FOUND ทั้งที่โค้ดถูกต้องทุกอย่าง (เจอจริง 22 ก.ย. 2569 กับ longdo-fetch.js)
+COPY *.js ./
 RUN mkdir -p /app/data
 
 EXPOSE 3000
