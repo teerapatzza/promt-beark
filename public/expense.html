@@ -545,9 +545,14 @@
                         </div>
                     </div>
 
-                    <p class="text-[11px] text-slate-400 mb-3">
-                        ค่าน้ำมัน <b>4</b> บาท/กม. — อัตรานี้กำหนดโดยผู้ดูแลระบบ แก้ไขไม่ได้
+                    <!-- อัตรานี้หมวดหมู่ตั้งทับค่ากลางได้ จึงต้องอ่านจากค่าจริงเสมอ
+                         เคยเขียนเลขตายตัวไว้ตรงนี้ ผู้ใช้เลยเห็น 4 ขณะที่ระบบคิดด้วย 5
+                         แล้วยอดออกมาไม่ตรงกับที่คำนวณเองในใจ -->
+                    <p class="text-[11px] text-slate-500 mb-3" id="fuelRateNote">
+                        ค่าน้ำมัน <b id="fuelRateLabel">—</b> บาท/กม. — อัตรานี้กำหนดโดยผู้ดูแลระบบ แก้ไขไม่ได้
                     </p>
+                    <p class="hidden text-[11px] text-slate-600 mb-3 px-2.5 py-1.5 rounded-md bg-slate-50 border border-slate-200"
+                       id="fuelWorkNote"></p>
 
                     <!-- ช่องเดิมที่โค้ดส่วนอื่นยังอ่านอยู่ ซ่อนไว้ ไม่ให้ผู้ใช้ต้องมายุ่ง
                          carType คิดจากติ๊กรถส่วนตัวของสองขา  returnDiff คิดจากช่องขากลับที่กรอกไว้ -->
@@ -1076,6 +1081,34 @@
         box('legOutTaxiBox',  document.getElementById('legOutTaxi')?.checked);
         box('legBackTaxiBox', document.getElementById('legBackTaxi')?.checked);
         if (typeof updateLegDateLabels === 'function') updateLegDateLabels();
+    }
+
+    /* แสดงอัตราค่าน้ำมันที่ใช้จริง พร้อมวิธีคิดแบบที่ตรวจตามได้ด้วยเครื่องคิดเลข
+       ยอดค่าน้ำมันเป็นเลขที่ผู้ใช้คำนวณเองในใจได้ ถ้าตัวเลขบนจอไม่ตรงกับที่เขาคิด
+       เขาจะไม่รู้ว่าผิดที่ตรงไหน จึงต้องกางให้เห็นทั้งระยะทางและอัตรา */
+    function showFuelWorking() {
+        const rate = parseFloat(document.getElementById('fuelRate')?.value) || 0;
+        const lbl = document.getElementById('fuelRateLabel');
+        if (lbl) lbl.textContent = rate ? String(rate) : '—';
+
+        const note = document.getElementById('fuelWorkNote');
+        if (!note) return;
+        const car = document.getElementById('carType')?.value || 'ไม่ระบุ';
+        const out = parseFloat(document.getElementById('distOutbound')?.value) || 0;
+        const ret = parseFloat(document.getElementById('distReturn')?.value)   || 0;
+        const useOut = (car === 'ขาไป'   || car === 'ไป-กลับ') ? out : 0;
+        const useRet = (car === 'ขากลับ' || car === 'ไป-กลับ') ? ret : 0;
+        const km = useOut + useRet;
+        if (!km || !rate) { note.classList.add('hidden'); return; }
+
+        const fmt = v => v.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const parts = [];
+        if (useOut) parts.push('ขาไป ' + useOut.toLocaleString('th-TH') + ' กม.');
+        if (useRet) parts.push('ขากลับ ' + useRet.toLocaleString('th-TH') + ' กม.');
+        note.classList.remove('hidden');
+        note.innerHTML = 'วิธีคิดค่าน้ำมัน: ' + parts.join(' + ')
+            + (parts.length > 1 ? ' = ' + km.toLocaleString('th-TH') + ' กม.' : '')
+            + ' × ' + rate + ' บาท = <b>' + fmt(km * rate) + ' บาท</b>';
     }
 
     /* วันของแต่ละขา มาจากกำหนดการเดินทางด้านบน ที่เดียวกับที่ค่าน้ำมันใช้
@@ -2541,6 +2574,7 @@
         else if(carType === 'ไป-กลับ') fuelDist = out + ret;
 
         const fuelTotal = fuelRate * fuelDist;
+        if (typeof showFuelWorking === 'function') showFuelWorking();
 
         const taxiTotal = onReceipt ? getTaxiTotal() : 0;
 
@@ -2672,6 +2706,8 @@
 
         // Apply fuel rate from category (if defined by admin)
         const fuelRateInput = document.getElementById('fuelRate');
+        // เปลี่ยนหมวด = อัตราอาจเปลี่ยน ตัวเลขที่ผู้ใช้เห็นต้องเปลี่ยนตาม
+        setTimeout(() => { if (typeof showFuelWorking === 'function') showFuelWorking(); }, 0);
         if (category.fuelRate != null && category.fuelRate > 0) {
             fuelRateInput.value = category.fuelRate;
             fuelRateInput.readOnly = true;

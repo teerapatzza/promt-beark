@@ -263,6 +263,32 @@ try {
   ok('ติ๊กแค่ Taxi แล้วช่องจุดเริ่มต้นกดใช้ได้จริง', share.usable === true);
   ok('ติ๊กแค่รถส่วนตัว ก็ยังโผล่เหมือนเดิม', share.carOnly === true);
 
+  // ═══ 11. อัตราค่าน้ำมันที่แสดง ต้องเป็นอัตราที่ใช้คิดเงินจริง ═══
+  // หมวดหมู่ตั้งทับค่ากลางได้ เคยเขียนเลข 4 ตายตัวไว้ ผู้ใช้เห็น 4 แต่ระบบคิดด้วย 5
+  console.log('');
+  console.log('═══ 11. ตัวเลขอัตราที่เห็น ต้องตรงกับที่ใช้คิดจริง และกางวิธีคิดให้ตรวจได้ ═══');
+  const fuel = await ev([
+    tick('legOutTaxi', false),
+    tick('legBackTaxi', false),
+    tick('legBackCar', true),
+    tick('legOutCar', true),
+    "document.getElementById('fuelRate').value = 5;",   // หมวดตั้งทับเป็น 5
+    "document.getElementById('distOutbound').value = 23.4;",
+    "document.getElementById('distReturn').value   = 23.4;",
+    "calculateTravelTotal();",
+    "await new Promise(r=>setTimeout(r,200));",
+    "return { shown: document.getElementById('fuelRateLabel').textContent.trim(),",
+    "         work: document.getElementById('fuelWorkNote').textContent.replace(/\\s+/g,' ').trim(),",
+    "         workShown: !document.getElementById('fuelWorkNote').classList.contains('hidden'),",
+    "         total: " + total + " };"
+  ].join('\n'));
+  ok('อัตราที่แสดงตรงกับอัตราที่หมวดตั้งไว้ ไม่ใช่เลขตายตัว', fuel.shown === '5', fuel.shown);
+  ok('ยอดคิดจากอัตราจริง 46.8 × 5 = 234', fuel.total === 234, fuel.total + ' บาท');
+  ok('กางวิธีคิดให้เห็น ตรวจตามด้วยเครื่องคิดเลขได้', fuel.workShown === true, fuel.work);
+  ok('วิธีคิดบอกทั้งระยะทางสองขาและอัตรา',
+     /23.4/.test(fuel.work) && /46.8/.test(fuel.work) && /× 5/.test(fuel.work) && /234/.test(fuel.work),
+     fuel.work);
+
   ok('ไม่มี JavaScript error ตลอดการทดสอบ', pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '));
 
   console.log('');
