@@ -39,7 +39,11 @@ const SETUP = [
   "await new Promise(r=>setTimeout(r,300));",
   "document.getElementById('distOutbound').value = 100;",
   "document.getElementById('distReturn').value   = 100;",
-  "window.recalcRoute = async () => {};",   // ไม่ยิงเน็ตระหว่างทดสอบ
+  // ดักที่ routeLeg ไม่ใช่ recalcRoute เพื่อให้ตรรกะจริงของ recalcRoute ยังทำงาน
+  // (ทับ recalcRoute แล้วลบคืนไม่ได้ เพราะเป็น function declaration เทสต์จะกลายเป็นวัดลม)
+  "window.__legs = [];",
+  "window.routeLeg = async (a, b) => { window.__legs.push([a && a.label, b && b.label]);",
+  "  return { km: 42, meters: 42000, coords: [] }; };",
   "calculateTravelTotal();"
 ].join('\n');
 
@@ -167,6 +171,52 @@ try {
     + " back: document.getElementById('legBackDate').textContent.trim() };");
   ok('การ์ดขาไปขึ้นวันออกเดินทาง', /20/.test(dates.out), dates.out);
   ok('การ์ดขากลับขึ้นวันกลับถึง', /22/.test(dates.back), dates.back);
+
+  // ═══ 7. บ้านที่แผนที่หาไม่เจอ ต้องไม่ทำให้เบิกขากลับไม่ได้ ═══
+  console.log('');
+  console.log('═══ 7. บ้านที่แผนที่หาไม่เจอ — เว้นช่องว่างต้องยังคิดระยะทางได้ ═══');
+  const home = await ev([
+    // แกล้งว่ามีพิกัดจุดเริ่มต้น (บ้าน จากโปรไฟล์) และจุดหมายแล้ว แต่ระบบค้นชื่อบ้านไม่เจอ
+    "window.geoFrom = { lat: 13.65, lng: 100.49, label: 'บ้าน' };",
+    "window.geoTo   = { lat: 13.75, lng: 100.53, label: 'โรงแรมดุสิต' };",
+    "document.getElementById('travelFrom').value = '141/36 ซอยสุขสวัสดิ์ 55';",
+    "document.getElementById('travelTo').value   = 'โรงแรมดุสิต';",
+    "updateReturnPlaceholders();",
+    "const rt = document.getElementById('travelReturnTo');",
+    "const rf = document.getElementById('travelReturnFrom');",
+    "return { phTo: rt.placeholder, phFrom: rf.placeholder,",
+    "         hasOwnHint: !!document.getElementById('returnFromHint') };"
+  ].join('\n'));
+  ok('ช่องปลายทางขากลับบอกชื่อบ้านจริงให้เห็น ไม่ใช่ข้อความลอยๆ',
+     /141\/36/.test(home.phTo), home.phTo);
+  ok('ช่องจุดเริ่มต้นขากลับบอกชื่อจุดหมายจริง', /ดุสิต/.test(home.phFrom), home.phFrom);
+  ok('ช่องจุดเริ่มต้นขากลับมีที่แสดงคำเตือนของตัวเอง ไม่ไปปนกับช่องอื่น',
+     home.hasOwnHint === true);
+
+  // ═══ 8. หัวใจของเรื่อง — เว้นช่องปลายทางขากลับว่าง ต้องได้ระยะทางจริง ═══
+  console.log('');
+  console.log('═══ 8. เว้นช่องปลายทางขากลับว่าง = กลับบ้าน ต้องคิดระยะทางได้ ไม่ใช่ 0 ═══');
+  const dist = await ev([
+    "window.__legs = [];",
+    "setPoint('from', 13.65, 100.49, 'บ้าน', 'exact', 'user');",
+    "setPoint('to',   13.75, 100.53, 'โรงแรมดุสิต', 'exact', 'user');",
+    "await new Promise(r=>setTimeout(r,400));",
+    // ขากลับด้วยรถส่วนตัว ออกจากโรงพยาบาล แล้วเว้นช่องปลายทางว่างเพราะจะกลับบ้าน
+    "{ const c=document.getElementById('legBackCar'); c.checked=true; c.dispatchEvent(new Event('change',{bubbles:true})); }",
+    "const rf = document.getElementById('travelReturnFrom');",
+    "rf.value = 'รพ.กรุงเทพ'; rf.dispatchEvent(new Event('input',{bubbles:true}));",
+    "setPoint('retfrom', 13.72, 100.55, 'รพ.กรุงเทพ', 'exact', 'user');",
+    "document.getElementById('travelReturnTo').value = '';",
+    "await new Promise(r=>setTimeout(r,900));",
+    "return { ret: parseFloat(document.getElementById('distReturn').value || 0),",
+    "         diff: document.getElementById('returnDiff').checked,",
+    "         legs: window.__legs.map(l => l.join(' -> ')) };"
+  ].join('\n'));
+  ok('ระบบรู้ว่าขากลับไปคนละทาง', dist.diff === true);
+  ok('ระยะทางขากลับไม่เป็นศูนย์ ทั้งที่ไม่ได้พิมพ์ปลายทาง',
+     dist.ret > 0, dist.ret + ' กม.');
+  ok('คำนวณจาก รพ.กรุงเทพ กลับไปที่บ้าน โดยใช้พิกัดบ้านที่มีอยู่แล้ว',
+     dist.legs.some(l => /รพ.กรุงเทพ -> บ้าน/.test(l)), dist.legs.join(' | '));
 
   ok('ไม่มี JavaScript error ตลอดการทดสอบ', pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '));
 

@@ -517,6 +517,7 @@
                                             oninput="syncReturnDiff()">
                                         <div id="returnFromSuggest" class="hidden absolute z-[9100] w-full bg-white border border-slate-200 shadow-xl rounded-xl mt-1 max-h-64 overflow-y-auto overscroll-contain"></div>
                                     </div>
+                                    <p class="text-xs text-slate-400 mt-1" id="returnFromHint">เว้นว่างไว้ได้ ถ้าออกเดินทางกลับจากจุดหมายขาไป</p>
                                 </div>
                                 <div>
                                     <label class="block text-xs font-bold text-violet-700 mb-1">ปลายทางขากลับ</label>
@@ -1050,6 +1051,7 @@
         if (!backTaxi) { const l = document.getElementById('taxiEntriesListBack'); if (l) l.innerHTML = ''; }
 
         syncReturnDiff();
+        if (typeof updateReturnPlaceholders === 'function') updateReturnPlaceholders();
         if (typeof calculateTravelTotal === 'function') calculateTravelTotal();
         if (typeof recalcRoute === 'function') recalcRoute(false);
     }
@@ -1071,6 +1073,25 @@
         box('legOutTaxiBox',  document.getElementById('legOutTaxi')?.checked);
         box('legBackTaxiBox', document.getElementById('legBackTaxi')?.checked);
         if (typeof updateLegDateLabels === 'function') updateLegDateLabels();
+    }
+
+    /* เขียนชื่อสถานที่จริงลงใน placeholder ของช่องขากลับ
+       "ว่าง = กลับที่จุดเริ่มต้น" ลอยๆ ไม่ช่วยอะไร ถ้าเห็นว่าจุดเริ่มต้นคือบ้านเลขที่อะไร
+       ผู้ใช้จะรู้ทันทีว่าเว้นว่างไว้ได้เลย ไม่ต้องไปพิมพ์ที่อยู่บ้านซึ่งแผนที่มักหาไม่เจอ */
+    function updateReturnPlaceholders() {
+        const cut = t => { t = (t || '').trim(); return t.length > 28 ? t.slice(0, 28) + '…' : t; };
+        const fromTxt = cut(document.getElementById('travelFrom')?.value);
+        const toTxt   = cut(document.getElementById('travelTo')?.value);
+        const rf = document.getElementById('travelReturnFrom');
+        const rt = document.getElementById('travelReturnTo');
+        if (rf) rf.placeholder = toTxt   ? 'ว่าง = ออกจาก ' + toTxt   : 'ว่าง = ออกจากจุดหมายขาไป';
+        if (rt) rt.placeholder = fromTxt ? 'ว่าง = กลับที่ ' + fromTxt : 'ว่าง = กลับที่จุดเริ่มต้น';
+        const h = document.getElementById('returnToHint');
+        if (h && !/rose-600/.test(h.innerHTML)) {
+            h.textContent = fromTxt
+                ? 'เว้นว่างทั้งสองช่อง = ไปกลับเส้นทางเดิม กลับที่ ' + fromTxt
+                : 'เว้นว่างทั้งสองช่อง = ไปกลับเส้นทางเดิม';
+        }
     }
 
     /* ขากลับ "ไปคนละที่" ไม่ต้องให้ผู้ใช้ติ๊กเอง ดูจากว่ากรอกช่องขากลับไว้หรือเปล่า
@@ -1171,6 +1192,8 @@
 
     /** คำนวณระยะทางตามถนนจริงจาก /map-route */
     async function recalcRoute(userAsked) {
+        // ชื่อจุดเริ่มต้น/จุดหมายอาจเพิ่งเปลี่ยน ช่องขากลับต้องบอกให้ตรงว่าเว้นว่างแล้วได้ที่ไหน
+        if (typeof updateReturnPlaceholders === 'function') updateReturnPlaceholders();
         // หมุดเปลี่ยน = พื้นที่อาจเปลี่ยน = วงเงินแท็กซี่อาจเปลี่ยน ต้องคิดใหม่ทุกครั้ง
         if (typeof recomputeTaxiCap === 'function') recomputeTaxiCap();
         if (document.getElementById('manualDistOverride')?.checked) return;
@@ -1211,14 +1234,24 @@
             retPath = null; retInfo = null;
 
             if (returnIsDifferent()) {
-                if (!geoRet) {
+                /* บ้านคนมักค้นไม่เจอในแผนที่ จึงต้องไม่บังคับให้ค้นหาซ้ำ
+                   พิกัดบ้านรู้อยู่แล้วจากจุดเริ่มต้นขาไป (ดึงมาจากโปรไฟล์)
+                   เว้นช่องปลายทางขากลับว่าง = กลับที่นั่น ใช้พิกัดเดิมได้เลย
+                   เว้นช่องจุดเริ่มต้นขากลับว่าง = ออกจากจุดหมายขาไป
+                   ก่อนหน้านี้เว้นว่างแล้วได้ระยะทาง 0 ทั้งที่ช่องเขียนไว้ว่าเว้นได้ */
+                const txtRetTo   = (document.getElementById('travelReturnTo')?.value   || '').trim();
+                const txtRetFrom = (document.getElementById('travelReturnFrom')?.value || '').trim();
+                const backStart = geoRetFrom || (txtRetFrom ? null : geoTo);
+                const backEnd   = geoRet     || (txtRetTo   ? null : geoFrom);
+
+                if (!backStart || !backEnd) {
+                    // พิมพ์ชื่อไว้แต่ยังหาพิกัดไม่ได้ ไม่ควรเดาแทนเพราะจะได้ระยะทางผิด
                     retKm = 0;
+                    const which = !backStart ? 'จุดเริ่มต้นขากลับ' : 'ปลายทางขากลับ';
                     retMsg = ' ' + badge('bg-amber-50 border-amber-200 text-amber-800',
-                        'ยังไม่ได้เลือกปลายทางขากลับ');
+                        'ยังหาพิกัดของ' + which + 'ไม่ได้');
                 } else {
-                    // ปล่อยว่าง = ออกจากจุดหมายขาไป ซึ่งเป็นพฤติกรรมเดิม
-                    const backStart = geoRetFrom || geoTo;
-                    const back = await routeLeg(backStart, geoRet);
+                    const back = await routeLeg(backStart, geoRet || geoFrom);
                     retKm = back.km;
                     if (back.coords.length) {
                         retLine = L.polyline(back.coords,
@@ -1359,7 +1392,8 @@
     /** ข้อความใต้ช่องกรอก บอกสถานะของหมุดตรงๆ */
     function pointHint(which, html) {
         const el = document.getElementById(
-            which === 'from' ? 'fromHint' : which === 'to' ? 'toHint' : 'returnToHint');
+            which === 'from' ? 'fromHint' : which === 'to' ? 'toHint'
+            : which === 'retfrom' ? 'returnFromHint' : 'returnToHint');
         if (el) el.innerHTML = html;
     }
 
@@ -1398,8 +1432,18 @@
 
         const hit = (r.data || [])[0];
         if (!hit) {
+            // บ้านเลขที่ในซอยมักไม่มีในแผนที่ ถ้าที่ตรงนั้นคือบ้านซึ่งระบบรู้พิกัดอยู่แล้ว
+            // ทางออกที่ง่ายที่สุดคือลบข้อความทิ้ง ไม่ใช่ไปลากหมุดหรือกรอกระยะทางเอง
+            const backToStart = (which === 'ret')
+                ? '<span class="block text-slate-600">ถ้าจะกลับที่จุดเริ่มต้น (บ้าน) '
+                  + '<b>ลบข้อความในช่องนี้ออก</b> ระบบจะใช้พิกัดบ้านที่มีอยู่แล้วให้เอง</span>'
+                : (which === 'retfrom')
+                ? '<span class="block text-slate-600">ถ้าออกเดินทางกลับจากจุดหมายขาไป '
+                  + '<b>ลบข้อความในช่องนี้ออก</b> ระบบจะใช้พิกัดจุดหมายให้เอง</span>'
+                : '';
             pointHint(which, '<span class="text-rose-600">หาตำแหน่งของ "' + escHtml(txt) + '" ไม่เจอ</span>'
-                + '<span class="block text-slate-500">ลากหมุดบนแผนที่เอง '
+                + backToStart
+                + '<span class="block text-slate-500">หรือลากหมุดบนแผนที่เอง '
                 + 'หรือติ๊ก "ขอกรอกเอง" ด้านล่างเพื่อใส่ระยะทางเอง</span>');
             return;
         }
