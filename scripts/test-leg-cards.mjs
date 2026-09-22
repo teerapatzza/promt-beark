@@ -98,7 +98,7 @@ try {
   console.log('');
   console.log('═══ 2. ติ๊กรถส่วนตัวทีละขา ยอดต้องขยับตามจริง ═══');
   const a = await ev(tick('legOutCar', true) + "\nreturn { t: " + total + ", car: document.getElementById('carType').value,"
-    + " box: !document.getElementById('legOutCarBox').classList.contains('hidden') };");
+    + " box: !document.getElementById('legOutRouteBox').classList.contains('hidden') };");
   ok('ติ๊กขาไป: ช่องจุดเริ่มต้น-จุดหมายโผล่ขึ้นมา', a.box === true);
   ok('ติ๊กขาไป: รูปแบบรถกลายเป็น "ขาไป"', a.car === 'ขาไป', a.car);
   ok('ติ๊กขาไป: คิดค่าน้ำมันเฉพาะขาไป 400 บาท', a.t === 400, a.t + ' บาท');
@@ -108,7 +108,7 @@ try {
   ok('ติ๊กขากลับด้วย: คิดค่าน้ำมันสองขา 800 บาท', b.t === 800, b.t + ' บาท');
 
   const c = await ev(tick('legOutCar', false) + "\nreturn { t: " + total + ", car: document.getElementById('carType').value,"
-    + " box: !document.getElementById('legOutCarBox').classList.contains('hidden') };");
+    + " box: !document.getElementById('legOutRouteBox').classList.contains('hidden') };");
   ok('เอาติ๊กขาไปออก: เหลือ "ขากลับ" อย่างเดียว', c.car === 'ขากลับ', c.car);
   ok('เอาติ๊กขาไปออก: ช่องของขาไปหายไปด้วย', c.box === false);
   ok('เอาติ๊กขาไปออก: เหลือ 400 บาท', c.t === 400, c.t + ' บาท');
@@ -217,6 +217,51 @@ try {
      dist.ret > 0, dist.ret + ' กม.');
   ok('คำนวณจาก รพ.กรุงเทพ กลับไปที่บ้าน โดยใช้พิกัดบ้านที่มีอยู่แล้ว',
      dist.legs.some(l => /รพ.กรุงเทพ -> บ้าน/.test(l)), dist.legs.join(' | '));
+
+  // ═══ 9. Taxi ไม่ต้องกรอกวันที่ซ้ำ ═══
+  console.log('');
+  console.log('═══ 9. Taxi ต้องใช้วันของขานั้น ไม่ต้องให้กรอกซ้ำ ═══');
+  const td = await ev([
+    tick('legOutTaxi', true),
+    tick('legBackTaxi', true),
+    "const dOut  = document.querySelector('#taxiEntriesList .taxi-date');",
+    "const dBack = document.querySelector('#taxiEntriesListBack .taxi-date');",
+    "const before = { out: dOut && dOut.value, back: dBack && dBack.value };",
+    // ผู้ใช้แก้วันของแถวขาไปเอง แล้วเปลี่ยนวันเดินทางด้านบน
+    "dOut.value = '2025-11-05'; dOut.dispatchEvent(new Event('change',{bubbles:true}));",
+    "const ds = document.getElementById('dateStart'), de = document.getElementById('dateEnd');",
+    "ds.value='2025-10-21'; ds.dispatchEvent(new Event('change',{bubbles:true}));",
+    "de.value='2025-10-23'; de.dispatchEvent(new Event('change',{bubbles:true}));",
+    "await new Promise(r=>setTimeout(r,400));",
+    "return { before: before, afterOut: dOut.value, afterBack: dBack.value };"
+  ].join('\n'));
+  ok('แถว Taxi ขาไปถูกเติมวันออกเดินทางให้เอง', td.before.out === '2025-10-20', td.before.out);
+  ok('แถว Taxi ขากลับถูกเติมวันกลับถึงให้เอง', td.before.back === '2025-10-22', td.before.back);
+  ok('เปลี่ยนวันเดินทางด้านบน แถวที่ยังไม่เคยแก้เองตามไปด้วย',
+     td.afterBack === '2025-10-23', td.afterBack);
+  ok('แถวที่ผู้ใช้แก้วันเองไว้ ต้องไม่ถูกเขียนทับ',
+     td.afterOut === '2025-11-05', td.afterOut);
+
+  // ═══ 10. เส้นทางขาไปใช้ร่วมกัน วงเงินค่า Taxi ก็ดูจากหมุดสองจุดนี้ ═══
+  console.log('');
+  console.log('═══ 10. ติ๊กแค่ Taxi ก็ต้องปักหมุดได้ ไม่งั้นวงเงิน 600 บาทใช้ไม่ได้ ═══');
+  const share = await ev([
+    tick('legOutCar', false),
+    tick('legOutTaxi', false),
+    "const hiddenWhenNone = document.getElementById('legOutRouteBox').classList.contains('hidden');",
+    tick('legOutTaxi', true),
+    "const shownWithTaxiOnly = !document.getElementById('legOutRouteBox').classList.contains('hidden');",
+    "const fromUsable = document.getElementById('travelFrom').getBoundingClientRect().height > 10;",
+    tick('legOutCar', true),
+    tick('legOutTaxi', false),
+    "const shownWithCarOnly = !document.getElementById('legOutRouteBox').classList.contains('hidden');",
+    "return { none: hiddenWhenNone, taxiOnly: shownWithTaxiOnly,",
+    "         carOnly: shownWithCarOnly, usable: fromUsable };"
+  ].join('\n'));
+  ok('ไม่ติ๊กอะไรเลย ช่องเส้นทางซ่อนอยู่ ไม่รก', share.none === true);
+  ok('ติ๊กแค่ Taxi ช่องเส้นทางก็ต้องโผล่ (วงเงิน 600 บาทใช้หมุดนี้)', share.taxiOnly === true);
+  ok('ติ๊กแค่ Taxi แล้วช่องจุดเริ่มต้นกดใช้ได้จริง', share.usable === true);
+  ok('ติ๊กแค่รถส่วนตัว ก็ยังโผล่เหมือนเดิม', share.carOnly === true);
 
   ok('ไม่มี JavaScript error ตลอดการทดสอบ', pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '));
 

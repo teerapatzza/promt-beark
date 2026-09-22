@@ -462,7 +462,19 @@
                             <span class="font-semibold text-slate-700">รถส่วนตัว</span>
                             <span class="text-xs text-slate-400">คิดค่าน้ำมันจากระยะทาง</span>
                         </label>
-                        <div id="legOutCarBox" class="hidden pl-6 pb-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+
+                        <label class="flex items-center gap-2 text-sm cursor-pointer py-1.5">
+                            <input type="checkbox" id="legOutTaxi" class="rounded w-4 h-4" onchange="onLegModeChange()">
+                            <span class="font-semibold text-slate-700">Taxi</span>
+                            <span class="text-xs text-slate-400">กรอกค่าโดยสารที่จ่ายจริง</span>
+                        </label>
+                        <div id="legOutTaxiBox" class="hidden pl-6">
+                            <div id="taxiEntriesList" class="space-y-2"></div>
+                            <button type="button" onclick="addTaxiEntry('ขาไป')"
+                                class="mt-2 text-xs font-bold text-blue-600 hover:text-blue-800">+ เพิ่มเที่ยว Taxi ขาไป</button>
+                        </div>
+                        <div id="legOutRouteBox" class="hidden mt-2 pt-3 border-t border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div class="md:col-span-2 -mb-1"><span class="text-xs font-bold text-slate-600">เส้นทางของขาไป</span><span class="text-xs text-slate-400"> — ใช้กับแผนที่ ระยะทางค่าน้ำมัน และวงเงินค่า Taxi ในเขต กทม.ปริมณฑล</span></div>
                             <div>
                                 <label class="block text-xs font-bold text-emerald-700 mb-1">จุดเริ่มต้น <span class="text-rose-500">*</span></label>
                                 <div class="relative">
@@ -481,17 +493,6 @@
                                 </div>
                                 <p class="text-xs text-slate-400 mt-1" id="toHint">พิมพ์ชื่อสถานที่ ระบบจะค้นหาให้</p>
                             </div>
-                        </div>
-
-                        <label class="flex items-center gap-2 text-sm cursor-pointer py-1.5">
-                            <input type="checkbox" id="legOutTaxi" class="rounded w-4 h-4" onchange="onLegModeChange()">
-                            <span class="font-semibold text-slate-700">Taxi</span>
-                            <span class="text-xs text-slate-400">กรอกค่าโดยสารที่จ่ายจริง</span>
-                        </label>
-                        <div id="legOutTaxiBox" class="hidden pl-6">
-                            <div id="taxiEntriesList" class="space-y-2"></div>
-                            <button type="button" onclick="addTaxiEntry('ขาไป')"
-                                class="mt-2 text-xs font-bold text-blue-600 hover:text-blue-800">+ เพิ่มเที่ยว Taxi ขาไป</button>
                         </div>
                     </div>
 
@@ -1030,7 +1031,8 @@
         const backTaxi= !!document.getElementById('legBackTaxi')?.checked;
 
         const box = (id, on) => document.getElementById(id)?.classList.toggle('hidden', !on);
-        box('legOutCarBox',   outCar);
+        // เส้นทางขาไปใช้ร่วมกัน ทั้งค่าน้ำมันและวงเงินค่า Taxi จึงต้องโผล่เมื่อเบิกอะไรก็ตาม
+        box('legOutRouteBox', outCar || outTaxi);
         box('legBackCarBox',  backCar);
         box('legOutTaxiBox',  outTaxi);
         box('legBackTaxiBox', backTaxi);
@@ -1068,11 +1070,34 @@
         set('legOutTaxi',  !!document.querySelector('#taxiEntriesList .taxi-entry'));
         set('legBackTaxi', !!document.querySelector('#taxiEntriesListBack .taxi-entry'));
         const box = (id, on) => document.getElementById(id)?.classList.toggle('hidden', !on);
-        box('legOutCarBox',   document.getElementById('legOutCar')?.checked);
+        box('legOutRouteBox', document.getElementById('legOutCar')?.checked
+                              || document.getElementById('legOutTaxi')?.checked);
         box('legBackCarBox',  document.getElementById('legBackCar')?.checked);
         box('legOutTaxiBox',  document.getElementById('legOutTaxi')?.checked);
         box('legBackTaxiBox', document.getElementById('legBackTaxi')?.checked);
         if (typeof updateLegDateLabels === 'function') updateLegDateLabels();
+    }
+
+    /* วันของแต่ละขา มาจากกำหนดการเดินทางด้านบน ที่เดียวกับที่ค่าน้ำมันใช้
+       Taxi จึงไม่ต้องกรอกวันที่ซ้ำอีกรอบ */
+    function legDateFor(dir) {
+        const id = (dir === 'ขากลับ') ? 'dateEnd' : 'dateStart';
+        const v = document.getElementById(id)?.value || '';
+        // ไปกลับวันเดียวกัน หรือยังไม่ได้กรอกวันกลับ ให้ใช้วันออกเดินทาง
+        return v || (document.getElementById('dateStart')?.value || '');
+    }
+
+    /* วันเดินทางด้านบนเปลี่ยน แถว Taxi ที่ยังไม่เคยถูกแก้เองต้องตามไปด้วย
+       แถวที่ผู้ใช้แก้วันเองไว้แล้ว ห้ามเขียนทับ ไม่งั้นของที่ตั้งใจกรอกจะหายเงียบๆ */
+    function syncTaxiDatesFromLegs() {
+        const apply = (listId, dir) => {
+            document.querySelectorAll('#' + listId + ' .taxi-entry').forEach(row => {
+                const dt = row.querySelector('.taxi-date');
+                if (dt && dt.dataset.touched !== '1') dt.value = legDateFor(dir);
+            });
+        };
+        apply('taxiEntriesList', 'ขาไป');
+        apply('taxiEntriesListBack', 'ขากลับ');
     }
 
     /* เขียนชื่อสถานที่จริงลงใน placeholder ของช่องขากลับ
@@ -1681,6 +1706,7 @@
     /** ตรวจวันที่ให้สมเหตุสมผล + สรุปจำนวนวัน/คืนให้เห็นทันที */
     function onTripDatesChange() {
         if (typeof updateLegDateLabels === 'function') updateLegDateLabels();
+        if (typeof syncTaxiDatesFromLegs === 'function') syncTaxiDatesFromLegs();
         const a = document.getElementById('dateStart');
         const b = document.getElementById('dateEnd');
         const sum = document.getElementById('tripSummary');
@@ -2140,8 +2166,9 @@
         div.innerHTML = `
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mb-1.5">
                 <div>
-                    <label class="text-[10px] text-slate-400 font-bold block mb-0.5">วันที่ <span class="text-rose-500">*</span></label>
-                    <input type="date" class="taxi-date w-full border border-slate-200 px-2 py-1.5 rounded text-xs outline-none focus:border-blue-400">
+                    <label class="text-[10px] text-slate-400 font-bold block mb-0.5">วันที่ <span class="font-normal">(ตามวันเดินทางของขานี้)</span></label>
+                    <input type="date" class="taxi-date w-full border border-slate-200 px-2 py-1.5 rounded text-xs outline-none focus:border-blue-400"
+                        onchange="this.dataset.touched='1'">
                 </div>
                 <div>
                     <label class="text-[10px] text-slate-400 font-bold block mb-0.5">ทิศทาง</label>
@@ -2181,6 +2208,12 @@
             <div class="taxi-err hidden text-[11px] text-rose-600 mt-1 font-semibold"></div>
         `;
         list.appendChild(div);
+        // วันที่ของขานี้รู้อยู่แล้วจากกำหนดการเดินทางด้านบน ไม่ต้องให้กรอกซ้ำ
+        // ผู้ใช้แก้เองได้ถ้าเที่ยวนั้นไม่ตรงวัน แก้แล้วระบบจะไม่ไปเขียนทับอีก
+        if (typeof legDateFor === 'function') {
+            const dt = div.querySelector('.taxi-date');
+            if (dt && !dt.value) dt.value = legDateFor(presetDir);
+        }
         if (presetDir) {
             const sel = div.querySelector('.taxi-dir');
             sel.value = presetDir;
@@ -3658,7 +3691,10 @@
                     const dir = entry.direction || 'ขาไป';
                     addTaxiEntry(dir === 'ไป-กลับ' ? null : dir);
                     const row = (dir === 'ขากลับ' ? taxiListBack : taxiList).lastElementChild;
-                    row.querySelector('.taxi-date').value = entry.date || '';
+                    const dtCell = row.querySelector('.taxi-date');
+                    dtCell.value = entry.date || '';
+                    // วันที่ที่เคยบันทึกไว้ถือว่าเจตนาของผู้ใช้ ห้ามให้วันของขามาเขียนทับ
+                    if (entry.date) dtCell.dataset.touched = '1';
                     row.querySelector('.taxi-from').value = entry.from || '';
                     row.querySelector('.taxi-to').value   = entry.to   || '';
                     const dirSel = row.querySelector('.taxi-dir');
