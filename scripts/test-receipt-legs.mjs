@@ -196,11 +196,12 @@ try {
     "await new Promise(r => setTimeout(r, 900));",
     "const inp = document.getElementById('travelReturnFrom');",
     "if (!inp) return { มี: false };",
-    "const hiddenBefore = document.getElementById('returnToBox').classList.contains('hidden');",
-    "const cb = document.getElementById('returnDiff');",
+    // ช่องขากลับอยู่ในการ์ด "ขากลับ" ติ๊กรถส่วนตัวของขานั้นแล้วจึงโผล่
+    "const hiddenBefore = document.getElementById('legBackCarBox').classList.contains('hidden');",
+    "const cb = document.getElementById('legBackCar');",
     "cb.checked = true; cb.dispatchEvent(new Event('change',{bubbles:true}));",
     "await new Promise(r => setTimeout(r, 500));",
-    "const shown = !document.getElementById('returnToBox').classList.contains('hidden');",
+    "const shown = !document.getElementById('legBackCarBox').classList.contains('hidden');",
     "inp.value = 'รพ.กรุงเทพสุราษฎร์'; inp.dispatchEvent(new Event('input',{bubbles:true}));",
     "const r = inp.getBoundingClientRect();",
     "return { มี: true, ซ่อนตอนแรก: hiddenBefore, โผล่เมื่อติ๊ก: shown,",
@@ -208,8 +209,8 @@ try {
     "         ค่าที่พิมพ์: inp.value };"
   ].join('\n'));
   ok('มีช่อง "จุดเริ่มต้นขากลับ" ในฟอร์ม', form['มี'] === true);
-  ok('ซ่อนไว้ตอนยังไม่ติ๊ก "ขากลับไปที่อื่น"', form['ซ่อนตอนแรก'] === true);
-  ok('ติ๊กแล้วโผล่ขึ้นมาให้กรอก', form['โผล่เมื่อติ๊ก'] === true);
+  ok('ซ่อนไว้ตอนยังไม่ติ๊กรถส่วนตัวขากลับ', form['ซ่อนตอนแรก'] === true);
+  ok('ติ๊กรถส่วนตัวขากลับแล้วโผล่ขึ้นมาให้กรอก', form['โผล่เมื่อติ๊ก'] === true);
   ok('พิมพ์ได้จริง ไม่ถูกปิด และกดได้',
      form['มี'] && !form['ปิดอยู่'] && form['กว้าง'] > 60 && form['สูง'] > 20
      && form['ค่าที่พิมพ์'] === 'รพ.กรุงเทพสุราษฎร์',

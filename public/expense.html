@@ -436,105 +436,128 @@
 
                 <div id="secVehicle" class="hidden mt-6 bg-slate-50 p-5 rounded-xl border border-slate-200 animate-fade-in">
                     <h3 class="text-sm font-bold text-blue-900 mb-4 border-b pb-2">2. ค่าพาหนะ</h3>
-                        <div id="costTaxiBox" class="bg-white p-3 rounded-lg border border-blue-100 shadow-sm">
-                            <div class="flex items-center justify-between mb-2">
-                                <label class="text-xs font-bold text-slate-500">2.1 ค่าพาหนะรับจ้าง (Taxi)</label>
-                                <button type="button" onclick="addTaxiEntry()"
-                                    class="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition-colors">
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
-                                    </svg>
-                                    เพิ่มรอบ Taxi
-                                </button>
-                            </div>
-                            <div id="taxiCapNote"
-                                class="hidden mb-2 text-[11px] px-2.5 py-1.5 rounded-md bg-amber-50 border border-amber-200 text-amber-800"></div>
-                            <div id="taxiEntriesList" class="space-y-2">
-                                <!-- entries added by addTaxiEntry() -->
-                            </div>
-                        </div>
-
+                <!-- ── 2.1 การเดินทาง แยกเป็นการ์ดต่อขา ──
+                     เดิมถามแยกกันคนละที่ คือ "รายการ Taxi" กล่องหนึ่ง กับ "รูปแบบรถส่วนตัว" อีกกล่อง
+                     คนกรอกต้องประกอบภาพเองว่าขาไหนใช้อะไร และช่องรถส่วนตัวตั้งค่าเริ่มต้นไว้ที่ "ไป-กลับ"
+                     คนที่นั่ง Taxi ล้วนแต่ไม่ได้ไปแตะช่องนั้น จึงถูกคิดค่าน้ำมันที่ไม่ได้จ่าย
+                     (ทดสอบแล้วเกิดขึ้นจริง 800 บาท) ตอนนี้ถามทีละขา ติ๊กอะไรค่อยโผล่ช่องของอันนั้น
+                     ไม่ติ๊ก = ไม่คิดเงิน ซึ่งเป็นค่าเริ่มต้นที่ปลอดภัยกว่า -->
                 <div id="travelDetailsBox" class="hidden mt-6 bg-blue-50/50 p-5 rounded-xl border border-blue-200 shadow-inner animate-fade-in">
-                    <label class="block text-sm font-bold text-blue-900 mb-4 border-b border-blue-200 pb-2">
-                        2.2 ค่าน้ำมันรถ — เส้นทางและระยะทาง
+                    <label class="block text-sm font-bold text-blue-900 mb-1 border-b border-blue-200 pb-2">
+                        2.1 การเดินทาง — เลือกทีละขา
                     </label>
+                    <p class="text-xs text-slate-500 mb-4">ขาไหนเดินทางด้วยอะไร ติ๊กอันนั้น — ขาเดียวติ๊กได้มากกว่าหนึ่งอย่าง</p>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+                    <div id="taxiCapNote" class="hidden mb-3 text-[11px] px-2.5 py-1.5 rounded-md bg-amber-50 border border-amber-200 text-amber-800"></div>
 
-                        <div class="bg-white p-3 rounded-lg border border-blue-100 shadow-sm">
-                            <label class="block text-xs font-bold text-slate-500 mb-2">🚘 การเดินทางด้วยรถส่วนตัว (ค่าน้ำมัน)</label>
-                            <select id="carType" onchange="calculateTravelTotal()" class="w-full border border-slate-200 p-2 rounded text-sm outline-none focus:border-blue-500">
-                                <option value="ไม่ระบุ">-- ไม่ได้เบิกรถส่วนตัว --</option>
-                                <option value="ขาไป">ขาไป</option>
-                                <option value="ขากลับ">ขากลับ</option>
-                                <option value="ไป-กลับ" selected>ไป-กลับ</option>
-                            </select>
-                            <div class="mt-2">
-                                <label for="fuelRate" class="block text-[10px] text-slate-400 mb-1">ค่าน้ำมัน (บาท/กม.) <svg class="inline w-3.5 h-3.5 -mt-0.5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></label>
-                                <input type="number" id="fuelRate" readonly class="w-full border border-slate-300 bg-slate-100 p-2 rounded text-sm outline-none cursor-not-allowed text-slate-600 font-bold" value="4">
-                                <p class="text-[9px] text-slate-400 mt-1"><svg class="inline w-3.5 h-3.5 -mt-0.5 flex-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2Z"/></svg> อัตรานี้กำหนดโดย Admin (ไม่สามารถแก้ไขได้)</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <div>
-                            <label class="block text-xs font-bold text-emerald-700 mb-1"><svg class="inline w-3.5 h-3.5 -mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5"/></svg> จุดเริ่มต้น <span class="text-rose-500">*</span></label>
-                            <div class="relative">
-                                <input type="text" id="travelFrom" autocomplete="off" placeholder="พิมพ์ชื่อสถานที่ แล้วเลือกจากรายการ"
-                                    class="w-full border-2 border-white p-3 rounded-lg text-sm shadow-sm focus:border-emerald-400 outline-none">
-                                <div id="fromSuggest" class="hidden absolute z-[9100] w-full bg-white border border-slate-200 shadow-xl rounded-xl mt-1 max-h-64 overflow-y-auto overscroll-contain"></div>
-                            </div>
-                            <p class="text-xs text-slate-400 mt-1" id="fromHint">ดึงจากโปรไฟล์ผู้เดินทางอัตโนมัติ</p>
+                    <!-- ═══════════ ขาไป ═══════════ -->
+                    <div class="bg-white rounded-xl border-2 border-emerald-200 p-4 mb-4">
+                        <div class="flex items-baseline gap-2 mb-3 pb-2 border-b border-emerald-100">
+                            <span class="text-sm font-bold text-emerald-800">ขาไป</span>
+                            <span class="text-xs text-slate-400" id="legOutDate">ยังไม่ได้ระบุวันออกเดินทาง</span>
                         </div>
 
-                        <div>
-                            <label class="block text-xs font-bold text-rose-700 mb-1"><svg class="inline w-3.5 h-3.5 -mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg> จุดหมาย <span class="text-rose-500">*</span></label>
-                            <div class="relative">
-                                <input type="text" id="travelTo" autocomplete="off" placeholder="เช่น โรงพยาบาลนครพิงค์, รพ.สต.บ้านหนองบัว"
-                                    class="w-full border-2 border-white p-3 rounded-lg text-sm shadow-sm focus:border-rose-400 outline-none">
-                                <div id="toSuggest" class="hidden absolute z-[9100] w-full bg-white border border-slate-200 shadow-xl rounded-xl mt-1 max-h-64 overflow-y-auto overscroll-contain"></div>
-                            </div>
-                            <p class="text-xs text-slate-400 mt-1" id="toHint">พิมพ์ชื่อสถานที่ ระบบจะค้นหาให้</p>
-                        </div>
-                    </div>
-
-                    <!-- ขากลับไปคนละที่กับตอนไป เช่น ไปที่ทำงาน แล้วกลับเข้าโรงแรม
-                         แบบฟอร์ม FM-SAM-095-00 มีช่อง จาก/ถึง ของค่าน้ำมันสองแถวอยู่แล้ว
-                         เดิมโค้ดกรอกแถวสองแบบสลับทางตายตัว ทำให้เคสนี้พิมพ์ออกมาผิด -->
-                    <div class="mb-4" id="returnDiffWrap">
-                        <label class="flex items-start gap-2 text-sm text-slate-700 cursor-pointer">
-                            <input type="checkbox" id="returnDiff" onchange="toggleReturnDiff()" class="rounded mt-0.5">
-                            <span>
-                                ขากลับไปที่อื่น <span class="text-slate-400 font-normal">(ไม่ได้กลับที่จุดเริ่มต้น)</span>
-                                <span class="block text-xs text-slate-400">เช่น ไปที่ทำงาน แล้วขากลับเข้าโรงแรม — ระยะทางสองขาจะคิดแยกกัน</span>
-                            </span>
+                        <label class="flex items-center gap-2 text-sm cursor-pointer py-1.5">
+                            <input type="checkbox" id="legOutCar" class="rounded w-4 h-4" onchange="onLegModeChange()">
+                            <span class="font-semibold text-slate-700">รถส่วนตัว</span>
+                            <span class="text-xs text-slate-400">คิดค่าน้ำมันจากระยะทาง</span>
                         </label>
-                        <div id="returnToBox" class="hidden mt-2 pl-6 space-y-3">
-                            <!-- ขากลับอาจไม่ได้ออกจากจุดหมายขาไป เช่น ไปพักโรงแรม
-                                 แล้ววันรุ่งขึ้นออกจากโรงพยาบาลกลับบ้าน
-                                 ปล่อยว่างไว้ = ออกจากจุดหมายขาไปเหมือนเดิม -->
+                        <div id="legOutCarBox" class="hidden pl-6 pb-3 grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div>
-                                <label class="block text-xs font-bold text-violet-700 mb-1">จุดเริ่มต้นขากลับ</label>
+                                <label class="block text-xs font-bold text-emerald-700 mb-1">จุดเริ่มต้น <span class="text-rose-500">*</span></label>
                                 <div class="relative">
-                                    <input type="text" id="travelReturnFrom" autocomplete="off" placeholder="ปล่อยว่าง = ออกจากจุดหมายขาไป"
-                                        class="w-full border-2 border-white p-3 rounded-lg text-sm shadow-sm focus:border-violet-400 outline-none">
-                                    <div id="returnFromSuggest" class="hidden absolute z-[9100] w-full bg-white border border-slate-200 shadow-xl rounded-xl mt-1 max-h-64 overflow-y-auto overscroll-contain"></div>
+                                    <input type="text" id="travelFrom" autocomplete="off" placeholder="พิมพ์ชื่อสถานที่ แล้วเลือกจากรายการ"
+                                        class="w-full border-2 border-white p-3 rounded-lg text-sm shadow-sm focus:border-emerald-400 outline-none">
+                                    <div id="fromSuggest" class="hidden absolute z-[9100] w-full bg-white border border-slate-200 shadow-xl rounded-xl mt-1 max-h-64 overflow-y-auto overscroll-contain"></div>
+                                </div>
+                                <p class="text-xs text-slate-400 mt-1" id="fromHint">ดึงจากโปรไฟล์ผู้เดินทางอัตโนมัติ</p>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-rose-700 mb-1">จุดหมาย <span class="text-rose-500">*</span></label>
+                                <div class="relative">
+                                    <input type="text" id="travelTo" autocomplete="off" placeholder="เช่น โรงพยาบาลนครพิงค์, รพ.สต.บ้านหนองบัว"
+                                        class="w-full border-2 border-white p-3 rounded-lg text-sm shadow-sm focus:border-rose-400 outline-none">
+                                    <div id="toSuggest" class="hidden absolute z-[9100] w-full bg-white border border-slate-200 shadow-xl rounded-xl mt-1 max-h-64 overflow-y-auto overscroll-contain"></div>
+                                </div>
+                                <p class="text-xs text-slate-400 mt-1" id="toHint">พิมพ์ชื่อสถานที่ ระบบจะค้นหาให้</p>
+                            </div>
+                        </div>
+
+                        <label class="flex items-center gap-2 text-sm cursor-pointer py-1.5">
+                            <input type="checkbox" id="legOutTaxi" class="rounded w-4 h-4" onchange="onLegModeChange()">
+                            <span class="font-semibold text-slate-700">Taxi</span>
+                            <span class="text-xs text-slate-400">กรอกค่าโดยสารที่จ่ายจริง</span>
+                        </label>
+                        <div id="legOutTaxiBox" class="hidden pl-6">
+                            <div id="taxiEntriesList" class="space-y-2"></div>
+                            <button type="button" onclick="addTaxiEntry('ขาไป')"
+                                class="mt-2 text-xs font-bold text-blue-600 hover:text-blue-800">+ เพิ่มเที่ยว Taxi ขาไป</button>
+                        </div>
+                    </div>
+
+                    <!-- ═══════════ ขากลับ ═══════════ -->
+                    <div class="bg-white rounded-xl border-2 border-violet-200 p-4 mb-4">
+                        <div class="flex items-baseline gap-2 mb-3 pb-2 border-b border-violet-100">
+                            <span class="text-sm font-bold text-violet-800">ขากลับ</span>
+                            <span class="text-xs text-slate-400" id="legBackDate">ยังไม่ได้ระบุวันกลับถึง</span>
+                        </div>
+
+                        <label class="flex items-center gap-2 text-sm cursor-pointer py-1.5">
+                            <input type="checkbox" id="legBackCar" class="rounded w-4 h-4" onchange="onLegModeChange()">
+                            <span class="font-semibold text-slate-700">รถส่วนตัว</span>
+                            <span class="text-xs text-slate-400">คิดค่าน้ำมันจากระยะทาง</span>
+                        </label>
+                        <div id="legBackCarBox" class="hidden pl-6 pb-3">
+                            <div id="returnDiffWrap" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-bold text-violet-700 mb-1">จุดเริ่มต้นขากลับ</label>
+                                    <div class="relative">
+                                        <input type="text" id="travelReturnFrom" autocomplete="off" placeholder="ว่าง = ออกจากจุดหมายขาไป"
+                                            class="w-full border-2 border-white p-3 rounded-lg text-sm shadow-sm focus:border-violet-400 outline-none"
+                                            oninput="syncReturnDiff()">
+                                        <div id="returnFromSuggest" class="hidden absolute z-[9100] w-full bg-white border border-slate-200 shadow-xl rounded-xl mt-1 max-h-64 overflow-y-auto overscroll-contain"></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-violet-700 mb-1">ปลายทางขากลับ</label>
+                                    <div class="relative">
+                                        <input type="text" id="travelReturnTo" autocomplete="off" placeholder="ว่าง = กลับที่จุดเริ่มต้น"
+                                            class="w-full border-2 border-white p-3 rounded-lg text-sm shadow-sm focus:border-violet-400 outline-none"
+                                            oninput="syncReturnDiff()">
+                                        <div id="returnToSuggest" class="hidden absolute z-[9100] w-full bg-white border border-slate-200 shadow-xl rounded-xl mt-1 max-h-64 overflow-y-auto overscroll-contain"></div>
+                                    </div>
+                                    <p class="text-xs text-slate-400 mt-1" id="returnToHint">เว้นว่างทั้งสองช่อง = กลับทางเดิม ระยะทางเท่าขาไป</p>
                                 </div>
                             </div>
-                            <div>
-                            <label class="block text-xs font-bold text-violet-700 mb-1">ปลายทางขากลับ</label>
-                            <div class="relative">
-                                <input type="text" id="travelReturnTo" autocomplete="off" placeholder="เช่น โรงแรมที่เข้าพัก"
-                                    class="w-full border-2 border-white p-3 rounded-lg text-sm shadow-sm focus:border-violet-400 outline-none">
-                                <div id="returnToSuggest" class="hidden absolute z-[9100] w-full bg-white border border-slate-200 shadow-xl rounded-xl mt-1 max-h-64 overflow-y-auto overscroll-contain"></div>
-                            </div>
-                            <p class="text-xs text-slate-400 mt-1" id="returnToHint">
-                                ขากลับคิดจาก <b>จุดเริ่มต้นขากลับ</b> ไปยังที่นี่ — หมุดสีม่วงบนแผนที่ ลากปรับได้
-                            </p>
-                            </div>
+                        </div>
+
+                        <label class="flex items-center gap-2 text-sm cursor-pointer py-1.5">
+                            <input type="checkbox" id="legBackTaxi" class="rounded w-4 h-4" onchange="onLegModeChange()">
+                            <span class="font-semibold text-slate-700">Taxi</span>
+                            <span class="text-xs text-slate-400">กรอกค่าโดยสารที่จ่ายจริง</span>
+                        </label>
+                        <div id="legBackTaxiBox" class="hidden pl-6">
+                            <div id="taxiEntriesListBack" class="space-y-2"></div>
+                            <button type="button" onclick="addTaxiEntry('ขากลับ')"
+                                class="mt-2 text-xs font-bold text-blue-600 hover:text-blue-800">+ เพิ่มเที่ยว Taxi ขากลับ</button>
                         </div>
                     </div>
+
+                    <p class="text-[11px] text-slate-400 mb-3">
+                        ค่าน้ำมัน <b>4</b> บาท/กม. — อัตรานี้กำหนดโดยผู้ดูแลระบบ แก้ไขไม่ได้
+                    </p>
+
+                    <!-- ช่องเดิมที่โค้ดส่วนอื่นยังอ่านอยู่ ซ่อนไว้ ไม่ให้ผู้ใช้ต้องมายุ่ง
+                         carType คิดจากติ๊กรถส่วนตัวของสองขา  returnDiff คิดจากช่องขากลับที่กรอกไว้ -->
+                    <select id="carType" class="hidden" onchange="calculateTravelTotal()">
+                        <option value="ไม่ระบุ" selected>ไม่ระบุ</option>
+                        <option value="ขาไป">ขาไป</option>
+                        <option value="ขากลับ">ขากลับ</option>
+                        <option value="ไป-กลับ">ไป-กลับ</option>
+                    </select>
+                    <input type="number" id="fuelRate" class="hidden" readonly value="4">
+                    <span class="hidden"><input type="checkbox" id="returnDiff" onchange="toggleReturnDiff()"></span>
+                    <div id="returnToBox" class="hidden"></div>
 
                     <!-- แผนที่: ยืนยัน/ลากปรับหมุดทั้งสองจุด -->
                     <div class="mb-4">
@@ -994,6 +1017,91 @@
         mRet = null; mRetFrom = null; geoRet = null; geoRetFrom = null; retPath = null; retInfo = null;
         if (retLine && routeMap) { routeMap.removeLayer(retLine); }
         retLine = null;
+    }
+
+    /* ══════════ การ์ดต่อขา ══════════
+       ช่อง carType กับ returnDiff ของเดิมยังอยู่ แต่ซ่อนไว้และให้การ์ดเป็นคนตั้งค่าให้
+       โค้ดคำนวณเงิน บันทึก และออกเอกสาร จึงไม่ต้องแก้อะไรเลย */
+    function onLegModeChange() {
+        const outCar  = !!document.getElementById('legOutCar')?.checked;
+        const backCar = !!document.getElementById('legBackCar')?.checked;
+        const outTaxi = !!document.getElementById('legOutTaxi')?.checked;
+        const backTaxi= !!document.getElementById('legBackTaxi')?.checked;
+
+        const box = (id, on) => document.getElementById(id)?.classList.toggle('hidden', !on);
+        box('legOutCarBox',   outCar);
+        box('legBackCarBox',  backCar);
+        box('legOutTaxiBox',  outTaxi);
+        box('legBackTaxiBox', backTaxi);
+
+        // ติ๊กรถส่วนตัวของสองขา แปลงกลับเป็นค่าเดียวที่เอกสารกับการคิดเงินใช้อยู่
+        const car = document.getElementById('carType');
+        if (car) {
+            car.value = (outCar && backCar) ? 'ไป-กลับ'
+                      : outCar ? 'ขาไป'
+                      : backCar ? 'ขากลับ' : 'ไม่ระบุ';
+        }
+
+        // ติ๊ก Taxi แล้วยังไม่มีเที่ยวเลย ใส่ให้หนึ่งแถวจะได้ไม่ต้องกดซ้ำ
+        if (outTaxi  && !document.querySelector('#taxiEntriesList .taxi-entry'))     addTaxiEntry('ขาไป');
+        if (backTaxi && !document.querySelector('#taxiEntriesListBack .taxi-entry')) addTaxiEntry('ขากลับ');
+        // เอาติ๊กออก = ไม่เบิกขานั้นแล้ว ต้องล้างรายการทิ้ง ไม่งั้นยอดยังถูกนับอยู่
+        if (!outTaxi)  { const l = document.getElementById('taxiEntriesList');     if (l) l.innerHTML = ''; }
+        if (!backTaxi) { const l = document.getElementById('taxiEntriesListBack'); if (l) l.innerHTML = ''; }
+
+        syncReturnDiff();
+        if (typeof calculateTravelTotal === 'function') calculateTravelTotal();
+        if (typeof recalcRoute === 'function') recalcRoute(false);
+    }
+
+    /* ตั้งติ๊กของการ์ดต่อขาจากข้อมูลที่อยู่ในฟอร์มแล้ว
+       ใช้ตอนเปิดใบเดิมมาแก้ และตอนเปลี่ยนหมวด
+       ต่างจาก onLegModeChange ตรงที่อันนี้ "อ่าน" สถานะมาแสดง ไม่ใช่ "เขียน" ทับ
+       จึงไม่ล้างรายการ Taxi ที่เพิ่งกู้คืนมา */
+    function syncLegCardsFromForm() {
+        const car = document.getElementById('carType')?.value || 'ไม่ระบุ';
+        const set = (id, on) => { const el = document.getElementById(id); if (el) el.checked = !!on; };
+        set('legOutCar',  car === 'ขาไป'   || car === 'ไป-กลับ');
+        set('legBackCar', car === 'ขากลับ' || car === 'ไป-กลับ');
+        set('legOutTaxi',  !!document.querySelector('#taxiEntriesList .taxi-entry'));
+        set('legBackTaxi', !!document.querySelector('#taxiEntriesListBack .taxi-entry'));
+        const box = (id, on) => document.getElementById(id)?.classList.toggle('hidden', !on);
+        box('legOutCarBox',   document.getElementById('legOutCar')?.checked);
+        box('legBackCarBox',  document.getElementById('legBackCar')?.checked);
+        box('legOutTaxiBox',  document.getElementById('legOutTaxi')?.checked);
+        box('legBackTaxiBox', document.getElementById('legBackTaxi')?.checked);
+        if (typeof updateLegDateLabels === 'function') updateLegDateLabels();
+    }
+
+    /* ขากลับ "ไปคนละที่" ไม่ต้องให้ผู้ใช้ติ๊กเอง ดูจากว่ากรอกช่องขากลับไว้หรือเปล่า
+       เว้นว่างทั้งสองช่อง = กลับทางเดิม ซึ่งเป็นพฤติกรรมเดิมทุกประการ */
+    function syncReturnDiff() {
+        const rf = (document.getElementById('travelReturnFrom')?.value || '').trim();
+        const rt = (document.getElementById('travelReturnTo')?.value   || '').trim();
+        const backCar = !!document.getElementById('legBackCar')?.checked;
+        const cb = document.getElementById('returnDiff');
+        if (!cb) return;
+        const want = backCar && !!(rf || rt);
+        if (cb.checked !== want) { cb.checked = want; }
+    }
+
+    /* หัวการ์ดบอกวันที่ของขานั้น ให้ตรงกับที่กรอกไว้ในกำหนดการเดินทาง
+       คนกรอกจะได้เห็นทันทีว่ากำลังกรอกของวันไหน โดยไม่ต้องเลื่อนขึ้นไปดู */
+    function updateLegDateLabels() {
+        const fmt = v => {
+            if (!v) return '';
+            const d = new Date(v + 'T00:00:00');
+            if (isNaN(d.getTime())) return '';
+            return d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+        };
+        const go   = fmt(document.getElementById('dateStart')?.value);
+        const back = fmt(document.getElementById('dateEnd')?.value) || go;
+        const set = (id, v, fallback) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = v || fallback;
+        };
+        set('legOutDate',  go,   'ยังไม่ได้ระบุวันออกเดินทาง');
+        set('legBackDate', back, 'ยังไม่ได้ระบุวันกลับถึง');
     }
 
     async function toggleReturnDiff() {
@@ -1528,6 +1636,7 @@
 
     /** ตรวจวันที่ให้สมเหตุสมผล + สรุปจำนวนวัน/คืนให้เห็นทันที */
     function onTripDatesChange() {
+        if (typeof updateLegDateLabels === 'function') updateLegDateLabels();
         const a = document.getElementById('dateStart');
         const b = document.getElementById('dateEnd');
         const sum = document.getElementById('tripSummary');
@@ -1973,8 +2082,13 @@
         // legacy compat — ไม่ใช้แล้วแต่เก็บไว้กันพัง
     }
 
-    function addTaxiEntry() {
-        const list    = document.getElementById('taxiEntriesList');
+    /* เพิ่มเที่ยว Taxi ลงการ์ดของขานั้น
+       ส่งทิศทางมาด้วย = ลงลิสต์ของขานั้นและล็อกทิศทางไว้ ผู้ใช้ไม่ต้องเลือกซ้ำ
+       ไม่ส่งมา = ลิสต์ขาไปและเลือกทิศทางเองได้ ใช้ตอนเปิดใบเก่าที่มีรายการ "ไป-กลับ" */
+    function addTaxiEntry(presetDir) {
+        const list = (presetDir === 'ขากลับ')
+            ? document.getElementById('taxiEntriesListBack')
+            : document.getElementById('taxiEntriesList');
         const fromVal = (document.getElementById('travelFrom').value || '').replace(/"/g, '&quot;');
         const toVal   = (document.getElementById('travelTo').value   || '').replace(/"/g, '&quot;');
         const div = document.createElement('div');
@@ -2023,6 +2137,13 @@
             <div class="taxi-err hidden text-[11px] text-rose-600 mt-1 font-semibold"></div>
         `;
         list.appendChild(div);
+        if (presetDir) {
+            const sel = div.querySelector('.taxi-dir');
+            sel.value = presetDir;
+            // ทิศทางถูกกำหนดโดยการ์ดที่มันอยู่แล้ว ไม่ต้องให้เลือกซ้ำให้สับสน
+            sel.closest('div').classList.add('hidden');
+            if (typeof onTaxiDirChange === 'function') onTaxiDirChange(sel);
+        }
         showTaxiCap();   // แถวที่เพิ่งเพิ่มต้องเห็นวงเงินด้วย
     }
 
@@ -2424,7 +2545,6 @@
         show('secOther',   hasTravel);                   // 3. ค่าใช้จ่ายอื่นๆ (ทางด่วน/เบี้ยเลี้ยง)
         show('costHotelBox',     hasReport);             // ค่าที่พัก
         show('costAirBox',       hasReport);             // ค่าตั๋วเครื่องบิน
-        show('costTaxiBox',      hasReceipt);            // ค่า Taxi
         show('costTollBox',      hasTravel);             // ค่าทางด่วน  (ทั้งสองใบ)
         show('costParkingBox',   hasTravel);             // ค่าที่จอดรถ (ทั้งสองใบ)
         show('costOtherBox',     hasTravel);             // ค่าอื่นๆ    (ทั้งสองใบ)
@@ -3478,6 +3598,8 @@
             // Taxi entries
             const taxiList = document.getElementById('taxiEntriesList');
             taxiList.innerHTML = '';
+            const taxiListBack = document.getElementById('taxiEntriesListBack');
+            if (taxiListBack) taxiListBack.innerHTML = '';
             // ใบเก่าเก็บ Taxi เป็น taxiOutAmt/taxiRetAmt ก้อนเดียว ใบใหม่เป็น taxiEntries[]
             // แปลงของเก่าให้เป็นรายการเดียวเพื่อไม่ให้ยอดหายตอนเปิดมาแก้
             const taxiSrc = (Array.isArray(c.taxiEntries) && c.taxiEntries.length)
@@ -3488,8 +3610,10 @@
                     : []);
             if (Array.isArray(taxiSrc)) {
                 for (const entry of taxiSrc) {
-                    addTaxiEntry();
-                    const row = taxiList.lastElementChild;
+                    // รายการ "ไป-กลับ" ของใบเก่าคร่อมสองขา วางไว้การ์ดขาไปและเปิดช่องทิศทางให้เห็น
+                    const dir = entry.direction || 'ขาไป';
+                    addTaxiEntry(dir === 'ไป-กลับ' ? null : dir);
+                    const row = (dir === 'ขากลับ' ? taxiListBack : taxiList).lastElementChild;
                     row.querySelector('.taxi-date').value = entry.date || '';
                     row.querySelector('.taxi-from').value = entry.from || '';
                     row.querySelector('.taxi-to').value   = entry.to   || '';
@@ -3506,6 +3630,10 @@
                     }
                 }
             }
+            // เปิดใบเดิมมาแก้ ต้องติ๊กการ์ดต่อขาให้ตรงกับที่บันทึกไว้
+            // ตั้งค่าตรงๆ ไม่เรียก onLegModeChange เพราะฟังก์ชันนั้นจะล้างรายการที่เพิ่งกู้คืนมา
+            syncLegCardsFromForm();
+
             // Extra bottom entries
             document.getElementById('extraAddrLine').value = meta._extraAddr || '';
             const extraList = document.getElementById('extraActivitiesList');
