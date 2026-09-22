@@ -1145,7 +1145,10 @@
         if (rf) rf.placeholder = toTxt   ? 'ว่าง = ออกจาก ' + toTxt   : 'ว่าง = ออกจากจุดหมายขาไป';
         if (rt) rt.placeholder = fromTxt ? 'ว่าง = กลับที่ ' + fromTxt : 'ว่าง = กลับที่จุดเริ่มต้น';
         const h = document.getElementById('returnToHint');
-        if (h && !/rose-600/.test(h.innerHTML)) {
+        // เขียนทับคำเตือนเก่าได้เมื่อช่องว่างแล้ว ของเดิมเลี่ยงไม่แตะถ้าเป็นสีแดง
+        // ทำให้คำเตือนที่หมดอายุแล้วค้างอยู่ทั้งที่ผู้ใช้แก้ไปแล้ว
+        const rtNow = (rt && rt.value || '').trim();
+        if (h && (!rtNow || !/rose-600/.test(h.innerHTML))) {
             h.textContent = fromTxt
                 ? 'เว้นว่างทั้งสองช่อง = ไปกลับเส้นทางเดิม กลับที่ ' + fromTxt
                 : 'เว้นว่างทั้งสองช่อง = ไปกลับเส้นทางเดิม';
@@ -1160,8 +1163,30 @@
         const backCar = !!document.getElementById('legBackCar')?.checked;
         const cb = document.getElementById('returnDiff');
         if (!cb) return;
+
+        /* ลบชื่อสถานที่ออกแล้ว หมุดของช่องนั้นต้องหายไปด้วย
+           ไม่งั้นระบบยังคิดเส้นทางจากหมุดเก่าที่ผู้ใช้ตั้งใจเอาออกไปแล้ว */
+        if (!rf && geoRetFrom) {
+            if (mRetFrom && routeMap) routeMap.removeLayer(mRetFrom);
+            mRetFrom = null; geoRetFrom = null;
+        }
+        if (!rt && geoRet) {
+            if (mRet && routeMap) routeMap.removeLayer(mRet);
+            mRet = null; geoRet = null;
+        }
+        // คำเตือนเก่าของช่องที่ถูกลบข้อความ ต้องหายไปด้วย ไม่ค้างให้เข้าใจผิด
+        if (!rf) pointHint('retfrom', 'เว้นว่างไว้ได้ ถ้าออกเดินทางกลับจากจุดหมายขาไป');
+        if (!rt) pointHint('ret', '');
+
         const want = backCar && !!(rf || rt);
-        if (cb.checked !== want) { cb.checked = want; }
+        const changed = cb.checked !== want;
+        cb.checked = want;
+        if (typeof updateReturnPlaceholders === 'function') updateReturnPlaceholders();
+
+        /* ความหมายของเส้นทางขากลับเพิ่งเปลี่ยน ต้องคิดระยะทางใหม่ทันที
+           ก่อนหน้านี้แค่ติ๊ก/ปลดติ๊กเงียบๆ ตัวเลขกับคำเตือนเดิมจึงค้างอยู่บนจอ
+           ผู้ใช้ลบข้อความออกแล้วแต่ยังเห็น "ระยะทางขากลับ 0" กับคำเตือนเก่า */
+        if (changed && typeof recalcRoute === 'function') recalcRoute(false);
     }
 
     /* หัวการ์ดบอกวันที่ของขานั้น ให้ตรงกับที่กรอกไว้ในกำหนดการเดินทาง
@@ -1287,7 +1312,10 @@
 
             // ── ขากลับ ──
             // ปกติกลับทางเดิม ระยะเท่ากัน แต่ถ้าติ๊กว่าไปคนละที่ ต้องคิดจากจุดหมายไปยังที่ใหม่
-            let retKm = km, retMsg = '';
+            let retKm = km;
+            // กลับทางเดิม = ไม่วาดเส้นซ้ำ แต่ต้องบอกให้รู้ ไม่งั้นดูเหมือนระบบลืมขากลับ
+            let retMsg = ' ' + badge('bg-slate-50 border-slate-200 text-slate-600',
+                'ขากลับใช้เส้นทางเดิม ' + km.toLocaleString('th-TH') + ' กม.');
             if (retLine) { routeMap.removeLayer(retLine); retLine = null; }
             retPath = null; retInfo = null;
 

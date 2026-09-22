@@ -289,6 +289,39 @@ try {
      /23.4/.test(fuel.work) && /46.8/.test(fuel.work) && /× 5/.test(fuel.work) && /234/.test(fuel.work),
      fuel.work);
 
+  // ═══ 12. ลบข้อความในช่องขากลับ ต้องคิดใหม่ทันที ไม่ปล่อยให้ค่าเดิมค้าง ═══
+  console.log('');
+  console.log('═══ 12. ลบชื่อสถานที่ขากลับออก ค่าเดิมและคำเตือนเก่าต้องหายไปด้วย ═══');
+  const stale = await ev([
+    tick('legOutCar', true),
+    tick('legBackCar', true),
+    "setPoint('from', 13.65, 100.49, 'บ้าน', 'exact', 'user');",
+    "setPoint('to',   13.75, 100.53, 'โรงแรม', 'exact', 'user');",
+    "await new Promise(r=>setTimeout(r,500));",
+    // ล้างหมุดขากลับที่ค้างจากการทดสอบข้อก่อนหน้าก่อน จะได้เริ่มจากสภาพจริงของผู้ใช้ใหม่
+    "const rf = document.getElementById('travelReturnFrom');",
+    "rf.value = ''; rf.dispatchEvent(new Event('input',{bubbles:true}));",
+    "await new Promise(r=>setTimeout(r,400));",
+    // พิมพ์ที่อยู่บ้านที่แผนที่หาไม่เจอ ลงในช่องจุดเริ่มต้นขากลับ
+    "rf.value = '141/36 ซอยสุขสวัสดิ์ 55'; rf.dispatchEvent(new Event('input',{bubbles:true}));",
+    "await new Promise(r=>setTimeout(r,600));",
+    "const mid = { ret: parseFloat(document.getElementById('distReturn').value||0),",
+    "              diff: document.getElementById('returnDiff').checked };",
+    // แล้วลบทิ้ง เพราะจะออกจากจุดหมายขาไปตามปกติ
+    "rf.value = ''; rf.dispatchEvent(new Event('input',{bubbles:true}));",
+    "await new Promise(r=>setTimeout(r,900));",
+    "return { mid: mid, after: parseFloat(document.getElementById('distReturn').value||0),",
+    "         diffAfter: document.getElementById('returnDiff').checked,",
+    "         hint: document.getElementById('returnFromHint').textContent.replace(/\\s+/g,' ').trim() };"
+  ].join('\n'));
+  ok('พิมพ์ที่หาไม่เจอ ระบบถือว่าไปคนละทางและยังคิดไม่ได้',
+     stale.mid.diff === true && stale.mid.ret === 0, 'ระยะ ' + stale.mid.ret);
+  ok('ลบออกแล้ว กลับไปเป็นกลับทางเดิมทันที', stale.diffAfter === false);
+  ok('ลบออกแล้ว ระยะทางขากลับคิดใหม่ให้ ไม่ค้างที่ 0',
+     stale.after > 0, stale.after + ' กม.');
+  ok('คำเตือนเก่าหายไป ไม่ค้างให้เข้าใจผิด',
+     !/ไม่เจอ/.test(stale.hint), stale.hint);
+
   ok('ไม่มี JavaScript error ตลอดการทดสอบ', pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '));
 
   console.log('');
