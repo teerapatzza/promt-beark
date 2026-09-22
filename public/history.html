@@ -598,7 +598,10 @@
                 // ไม่ใช่สลับทางกลับบ้านซึ่งไม่ตรงกับที่เดินทางจริง
                 const retDiff = !!tr.returnDifferent &&
                                 !!asText(tr.returnTo, tr.returnGeo && tr.returnGeo.label);
-                const retFrom = tr.to;
+                // ขากลับอาจไม่ได้ออกจากจุดหมายขาไป เช่น ไปพักที่โรงแรม
+                // แล้ววันรุ่งขึ้นออกจากโรงพยาบาลกลับบ้าน
+                // ใบเก่าไม่มีคีย์นี้ จึงถอยไปใช้จุดหมายขาไปเหมือนเดิม
+                const retFrom = asText(tr.returnFrom, tr.returnFromGeo && tr.returnFromGeo.label) || tr.to;
                 const retTo   = retDiff
                     ? asText(tr.returnTo, tr.returnGeo && tr.returnGeo.label)
                     : tr.from;
@@ -647,6 +650,52 @@
                 else if(carType === 'ขากลับ') fuelDist = distRet;
                 else if(carType === 'ไป-กลับ') fuelDist = distOut + distRet;
                 const fuelTotal = fuelDist * fRate;
+
+                /* ── วันที่ของแต่ละขาเดินทาง ──
+                   เอกสารต้นแบบเขียนวันที่ไว้บรรทัดเดียวกับขาเดินทางนั้น
+                   ไม่ใช่วันเดียวลอยอยู่บรรทัดบนสุดแล้วคร่อมทั้งตาราง
+                   ขาไปใช้วันที่ "ออกเดินทาง" ขากลับใช้ "กลับถึง"
+                   ถ้าไปกลับวันเดียวกัน สองบรรทัดก็ขึ้นวันเดียวกัน ซึ่งถูกต้องแล้ว */
+                const legDateText = v => {
+                    if (!v) return '';
+                    const d = new Date(String(v).slice(0, 10) + 'T00:00:00');
+                    return isNaN(d.getTime()) ? '' : formatDateDisplay(d);
+                };
+                const dateGo   = legDateText(tr.startDate);
+                const dateBack = legDateText(tr.endDate) || dateGo;
+
+                /* ค่าน้ำมันแยกยอดรายขา เอกสารต้นแบบเขียนยอดไว้ที่บรรทัดระยะทางของขานั้น
+                   ไม่ใช่ยอดรวมก้อนเดียวคร่อมห้าบรรทัด  สองยอดนี้บวกกันได้ fuelTotal พอดี */
+                const fuelOut = (carType === 'ขาไป'   || carType === 'ไป-กลับ') ? distOut * fRate : 0;
+                const fuelRet = (carType === 'ขากลับ' || carType === 'ไป-กลับ') ? distRet * fRate : 0;
+
+                /* ── ตัวช่วยวาดแถวในใบรับรองค่าพาหนะ ──
+                   เอกสารต้นแบบตีเส้นทุกบรรทัดครบทั้งสามคอลัมน์
+                   ของเดิมเชื่อมช่องเป็นบล็อกด้วย border-bottom:none หน้าตาจึงไม่ตรงแบบ
+                   และช่องวันที่ของเดิมกินยาว 16 แถว ทำให้วันที่ลอยอยู่บรรทัดบนสุด */
+                const RC_BD   = '1px solid #000';
+                const rcTdDay = 'border:' + RC_BD + '; padding:3px 6px; text-align:center; vertical-align:middle; white-space:nowrap; font-size:12px;';
+                // แถวที่ไม่มีข้อความต้องสูงเท่าแถวอื่น ไม่งั้นบางจนดูเหมือนเส้นซ้อนกัน
+                const rcTdTxt = 'border:' + RC_BD + '; padding:3px 8px; vertical-align:middle; height:22px;';
+                const rcTdAmt = 'border:' + RC_BD + '; padding:3px 8px; text-align:right; vertical-align:middle; white-space:nowrap;';
+                const rcRow = (day, detail, amt) =>
+                    '<tr><td style="' + rcTdDay + '">' + (day || '') + '</td>' +
+                    '<td style="' + rcTdTxt + '">' + (detail || '') + '</td>' +
+                    '<td style="' + rcTdAmt + '">' + (amt || '') + '</td></tr>';
+                const rcFromTo = (f, t) =>
+                    '<table style="width:100%;border-collapse:collapse;border:none;table-layout:fixed;"><tr>' +
+                    '<td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:30px;line-height:1.6;">จาก</td>' +
+                    '<td style="border:none;padding:0 10px 0 0;vertical-align:top;width:calc(50% - 30px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;font-size:11.5px;">' + wrapCell(f, 28) + '</td>' +
+                    '<td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:30px;line-height:1.6;">ถึง</td>' +
+                    '<td style="border:none;padding:0;vertical-align:top;width:calc(50% - 30px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;font-size:11.5px;">' + wrapCell(t, 28) + '</td>' +
+                    '</tr></table>';
+                const rcDist = km =>
+                    'ระยะทาง &nbsp;<span style="display:inline-block;width:44px;text-align:center;">' + (km || '') + '</span> ก.ม. x ' +
+                    '<span style="display:inline-block;width:24px;text-align:center;">' + (km ? '1' : '') + '</span> เที่ยว x ' +
+                    '<span style="display:inline-block;width:32px;text-align:center;">' + (km ? fRate : '') + '</span> บาท';
+                // เอกสารต้นแบบใช้ช่องสี่เหลี่ยมกับ "ประเภทค่าใช้จ่าย" และวงกลมกับ "ทิศทาง"
+                const rcSquare = on => '<span style="font-family:Arial;font-size:15px;vertical-align:middle;">' + (on ? '☑' : '☐') + '</span>';
+                const rcCircle = on => '<span style="font-family:Arial;font-size:18px;vertical-align:middle;">' + (on ? fontCircleCheck : fontCircleEmpty) + '</span>';
 
                 const tollTotal = parseFloat(c.tollAmount || 0);
                 // ใบเก่าไม่มีคีย์นี้ ได้ 0 เอกสารจึงออกมาเหมือนเดิมทุกตัวอักษร
@@ -970,139 +1019,55 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <!-- row 1: กิจกรรม -->
-                                <tr>
-                                    <td style="border-bottom: none; text-align: center; vertical-align: top; padding-left:6px; padding-right:6px; white-space:nowrap;" rowspan="16">${dateStrFor('TRANSPORT_RECEIPT')}</td>
-                                    <td style="border-bottom: 1px solid #000;">
-                                        <b>กิจกรรม</b> &nbsp;&nbsp;&nbsp; <span class="free-text" style="display:inline">${actName}</span>
-                                    </td>
-                                    <td style="border-bottom: 1px solid #000;"></td>
-                                </tr>
-                                <!-- row 2: ค่า Taxi header -->
-                                <tr>
-                                    <td style="border-top: none; border-bottom: none;">
-                                        <span style="display:inline-block; width: 60px;">ค่า Taxi</span>
-                                        <span style="font-family: Arial; font-size: 18px; vertical-align: middle;">${chkTaxiOtw}</span> ขาไป &nbsp;&nbsp;&nbsp;&nbsp;
-                                        <span style="font-family: Arial; font-size: 18px; vertical-align: middle;">${chkTaxiRet}</span> ขากลับ &nbsp;&nbsp;&nbsp;&nbsp;
-                                        <span style="font-family: Arial; font-size: 18px; vertical-align: middle;">${chkTaxiRnd}</span> ไป-กลับ
-                                    </td>
-                                    <td style="border-top: none; border-bottom: none;"></td>
-                                </tr>
-                                <!-- row 3: จาก/ถึง taxi 1 (ขาไป) -->
-                                <tr>
-                                    <td style="border-top: none; border-bottom: none;">
-                                        <table style="width:100%;border-collapse:collapse;border:none;table-layout:fixed;"><tr><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">จาก</td><td style="border:none;padding:0 10px 0 0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;font-size:11.5px;">${wrapCell(firstTaxiOut ? firstTaxiOut.from : '', 28)}</td><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">ถึง</td><td style="border:none;padding:0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;font-size:11.5px;">${wrapCell(firstTaxiOut ? firstTaxiOut.to   : '', 28)}</td></tr></table>
-                                    </td>
-                                    <td style="border-top: none; border-bottom: none; text-align: right; vertical-align: middle; white-space: nowrap;">
-                                        ${taxiOutDisplayAmt > 0 ? formatNumber(taxiOutDisplayAmt) : ''}
-                                    </td>
-                                </tr>
-                                <!-- row 4: จาก/ถึง taxi 2 (ขากลับ — ถ้า ไป-กลับ ให้สลับทิศ) -->
-                                <tr>
-                                    <td style="border-top: none; border-bottom: none;">
-                                        <table style="width:100%;border-collapse:collapse;border:none;table-layout:fixed;"><tr><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">จาก</td><td style="border:none;padding:0 10px 0 0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;font-size:11.5px;">${wrapCell(firstTaxiRet ? (firstTaxiRet.direction === 'ไป-กลับ' ? firstTaxiRet.to : firstTaxiRet.from) : '', 28)}</td><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">ถึง</td><td style="border:none;padding:0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;font-size:11.5px;">${wrapCell(firstTaxiRet ? (firstTaxiRet.direction === 'ไป-กลับ' ? firstTaxiRet.from : firstTaxiRet.to) : '', 28)}</td></tr></table>
-                                    </td>
-                                    <td style="border-top: none; border-bottom: none; text-align: right; vertical-align: middle; white-space: nowrap;">
-                                        ${taxiRetDisplayAmt > 0 ? formatNumber(taxiRetDisplayAmt) : ''}
-                                    </td>
-                                </tr>
-                                <!-- row 5: จาก/ถึง taxi 3 (ใหม่) -->
-                                <tr>
-                                    <td style="border-top: none; border-bottom: 1px solid #000;">
-                                        <table style="width:100%;border-collapse:collapse;border:none;table-layout:fixed;"><tr><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">จาก</td><td style="border:none;padding:0 10px 0 0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;font-size:11.5px;"></td><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">ถึง</td><td style="border:none;padding:0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;font-size:11.5px;"></td></tr></table>
-                                    </td>
-                                    <td style="border-top: none; border-bottom: 1px solid #000;"></td>
-                                </tr>
-                                <!-- row 6: ค่าน้ำมันเชื้อเพลิง header -->
-                                <tr>
-                                    <td style="border-top: 1px solid #000; border-bottom: none;">
-                                        <span style="font-family: Arial; font-size: 18px; vertical-align: middle;">${chkCarSelected}</span> ค่าน้ำมันเชื้อเพลิง &nbsp;
-                                        <span style="font-family: Arial; font-size: 18px; vertical-align: middle;">${chkCarOtw}</span> ขาไป &nbsp;&nbsp;&nbsp;&nbsp;
-                                        <span style="font-family: Arial; font-size: 18px; vertical-align: middle;">${chkCarRet}</span> ขากลับ &nbsp;&nbsp;&nbsp;&nbsp;
-                                        <span style="font-family: Arial; font-size: 18px; vertical-align: middle;">${chkCarRnd}</span> ไป-กลับ
-                                    </td>
-                                    <td style="border-top: 1px solid #000; border-bottom: none; text-align: right; vertical-align: middle;" rowspan="5">
-                                        ${fuelTotal > 0 ? formatNumber(fuelTotal) : ''}
-                                    </td>
-                                </tr>
-                                <!-- row 7: จาก/ถึง fuel 1 -->
-                                <tr>
-                                    <td style="border-top: none; border-bottom: none;">
-                                        <table style="width:100%;border-collapse:collapse;border:none;table-layout:fixed;"><tr><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">จาก</td><td style="border:none;padding:0 10px 0 0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;font-size:11.5px;">${carType === 'ขาไป' || carType === 'ไป-กลับ' ? wrapCell(tr.from, 28) : ''}</td><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">ถึง</td><td style="border:none;padding:0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;font-size:11.5px;">${carType === 'ขาไป' || carType === 'ไป-กลับ' ? wrapCell(tr.to, 28) : ''}</td></tr></table>
-                                    </td>
-                                </tr>
-                                <!-- row 8: ระยะทาง fuel 1 -->
-                                <tr>
-                                    <td style="border-top: none; border-bottom: none;">
-                                        ระยะทาง &nbsp;<span style="display:inline-block; width:40px; text-align:center;">${carType === 'ขาไป' || carType === 'ไป-กลับ' ? distOut : ''}</span> ก.ม. x
-                                        เที่ยว &nbsp;<span style="display:inline-block; width:20px; text-align:center;">${carType === 'ขาไป' || carType === 'ไป-กลับ' ? '1' : ''}</span> เที่ยว x
-                                        <span style="display:inline-block; width:30px; text-align:center;">${carType === 'ขาไป' || carType === 'ไป-กลับ' ? fRate : ''}</span> บาท
-                                    </td>
-                                </tr>
-                                <!-- row 9: จาก/ถึง fuel 2 -->
-                                <tr>
-                                    <td style="border-top: none; border-bottom: none;">
-                                        <table style="width:100%;border-collapse:collapse;border:none;table-layout:fixed;"><tr><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">จาก</td><td style="border:none;padding:0 10px 0 0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;font-size:11.5px;">${carType === 'ขากลับ' || carType === 'ไป-กลับ' ? wrapCell(retFrom, 28) : ''}</td><td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:34px;line-height:1.6;">ถึง</td><td style="border:none;padding:0;vertical-align:top;width:calc(50% - 34px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;font-size:11.5px;">${carType === 'ขากลับ' || carType === 'ไป-กลับ' ? wrapCell(retTo, 28) : ''}</td></tr></table>
-                                    </td>
-                                </tr>
-                                <!-- row 10: ระยะทาง fuel 2 -->
-                                <tr>
-                                    <td style="border-top: none; border-bottom: 1px solid #000;">
-                                        ระยะทาง &nbsp;<span style="display:inline-block; width:40px; text-align:center;">${carType === 'ขากลับ' || carType === 'ไป-กลับ' ? distRet : ''}</span> ก.ม. x
-                                        เที่ยว &nbsp;<span style="display:inline-block; width:20px; text-align:center;">${carType === 'ขากลับ' || carType === 'ไป-กลับ' ? '1' : ''}</span> เที่ยว x
-                                        <span style="display:inline-block; width:30px; text-align:center;">${carType === 'ขากลับ' || carType === 'ไป-กลับ' ? fRate : ''}</span> บาท
-                                    </td>
-                                </tr>
-                                <!-- row 11: ค่าทางด่วน -->
-                                <tr>
-                                    <td style="border-top: 1px solid #000; border-bottom: 1px solid #000;">
-                                        <span style="font-family: Arial; font-size: 18px; vertical-align: middle;">${tollTotal > 0 ? '&#9673;' : '&#9711;'}</span> ค่าทางด่วน
-                                    </td>
-                                    <td style="border-top: 1px solid #000; border-bottom: 1px solid #000; text-align: right;">
-                                        ${tollTotal > 0 ? formatNumber(tollTotal) : ''}
-                                    </td>
-                                </tr>
-                                <!-- row 12: ค่าที่จอดรถ (แยกแถว)
-                                     เดิมบรรทัดนี้ว่างเสมอ เพราะฟอร์มมีช่องรวม "ค่าทางด่วน/ที่จอดรถ" ช่องเดียว
-                                     ค่าที่จอดรถจึงไปโผล่ในบรรทัดค่าทางด่วน ตอนนี้ฟอร์มแยกช่องแล้ว -->
-                                <tr>
-                                    <td style="border-top: none; border-bottom: 1px solid #000;">
-                                        <span style="font-family: Arial; font-size: 18px; vertical-align: middle;">${parkingTotal > 0 ? '&#9673;' : '&#9711;'}</span> ค่าที่จอดรถ
-                                    </td>
-                                    <td style="border-top: none; border-bottom: 1px solid #000; text-align: right;">
-                                        ${parkingTotal > 0 ? formatNumber(parkingTotal) : ''}
-                                    </td>
-                                </tr>
-                                <!-- row 13: ค่าใช้จ่ายอื่นๆ -->
-                                <tr>
-                                    <td style="border-top: none; border-bottom: 1px solid #000;">
-                                        <span style="font-family: Arial; font-size: 18px; vertical-align: middle;">${otherTotal > 0 ? '&#9673;' : '&#9711;'}</span> ค่าใช้จ่ายอื่นๆ (โปรดระบุ)
-                                    </td>
-                                    <td style="border-top: none; border-bottom: 1px solid #000; text-align: right;">
-                                        ${otherTotal > 0 ? formatNumber(otherTotal) : ''}
-                                    </td>
-                                </tr>
-                                <!-- row 14: ที่อยู่ — แบ่งบรรทัดเอง ไม่ให้เบราว์เซอร์ตัด
-                                     เพราะข้อความไทยยาวๆ ที่ตัดบรรทัดเองในตารางที่มี rowspan
-                                     จะถูก html2canvas วางตำแหน่งผิดจนตัวหนังสือทับกัน -->
-                                <tr>
-                                    <td style="border-top: none; border-bottom: 1px solid #000; padding: 10px 8px; vertical-align: top;">
-                                        ${addrLinesHtml}
-                                    </td>
-                                    <td style="border-top: none; border-bottom: 1px solid #000;"></td>
-                                </tr>
-                                <!-- row 15: กิจกรรม -->
-                                <tr>
-                                    <td style="border-top: none; border-bottom: 1px solid #000;">
-                                        <b>กิจกรรม</b>${extraActivities[0] ? ' &nbsp; <span class="free-text" style="display:inline">' + extraActivities[0] + '</span>' : ''}
-                                    </td>
-                                    <td style="border-top: none; border-bottom: 1px solid #000;"></td>
-                                </tr>
-                                <!-- row 16: แถวว่าง / กิจกรรมเพิ่มเติม -->
-                                <tr>
-                                    <td style="border-bottom: 1px solid #000; min-height: 22px; line-height:1.7; word-break:break-word; overflow-wrap:anywhere;">${extraActivities[1] || ''}</td>
-                                    <td style="border-bottom: 1px solid #000;"></td>
-                                </tr>
+                                <!-- ลำดับแถวล้อตามเอกสารต้นแบบ FM-SAM-095-00
+                                     วันที่อยู่บรรทัดเดียวกับขาเดินทางนั้น ไม่ลอยอยู่บนสุด
+                                     ค่าน้ำมันแยกยอดรายขาไว้ที่บรรทัดระยะทางของขานั้น -->
+                                ${rcRow('', '<b>กิจกรรม</b> &nbsp;&nbsp;&nbsp; <span class="free-text" style="display:inline">' + actName + '</span>', '')}
+
+                                ${rcRow('', rcSquare(hasTaxiOut || hasTaxiRet) + ' ค่า Taxi &nbsp;&nbsp;&nbsp;&nbsp;'
+                                        + rcCircle(hasTaxiOut && !hasTaxiRet) + ' ขาไป &nbsp;&nbsp;&nbsp;&nbsp;'
+                                        + rcCircle(hasTaxiRet && !hasTaxiOut) + ' ขากลับ &nbsp;&nbsp;&nbsp;&nbsp;'
+                                        + rcCircle(hasTaxiOut && hasTaxiRet)  + ' ไป-กลับ', '')}
+
+                                ${rcRow(firstTaxiOut ? legDateText(firstTaxiOut.date) : '',
+                                        rcFromTo(firstTaxiOut ? firstTaxiOut.from : '', firstTaxiOut ? firstTaxiOut.to : ''),
+                                        taxiOutDisplayAmt > 0 ? formatNumber(taxiOutDisplayAmt) : '')}
+
+                                ${rcRow(firstTaxiRet ? legDateText(firstTaxiRet.date) : '',
+                                        rcFromTo(firstTaxiRet ? (firstTaxiRet.direction === 'ไป-กลับ' ? firstTaxiRet.to : firstTaxiRet.from) : '',
+                                                 firstTaxiRet ? (firstTaxiRet.direction === 'ไป-กลับ' ? firstTaxiRet.from : firstTaxiRet.to) : ''),
+                                        taxiRetDisplayAmt > 0 ? formatNumber(taxiRetDisplayAmt) : '')}
+
+                                ${rcRow('', rcFromTo('', ''), '')}
+
+                                ${rcRow('', rcSquare(carType !== 'ไม่ระบุ') + ' ค่าน้ำมันเชื้อเพลิง &nbsp;&nbsp;&nbsp;&nbsp;'
+                                        + rcCircle(carType === 'ขาไป')   + ' ขาไป &nbsp;&nbsp;&nbsp;&nbsp;'
+                                        + rcCircle(carType === 'ขากลับ') + ' ขากลับ &nbsp;&nbsp;&nbsp;&nbsp;'
+                                        + rcCircle(carType === 'ไป-กลับ') + ' ไป-กลับ', '')}
+
+                                ${rcRow((carType === 'ขาไป' || carType === 'ไป-กลับ') ? dateGo : '',
+                                        rcFromTo((carType === 'ขาไป' || carType === 'ไป-กลับ') ? tr.from : '',
+                                                 (carType === 'ขาไป' || carType === 'ไป-กลับ') ? tr.to   : ''), '')}
+
+                                ${rcRow('', rcDist((carType === 'ขาไป' || carType === 'ไป-กลับ') ? distOut : 0),
+                                        fuelOut > 0 ? formatNumber(fuelOut) : '')}
+
+                                ${rcRow((carType === 'ขากลับ' || carType === 'ไป-กลับ') ? dateBack : '',
+                                        rcFromTo((carType === 'ขากลับ' || carType === 'ไป-กลับ') ? retFrom : '',
+                                                 (carType === 'ขากลับ' || carType === 'ไป-กลับ') ? retTo   : ''), '')}
+
+                                ${rcRow('', rcDist((carType === 'ขากลับ' || carType === 'ไป-กลับ') ? distRet : 0),
+                                        fuelRet > 0 ? formatNumber(fuelRet) : '')}
+
+                                ${rcRow('', rcSquare(tollTotal > 0)    + ' ค่าทางด่วน',  tollTotal > 0 ? formatNumber(tollTotal) : '')}
+                                ${rcRow('', rcSquare(parkingTotal > 0) + ' ค่าที่จอดรถ', parkingTotal > 0 ? formatNumber(parkingTotal) : '')}
+                                ${rcRow('', rcSquare(otherTotal > 0)   + ' ค่าใช้จ่ายอื่นๆ (โปรดระบุ) <span style="font-size:11px;">เช่น ค่าที่พัก ค่าอาหาร ค่าเบ็ดเตล็ด กรณีเป็นบิลเงินสด</span>',
+                                        otherTotal > 0 ? formatNumber(otherTotal) : '')}
+
+                                ${rcRow('', addrLinesHtml, '')}
+                                ${rcRow('', '<b>กิจกรรม</b>' + (extraActivities[0] ? ' &nbsp; <span class="free-text" style="display:inline">' + extraActivities[0] + '</span>' : ''), '')}
+                                ${rcRow('', extraActivities[1] || '', '')}
+
                                 <!-- รวมทั้งสิ้น -->
                                 <tr style="font-weight: bold;">
                                     <td style="border-top: 1px solid #000; border-bottom: 1px solid #000; text-align: right;" colspan="2">
@@ -1499,14 +1464,20 @@
                 // ขากลับไปคนละที่: ต้องเห็นทั้งสองขาบนแผนที่ ไม่งั้นเอกสารเล่าไม่ครบ
                 const rg = tr.returnDifferent && tr.returnGeo ? tr.returnGeo : null;
                 const ret = rg ? L.latLng(rg.lat, rg.lng) : null;
+                // ขากลับอาจออกจากที่อื่น ไม่ใช่จุดหมายขาไป เช่น ไปพักโรงแรม
+                // แล้ววันรุ่งขึ้นออกจากโรงพยาบาลกลับบ้าน
+                // ใบเก่าไม่มีคีย์นี้ จึงถอยไปใช้จุดหมายขาไปเหมือนเดิม
+                const rgf = tr.returnDifferent && tr.returnFromGeo ? tr.returnFromGeo : null;
+                const retStart = rgf ? L.latLng(rgf.lat, rgf.lng) : to;
                 const retPts = ret
                     ? ((Array.isArray(tr.returnPath) && tr.returnPath.length > 1)
                         ? tr.returnPath.filter(p => Array.isArray(p) && p.length >= 2)
                                        .map(p => L.latLng(p[0], p[1]))
-                        : [to, ret])
+                        : [retStart, ret])
                     : [];
 
-                map.fitBounds(L.latLngBounds(pts.concat(retPts, [from, to], ret ? [ret] : [])),
+                map.fitBounds(L.latLngBounds(pts.concat(retPts, [from, to],
+                                  ret ? [ret] : [], rgf ? [retStart] : [])),
                               { padding: [46, 46], maxZoom: 15, animate: false });
 
                 // รอ tile โหลดครบจริงๆ ไม่ใช่เดาเวลา
@@ -1580,7 +1551,9 @@
                 if (retPts.length > 1) drawLine(retPts, '#7c3aed', !!(tr.returnPath && tr.returnPath.length > 1));
                 drawPin(from, '#059669', 'A');
                 drawPin(to,   '#e11d48', 'B');
-                if (ret) drawPin(ret, '#7c3aed', 'C');
+                // จุดเริ่มต้นขากลับได้หมุดของตัวเองเฉพาะเมื่อไม่ใช่จุดหมายขาไป
+                if (rgf) drawPin(retStart, '#a855f7', 'C');
+                if (ret) drawPin(ret, '#7c3aed', rgf ? 'D' : 'C');
 
                 return out.toDataURL('image/jpeg', 0.9);
             } catch (e) {

@@ -510,7 +510,19 @@
                                 <span class="block text-xs text-slate-400">เช่น ไปที่ทำงาน แล้วขากลับเข้าโรงแรม — ระยะทางสองขาจะคิดแยกกัน</span>
                             </span>
                         </label>
-                        <div id="returnToBox" class="hidden mt-2 pl-6">
+                        <div id="returnToBox" class="hidden mt-2 pl-6 space-y-3">
+                            <!-- ขากลับอาจไม่ได้ออกจากจุดหมายขาไป เช่น ไปพักโรงแรม
+                                 แล้ววันรุ่งขึ้นออกจากโรงพยาบาลกลับบ้าน
+                                 ปล่อยว่างไว้ = ออกจากจุดหมายขาไปเหมือนเดิม -->
+                            <div>
+                                <label class="block text-xs font-bold text-violet-700 mb-1">จุดเริ่มต้นขากลับ</label>
+                                <div class="relative">
+                                    <input type="text" id="travelReturnFrom" autocomplete="off" placeholder="ปล่อยว่าง = ออกจากจุดหมายขาไป"
+                                        class="w-full border-2 border-white p-3 rounded-lg text-sm shadow-sm focus:border-violet-400 outline-none">
+                                    <div id="returnFromSuggest" class="hidden absolute z-[9100] w-full bg-white border border-slate-200 shadow-xl rounded-xl mt-1 max-h-64 overflow-y-auto overscroll-contain"></div>
+                                </div>
+                            </div>
+                            <div>
                             <label class="block text-xs font-bold text-violet-700 mb-1">ปลายทางขากลับ</label>
                             <div class="relative">
                                 <input type="text" id="travelReturnTo" autocomplete="off" placeholder="เช่น โรงแรมที่เข้าพัก"
@@ -518,8 +530,9 @@
                                 <div id="returnToSuggest" class="hidden absolute z-[9100] w-full bg-white border border-slate-200 shadow-xl rounded-xl mt-1 max-h-64 overflow-y-auto overscroll-contain"></div>
                             </div>
                             <p class="text-xs text-slate-400 mt-1" id="returnToHint">
-                                ขากลับจะคิดจาก <b>จุดหมาย</b> ไปยังที่นี่ — หมุดสีม่วงบนแผนที่ ลากปรับได้
+                                ขากลับคิดจาก <b>จุดเริ่มต้นขากลับ</b> ไปยังที่นี่ — หมุดสีม่วงบนแผนที่ ลากปรับได้
                             </p>
+                            </div>
                         </div>
                     </div>
 
@@ -871,8 +884,10 @@
 
     let routeMap = null, mFrom = null, mTo = null, routeLine = null;
     let mRet = null, retLine = null;   // หมุดและเส้นทางขากลับ ใช้เมื่อขากลับไปคนละที่
+    let mRetFrom = null;               // หมุดจุดเริ่มต้นขากลับ (ถ้าไม่ใช่จุดหมายขาไป)
     let geoFrom = null, geoTo = null;          // {lat, lng, label, precision, source}
     let geoRet  = null;                         // ปลายทางขากลับ ใช้เมื่อขากลับไปคนละที่
+    let geoRetFrom = null;                      // จุดเริ่มต้นขากลับ ว่าง = ใช้จุดหมายขาไป
     let routeInfo = null;                       // ผลการคำนวณล่าสุด
     let routePath = null;                       // เส้นทางแบบย่อ สำหรับวาดใน PDF
     let retPath   = null;                       // เส้นทางขากลับ (เฉพาะเมื่อไปคนละที่)
@@ -936,12 +951,15 @@
     const PT = {
         from: { color: '#059669', tip: 'จุดเริ่มต้น (ลากได้)' },
         to:   { color: '#e11d48', tip: 'จุดหมาย (ลากได้)' },
-        ret:  { color: '#7c3aed', tip: 'ปลายทางขากลับ (ลากได้)' }
+        ret:  { color: '#7c3aed', tip: 'ปลายทางขากลับ (ลากได้)' },
+        retfrom: { color: '#a855f7', tip: 'จุดเริ่มต้นขากลับ (ลากได้)' }
     };
-    const getGeo = w => w === 'from' ? geoFrom : w === 'to' ? geoTo : geoRet;
-    const setGeo = (w, v) => { if (w === 'from') geoFrom = v; else if (w === 'to') geoTo = v; else geoRet = v; };
-    const getMk  = w => w === 'from' ? mFrom : w === 'to' ? mTo : mRet;
-    const setMk  = (w, v) => { if (w === 'from') mFrom = v; else if (w === 'to') mTo = v; else mRet = v; };
+    const getGeo = w => w === 'from' ? geoFrom : w === 'to' ? geoTo : w === 'retfrom' ? geoRetFrom : geoRet;
+    const setGeo = (w, v) => { if (w === 'from') geoFrom = v; else if (w === 'to') geoTo = v;
+                               else if (w === 'retfrom') geoRetFrom = v; else geoRet = v; };
+    const getMk  = w => w === 'from' ? mFrom : w === 'to' ? mTo : w === 'retfrom' ? mRetFrom : mRet;
+    const setMk  = (w, v) => { if (w === 'from') mFrom = v; else if (w === 'to') mTo = v;
+                               else if (w === 'retfrom') mRetFrom = v; else mRet = v; };
 
     function setPoint(which, lat, lng, label, precision, source) {
         initRouteMap();
@@ -972,7 +990,8 @@
     /** เอาหมุดปลายทางขากลับออกเมื่อผู้ใช้เอาติ๊กออก */
     function clearReturnPoint() {
         if (mRet && routeMap) { routeMap.removeLayer(mRet); }
-        mRet = null; geoRet = null; retPath = null; retInfo = null;
+        if (mRetFrom && routeMap) { routeMap.removeLayer(mRetFrom); }
+        mRet = null; mRetFrom = null; geoRet = null; geoRetFrom = null; retPath = null; retInfo = null;
         if (retLine && routeMap) { routeMap.removeLayer(retLine); }
         retLine = null;
     }
@@ -983,6 +1002,8 @@
         if (!on) {
             const inp = document.getElementById('travelReturnTo');
             if (inp) inp.value = '';
+            const inp2 = document.getElementById('travelReturnFrom');
+            if (inp2) inp2.value = '';
             clearReturnPoint();
         }
         await recalcRoute(false);
@@ -996,7 +1017,7 @@
     function fitRoute(userAsked) {
         if (!routeMap) return;
         routeMap.invalidateSize();
-        const pts = [mFrom, mTo, mRet].filter(Boolean).map(m => m.getLatLng());
+        const pts = [mFrom, mTo, mRetFrom, mRet].filter(Boolean).map(m => m.getLatLng());
         if (routeLine || retLine) {
             let b = null;
             [routeLine, retLine].filter(Boolean).forEach(l => {
@@ -1087,7 +1108,9 @@
                     retMsg = ' ' + badge('bg-amber-50 border-amber-200 text-amber-800',
                         'ยังไม่ได้เลือกปลายทางขากลับ');
                 } else {
-                    const back = await routeLeg(geoTo, geoRet);
+                    // ปล่อยว่าง = ออกจากจุดหมายขาไป ซึ่งเป็นพฤติกรรมเดิม
+                    const backStart = geoRetFrom || geoTo;
+                    const back = await routeLeg(backStart, geoRet);
                     retKm = back.km;
                     if (back.coords.length) {
                         retLine = L.polyline(back.coords,
@@ -1225,7 +1248,8 @@
 
     function markUnconfirmed(which) {
         const inp = document.getElementById(
-            which === 'from' ? 'travelFrom' : which === 'to' ? 'travelTo' : 'travelReturnTo');
+            which === 'from' ? 'travelFrom' : which === 'to' ? 'travelTo'
+            : which === 'retfrom' ? 'travelReturnFrom' : 'travelReturnTo');
         const g = getGeo(which);
         if (!inp) return;
         const txt = inp.value.trim();
@@ -1238,11 +1262,12 @@
     /** ถ้ามีข้อความแต่ยังไม่มีหมุด ให้ค้นหาแล้วปักหมุดจากผลอันดับแรกให้เลย */
     async function autoResolvePoint(which) {
         const inp = document.getElementById(
-            which === 'from' ? 'travelFrom' : which === 'to' ? 'travelTo' : 'travelReturnTo');
+            which === 'from' ? 'travelFrom' : which === 'to' ? 'travelTo'
+            : which === 'retfrom' ? 'travelReturnFrom' : 'travelReturnTo');
         if (!inp) return;
         const txt = inp.value.trim();
         if (txt.length < 2) return;
-        if (which === 'ret' && !returnIsDifferent()) return;
+        if ((which === 'ret' || which === 'retfrom') && !returnIsDifferent()) return;
 
         const g = getGeo(which);
         if (g && (g.label || '').trim() === txt) return;      // ยืนยันแล้ว ตรงกับที่พิมพ์
@@ -1744,6 +1769,7 @@
         initRouteMap();
         attachPlaceSearch('travelFrom',     'fromSuggest',     'from');
         attachPlaceSearch('travelTo',       'toSuggest',       'to');
+        attachPlaceSearch('travelReturnFrom', 'returnFromSuggest', 'retfrom');
         attachPlaceSearch('travelReturnTo', 'returnToSuggest', 'ret');
         const sel = document.getElementById('categorySelect');
         sel.innerHTML = '<option value="">-- กรุณาเลือกหมวดการเบิก --</option>';
@@ -2880,6 +2906,8 @@
                 // ขากลับไปคนละที่ — เก็บแยกเพื่อให้เอกสารพิมพ์ถูก และส่งออก API ได้ตรงความจริง
                 returnDifferent: returnIsDifferent(),
                 returnTo:   returnIsDifferent() ? (document.getElementById('travelReturnTo')?.value || '') : '',
+                returnFrom:    returnIsDifferent() ? (document.getElementById('travelReturnFrom')?.value || '') : '',
+                returnFromGeo: returnIsDifferent() ? geoRetFrom : null,
                 returnGeo:  returnIsDifferent() ? geoRet  : null,
                 returnPath: returnIsDifferent() ? retPath : null,
                 returnRoute: returnIsDifferent() ? retInfo : null,
@@ -3382,6 +3410,9 @@
                 try {
                     if (geoFrom) setPoint('from', geoFrom.lat, geoFrom.lng, geoFrom.label, geoFrom.precision, geoFrom.source);
                     if (geoTo)   setPoint('to',   geoTo.lat,   geoTo.lng,   geoTo.label,   geoTo.precision,   geoTo.source);
+                    // หมุดขากลับก็ต้องกลับมาด้วย เดิมคืนแค่พิกัดในตัวแปรแต่ไม่ได้ปักลงแผนที่
+                    if (geoRetFrom) setPoint('retfrom', geoRetFrom.lat, geoRetFrom.lng, geoRetFrom.label, geoRetFrom.precision, geoRetFrom.source);
+                    if (geoRet)     setPoint('ret',     geoRet.lat,     geoRet.lng,     geoRet.label,     geoRet.precision,     geoRet.source);
                     if (routeMap) { routeMap.invalidateSize(); fitRoute(); }
                 } catch (e) { console.warn('คืนหมุดบนแผนที่ไม่สำเร็จ:', e); }
             }, 300);
@@ -3392,8 +3423,11 @@
                 rdiff.checked = !!tr.returnDifferent;
                 document.getElementById('returnToBox')?.classList.toggle('hidden', !rdiff.checked);
                 document.getElementById('travelReturnTo').value = tr.returnTo || '';
+                document.getElementById('travelReturnFrom').value = tr.returnFrom || '';
                 if (tr.returnDifferent && tr.returnGeo) {
                     geoRet  = tr.returnGeo;
+                    // ใบเก่าไม่มีคีย์นี้ ขากลับจึงออกจากจุดหมายขาไปเหมือนเดิม
+                    geoRetFrom = tr.returnFromGeo || null;
                     retPath = tr.returnPath || null;
                     retInfo = tr.returnRoute || null;
                 }

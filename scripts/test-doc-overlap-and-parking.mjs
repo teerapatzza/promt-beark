@@ -152,7 +152,8 @@ try {
     "    d.innerHTML = b.html;",
     "    const out = {};",
     "    d.querySelectorAll('tr').forEach(function(tr){",
-    "      const td = tr.children[0]; if (!td) return;",
+    // คอลัมน์แรกเป็นช่องวันที่ ป้ายรายการอยู่คอลัมน์กลาง
+    "      const td = tr.children.length >= 3 ? tr.children[1] : tr.children[0]; if (!td) return;",
     "      const label = (td.textContent||'').replace(/\\s+/g,' ').trim();",
     "      const last = tr.children[tr.children.length-1];",
     "      const amt = (last.textContent||'').replace(/\\s+/g,'').trim();",
@@ -170,7 +171,8 @@ try {
     "return { onlyToll: onlyToll, onlyParking: onlyParking, both: both };"
   ].join('\n'));
 
-  const FILLED = '◉', EMPTY = '◯';   // &#9673; = U+25C9 กับ &#9711; = U+25EF
+  // เอกสารต้นแบบ FM-SAM-095-00 ใช้ช่องสี่เหลี่ยมกับประเภทค่าใช้จ่าย ส่วนวงกลมใช้กับทิศทาง
+  const FILLED = '☑', EMPTY = '☐';
   ok('กรอกแต่ค่าทางด่วน: บรรทัดทางด่วนมียอด บรรทัดที่จอดรถว่าง',
      rows.onlyToll.toll.amt === '500.00' && rows.onlyToll.parking.amt === '',
      'ทางด่วน=' + rows.onlyToll.toll.amt + ' ที่จอดรถ=' + (rows.onlyToll.parking.amt || 'ว่าง'));
@@ -180,7 +182,7 @@ try {
   ok('กรอกทั้งคู่: แยกกันถูกต้องทั้งสองบรรทัด',
      rows.both.toll.amt === '500.00' && rows.both.parking.amt === '120.00',
      'ทางด่วน=' + rows.both.toll.amt + ' ที่จอดรถ=' + rows.both.parking.amt);
-  ok('วงกลมหน้าบรรทัดถูกทำเครื่องหมายตามยอดที่กรอก',
+  ok('ช่องหน้าบรรทัดถูกทำเครื่องหมายตามยอดที่กรอก',
      rows.onlyParking.parking.mark === FILLED && rows.onlyParking.toll.mark === EMPTY,
      'ที่จอดรถ=' + rows.onlyParking.parking.mark + ' ทางด่วน=' + rows.onlyParking.toll.mark);
 
