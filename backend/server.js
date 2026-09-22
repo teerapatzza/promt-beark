@@ -982,16 +982,18 @@ app.get('/map-cache-stats', requireAdmin, (_req, res) => {
   });
 });
 
+// ตัวช่วยเรียก Longdo แบบมีกำหนดเวลาและลองซ้ำ อยู่ในไฟล์แยกเพื่อให้ชุดทดสอบใช้ตัวเดียวกัน
+const { longdoFetch, isTimeout } = require('./longdo-fetch');
+
 app.get('/map-route', requireAuth, async (req, res) => {
   const { flat, flon, tlat, tlon } = req.query;
   if (!flat || !flon || !tlat || !tlon) return res.status(400).json({ error: 'flat, flon, tlat, tlon required' });
+  const url = `https://api.longdo.com/RouteService/geojson/route?flat=${flat}&flon=${flon}&tlat=${tlat}&tlon=${tlon}&mode=t&key=${LONGDO_API_KEY}`;
   try {
-    const url = `https://api.longdo.com/RouteService/geojson/route?flat=${flat}&flon=${flon}&tlat=${tlat}&tlon=${tlon}&mode=t&key=${LONGDO_API_KEY}`;
-    const r = await fetch(url);
-    const data = await r.json();
-    res.json(data);
+    res.json(await longdoFetch(url, 'คำนวณเส้นทาง'));
   } catch (e) {
-    res.status(502).json({ error: 'upstream error' });
+    console.warn('[longdo] คำนวณเส้นทางไม่สำเร็จทุกครั้งที่ลอง: ' + (e && e.message));
+    res.status(502).json({ error: 'upstream error', timedOut: isTimeout(e), detail: (e && e.message) || '' });
   }
 });
 
