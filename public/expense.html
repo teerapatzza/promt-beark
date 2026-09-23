@@ -443,17 +443,36 @@
                      (ทดสอบแล้วเกิดขึ้นจริง 800 บาท) ตอนนี้ถามทีละขา ติ๊กอะไรค่อยโผล่ช่องของอันนั้น
                      ไม่ติ๊ก = ไม่คิดเงิน ซึ่งเป็นค่าเริ่มต้นที่ปลอดภัยกว่า -->
                 <div id="travelDetailsBox" class="hidden mt-6 bg-blue-50/50 p-5 rounded-xl border border-blue-200 shadow-inner animate-fade-in">
-                    <label class="block text-sm font-bold text-blue-900 mb-1 border-b border-blue-200 pb-2">
-                        2.1 การเดินทาง — เลือกทีละขา
+                    <label class="block text-sm font-bold text-blue-900 mb-3 border-b border-blue-200 pb-2">
+                        2.1 การเดินทาง
                     </label>
-                    <p class="text-xs text-slate-500 mb-4">ขาไหนเดินทางด้วยอะไร ติ๊กอันนั้น — ขาเดียวติ๊กได้มากกว่าหนึ่งอย่าง</p>
+
+                    <!-- คนส่วนใหญ่เดินทางแบบ บ้าน -> ที่ทำงาน -> กลับบ้าน ซึ่งเป็นเรื่องธรรมดา
+                         ไม่ควรต้องอ่านการ์ดสองใบกับติ๊กสี่ช่องเพื่อบอกแค่นั้น
+                         ตั้งเคสปกติเป็นค่าเริ่มต้น แล้วเปิดของซับซ้อนให้เฉพาะคนที่ต้องใช้จริง -->
+                    <div class="mb-4 space-y-1.5">
+                        <label class="flex items-start gap-2 text-sm cursor-pointer">
+                            <input type="radio" name="tripMode" id="tripModeNormal" class="mt-0.5" checked onchange="onTripModeChange()">
+                            <span>
+                                <b class="text-slate-800">ไป-กลับตามปกติ</b>
+                                <span class="block text-xs text-slate-400">ออกจากที่หนึ่ง ไปอีกที่ แล้วกลับที่เดิมด้วยเส้นทางเดิม</span>
+                            </span>
+                        </label>
+                        <label class="flex items-start gap-2 text-sm cursor-pointer">
+                            <input type="radio" name="tripMode" id="tripModeSpecial" class="mt-0.5" onchange="onTripModeChange()">
+                            <span>
+                                <b class="text-slate-800">กรณีพิเศษ</b>
+                                <span class="block text-xs text-slate-400">ไปกลับคนละจุด หรือเบิกแค่ขาเดียว</span>
+                            </span>
+                        </label>
+                    </div>
 
                     <div id="taxiCapNote" class="hidden mb-3 text-[11px] px-2.5 py-1.5 rounded-md bg-amber-50 border border-amber-200 text-amber-800"></div>
 
-                    <!-- ═══════════ ขาไป ═══════════ -->
+                    <!-- ═══════════ ขาไป (เคสปกติใช้การ์ดนี้ใบเดียว) ═══════════ -->
                     <div class="bg-white rounded-xl border-2 border-emerald-200 p-4 mb-4">
                         <div class="flex items-baseline gap-2 mb-3 pb-2 border-b border-emerald-100">
-                            <span class="text-sm font-bold text-emerald-800">ขาไป</span>
+                            <span class="text-sm font-bold text-emerald-800" id="legOutTitle">ขาไป</span>
                             <span class="text-xs text-slate-400" id="legOutDate">ยังไม่ได้ระบุวันออกเดินทาง</span>
                         </div>
 
@@ -462,19 +481,8 @@
                             <span class="font-semibold text-slate-700">รถส่วนตัว</span>
                             <span class="text-xs text-slate-400">คิดค่าน้ำมันจากระยะทาง</span>
                         </label>
-
-                        <label class="flex items-center gap-2 text-sm cursor-pointer py-1.5">
-                            <input type="checkbox" id="legOutTaxi" class="rounded w-4 h-4" onchange="onLegModeChange()">
-                            <span class="font-semibold text-slate-700">Taxi</span>
-                            <span class="text-xs text-slate-400">กรอกค่าโดยสารที่จ่ายจริง</span>
-                        </label>
-                        <div id="legOutTaxiBox" class="hidden pl-6">
-                            <div id="taxiEntriesList" class="space-y-2"></div>
-                            <button type="button" onclick="addTaxiEntry('ขาไป')"
-                                class="mt-2 text-xs font-bold text-blue-600 hover:text-blue-800">+ เพิ่มเที่ยว Taxi ขาไป</button>
-                        </div>
                         <div id="legOutRouteBox" class="hidden mt-2 pt-3 border-t border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div class="md:col-span-2 -mb-1"><span class="text-xs font-bold text-slate-600">เส้นทางของขาไป</span><span class="text-xs text-slate-400"> — ใช้กับแผนที่ ระยะทางค่าน้ำมัน และวงเงินค่า Taxi ในเขต กทม.ปริมณฑล</span></div>
+                        <div class="md:col-span-2 -mb-1"><span class="text-xs font-bold text-slate-600" id="legOutRouteTitle">เส้นทางของขาไป</span><span class="text-xs text-slate-400"> — ใช้กับแผนที่ ระยะทางค่าน้ำมัน และวงเงินค่า Taxi ในเขต กทม.ปริมณฑล</span></div>
                             <div>
                                 <label class="block text-xs font-bold text-emerald-700 mb-1">จุดเริ่มต้น <span class="text-rose-500">*</span></label>
                                 <div class="relative">
@@ -494,10 +502,21 @@
                                 <p class="text-xs text-slate-400 mt-1" id="toHint">พิมพ์ชื่อสถานที่ ระบบจะค้นหาให้</p>
                             </div>
                         </div>
+
+                        <label class="flex items-center gap-2 text-sm cursor-pointer py-1.5">
+                            <input type="checkbox" id="legOutTaxi" class="rounded w-4 h-4" onchange="onLegModeChange()">
+                            <span class="font-semibold text-slate-700">Taxi</span>
+                            <span class="text-xs text-slate-400">กรอกค่าโดยสารที่จ่ายจริง</span>
+                        </label>
+                        <div id="legOutTaxiBox" class="hidden pl-6">
+                            <div id="taxiEntriesList" class="space-y-2"></div>
+                            <button type="button" onclick="addTaxiEntry('ขาไป')"
+                                class="mt-2 text-xs font-bold text-blue-600 hover:text-blue-800" id="addTaxiOutBtn">+ เพิ่มเที่ยว Taxi ขาไป</button>
+                        </div>
                     </div>
 
-                    <!-- ═══════════ ขากลับ ═══════════ -->
-                    <div class="bg-white rounded-xl border-2 border-violet-200 p-4 mb-4">
+                    <!-- ═══════════ ขากลับ (โผล่เฉพาะกรณีพิเศษ) ═══════════ -->
+                    <div id="legBackCardWrap" class="bg-white rounded-xl border-2 border-violet-200 p-4 mb-4">
                         <div class="flex items-baseline gap-2 mb-3 pb-2 border-b border-violet-100">
                             <span class="text-sm font-bold text-violet-800">ขากลับ</span>
                             <span class="text-xs text-slate-400" id="legBackDate">ยังไม่ได้ระบุวันกลับถึง</span>
@@ -548,6 +567,9 @@
                     <!-- อัตรานี้หมวดหมู่ตั้งทับค่ากลางได้ จึงต้องอ่านจากค่าจริงเสมอ
                          เคยเขียนเลขตายตัวไว้ตรงนี้ ผู้ใช้เลยเห็น 4 ขณะที่ระบบคิดด้วย 5
                          แล้วยอดออกมาไม่ตรงกับที่คำนวณเองในใจ -->
+                    <p id="normalReturnNote" class="text-[11px] text-slate-600 mb-3 px-2.5 py-1.5 rounded-md bg-emerald-50 border border-emerald-200">
+                        ขากลับใช้เส้นทางเดิม กลับที่จุดเริ่มต้น — ไม่ต้องกรอกอะไรเพิ่ม
+                    </p>
                     <p class="text-[11px] text-slate-500 mb-3" id="fuelRateNote">
                         ค่าน้ำมัน <b id="fuelRateLabel">—</b> บาท/กม. — อัตรานี้กำหนดโดยผู้ดูแลระบบ แก้ไขไม่ได้
                     </p>
@@ -1026,14 +1048,56 @@
         retLine = null;
     }
 
+    /** จริงเมื่ออยู่เคส "ไป-กลับตามปกติ" ซึ่งเป็นค่าเริ่มต้น */
+    function isNormalTrip() {
+        const sp = document.getElementById('tripModeSpecial');
+        return !sp || !sp.checked;
+    }
+
+    /* สลับระหว่างเคสปกติกับกรณีพิเศษ
+       เคสปกติซ่อนการ์ดขากลับทั้งใบ แล้วให้ติ๊กของขาไปมีผลกับทั้งสองขา
+       ค่าที่บันทึกยังเป็นชุดเดิมทุกอย่าง (carType / taxiEntries / returnFrom)
+       เปลี่ยนแค่ว่าผู้ใช้ต้องกรอกอะไรบ้าง */
+    function onTripModeChange() {
+        const normal = isNormalTrip();
+        document.getElementById('legBackCardWrap')?.classList.toggle('hidden', normal);
+        document.getElementById('normalReturnNote')?.classList.toggle('hidden', !normal);
+        const t = document.getElementById('legOutTitle');
+        if (t) t.textContent = normal ? 'เส้นทาง' : 'ขาไป';
+        // เคสปกติไม่มีขาให้แยก ป้ายที่พูดถึง "ขาไป" จึงกลายเป็นคำถามว่าแล้วขากลับอยู่ไหน
+        const rt = document.getElementById('legOutRouteTitle');
+        if (rt) rt.textContent = normal ? 'เส้นทาง' : 'เส้นทางของขาไป';
+        const ab = document.getElementById('addTaxiOutBtn');
+        if (ab) ab.textContent = normal ? '+ เพิ่มเที่ยว Taxi' : '+ เพิ่มเที่ยว Taxi ขาไป';
+
+        if (normal) {
+            // กลับเส้นทางเดิมเสมอ ช่องขากลับจึงต้องว่าง ไม่ให้ค่าค้างจากตอนลองกรณีพิเศษ
+            const rf = document.getElementById('travelReturnFrom');
+            const rt = document.getElementById('travelReturnTo');
+            if (rf) rf.value = '';
+            if (rt) rt.value = '';
+            const back = document.getElementById('legBackTaxi');
+            if (back) back.checked = false;
+            const bl = document.getElementById('taxiEntriesListBack');
+            if (bl) bl.innerHTML = '';
+        }
+        onLegModeChange();
+    }
+
     /* ══════════ การ์ดต่อขา ══════════
        ช่อง carType กับ returnDiff ของเดิมยังอยู่ แต่ซ่อนไว้และให้การ์ดเป็นคนตั้งค่าให้
        โค้ดคำนวณเงิน บันทึก และออกเอกสาร จึงไม่ต้องแก้อะไรเลย */
     function onLegModeChange() {
+        const normal  = isNormalTrip();
         const outCar  = !!document.getElementById('legOutCar')?.checked;
-        const backCar = !!document.getElementById('legBackCar')?.checked;
         const outTaxi = !!document.getElementById('legOutTaxi')?.checked;
-        const backTaxi= !!document.getElementById('legBackTaxi')?.checked;
+        // เคสปกติ: ติ๊กครั้งเดียวมีผลทั้งสองขา ผู้ใช้ไม่ต้องบอกซ้ำ
+        if (normal) {
+            const bc = document.getElementById('legBackCar');
+            if (bc) bc.checked = outCar;
+        }
+        const backCar = !!document.getElementById('legBackCar')?.checked;
+        const backTaxi= normal ? false : !!document.getElementById('legBackTaxi')?.checked;
 
         const box = (id, on) => document.getElementById(id)?.classList.toggle('hidden', !on);
         // เส้นทางขาไปใช้ร่วมกัน ทั้งค่าน้ำมันและวงเงินค่า Taxi จึงต้องโผล่เมื่อเบิกอะไรก็ตาม
@@ -1050,8 +1114,12 @@
                       : backCar ? 'ขากลับ' : 'ไม่ระบุ';
         }
 
-        // ติ๊ก Taxi แล้วยังไม่มีเที่ยวเลย ใส่ให้หนึ่งแถวจะได้ไม่ต้องกดซ้ำ
-        if (outTaxi  && !document.querySelector('#taxiEntriesList .taxi-entry'))     addTaxiEntry('ขาไป');
+        // ติ๊ก Taxi แล้วยังไม่มีเที่ยวเลย ใส่ให้เลยจะได้ไม่ต้องกดซ้ำ
+        // เคสปกติเดินทางสองขา จึงใส่ให้สองเที่ยว ไปหนึ่งกลับหนึ่ง
+        if (outTaxi && !document.querySelector('#taxiEntriesList .taxi-entry')) {
+            addTaxiEntry('ขาไป');
+            if (normal) addTaxiEntry('ขากลับ');
+        }
         if (backTaxi && !document.querySelector('#taxiEntriesListBack .taxi-entry')) addTaxiEntry('ขากลับ');
         // เอาติ๊กออก = ไม่เบิกขานั้นแล้ว ต้องล้างรายการทิ้ง ไม่งั้นยอดยังถูกนับอยู่
         if (!outTaxi)  { const l = document.getElementById('taxiEntriesList');     if (l) l.innerHTML = ''; }
@@ -1067,6 +1135,26 @@
        ใช้ตอนเปิดใบเดิมมาแก้ และตอนเปลี่ยนหมวด
        ต่างจาก onLegModeChange ตรงที่อันนี้ "อ่าน" สถานะมาแสดง ไม่ใช่ "เขียน" ทับ
        จึงไม่ล้างรายการ Taxi ที่เพิ่งกู้คืนมา */
+    /* ใบที่บันทึกไว้ อยู่เคสปกติหรือกรณีพิเศษ ดูจากข้อมูลเอง ไม่ต้องเก็บธงเพิ่ม
+       กรณีพิเศษคือ เบิกรถขาเดียว หรือระบุจุดขากลับไว้ หรือนั่ง Taxi แค่ขาเดียว */
+    function detectTripMode(meta) {
+        const car = (meta && meta._carType) || 'ไม่ระบุ';
+        const tr  = (meta && meta._travel) || {};
+        const tx  = ((meta && meta._costs) || {}).taxiEntries;
+        const dirs = new Set((Array.isArray(tx) ? tx : []).map(e => e && e.direction));
+        const taxiOneWay = dirs.size > 0 && !dirs.has('ไป-กลับ')
+                           && !(dirs.has('ขาไป') && dirs.has('ขากลับ'));
+        const special = car === 'ขาไป' || car === 'ขากลับ'
+                        || !!(tr.returnFrom || tr.returnTo || tr.returnDifferent)
+                        || taxiOneWay;
+        const sp = document.getElementById('tripModeSpecial');
+        const nm = document.getElementById('tripModeNormal');
+        if (sp) sp.checked = special;
+        if (nm) nm.checked = !special;
+        onTripModeChange();
+        return special;
+    }
+
     function syncLegCardsFromForm() {
         const car = document.getElementById('carType')?.value || 'ไม่ระบุ';
         const set = (id, on) => { const el = document.getElementById(id); if (el) el.checked = !!on; };
@@ -2227,7 +2315,9 @@
        ส่งทิศทางมาด้วย = ลงลิสต์ของขานั้นและล็อกทิศทางไว้ ผู้ใช้ไม่ต้องเลือกซ้ำ
        ไม่ส่งมา = ลิสต์ขาไปและเลือกทิศทางเองได้ ใช้ตอนเปิดใบเก่าที่มีรายการ "ไป-กลับ" */
     function addTaxiEntry(presetDir) {
-        const list = (presetDir === 'ขากลับ')
+        // เคสปกติไม่มีการ์ดขากลับให้เห็น ทุกเที่ยวจึงอยู่รายการเดียวกัน
+        // และต้องเห็นว่าแถวไหนเป็นขาไปขากลับ ต่างจากกรณีพิเศษที่การ์ดบอกอยู่แล้ว
+        const list = (presetDir === 'ขากลับ' && !isNormalTrip())
             ? document.getElementById('taxiEntriesListBack')
             : document.getElementById('taxiEntriesList');
         const fromVal = (document.getElementById('travelFrom').value || '').replace(/"/g, '&quot;');
@@ -2288,8 +2378,9 @@
         if (presetDir) {
             const sel = div.querySelector('.taxi-dir');
             sel.value = presetDir;
-            // ทิศทางถูกกำหนดโดยการ์ดที่มันอยู่แล้ว ไม่ต้องให้เลือกซ้ำให้สับสน
-            sel.closest('div').classList.add('hidden');
+            // กรณีพิเศษ: การ์ดบอกทิศทางอยู่แล้ว ซ่อนช่องเลือกไม่ให้ถามซ้ำ
+            // เคสปกติ: ทุกเที่ยวอยู่รายการเดียวกัน ต้องเห็นว่าแถวไหนขาไปขากลับ
+            sel.closest('div').classList.toggle('hidden', !isNormalTrip());
             if (typeof onTaxiDirChange === 'function') onTaxiDirChange(sel);
         }
         showTaxiCap();   // แถวที่เพิ่งเพิ่มต้องเห็นวงเงินด้วย
@@ -2686,6 +2777,8 @@
         // ตรวจด้วยการนับวงเล็บใน history.html แล้ว: บรรทัดระยะทางอยู่ในบล็อก TRANSPORT_RECEIPT
         // หมวดที่ออกแค่ใบรายงานจึงไม่ควรมีแผนที่ให้ปักหมุด ขอแค่ชื่อโรงแรมกับวันที่พัก
         show('travelDetailsBox', hasReceipt);            // แผนที่ · ระยะทาง · ประเภทรถ
+        // ตั้งหน้าตาให้ตรงกับเคสที่เลือกอยู่ตั้งแต่แรก ไม่ใช่รอให้ผู้ใช้ไปกดสลับก่อน
+        if (typeof onTripModeChange === 'function') onTripModeChange();
         show('extraEntriesBox',  hasReceipt);            // กิจกรรมเพิ่มเติม
         describeDocDate(hasReport, hasReceipt, hasGeneral);
         // กล่องหัวข้อตามเลขข้อใน PDF — แสดงเมื่อมีอะไรอยู่ข้างในให้กรอกจริง
@@ -3726,6 +3819,9 @@
             }
 
             document.getElementById('carType').value   = meta._carType   || 'ไม่ระบุ';
+            // ต้องรู้เคสก่อนวางแถว Taxi ไม่งั้นแถวจะไปอยู่ผิดรายการ
+            // (เคสปกติทุกเที่ยวอยู่รายการเดียว กรณีพิเศษแยกตามการ์ด)
+            detectTripMode(meta);
             document.getElementById('fuelRate').value  = c.fuelRate       || 4;
 
             // Load accommodation entries

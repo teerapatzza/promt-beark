@@ -94,6 +94,53 @@ try {
   ok('ยอดรวมเป็นศูนย์ ทั้งที่แผนที่คำนวณระยะทาง 100+100 กม. ไว้แล้ว',
      d.total === 0, d.total + ' บาท');
 
+  // ═══ 1ข. เคสปกติต้องเป็นค่าเริ่มต้น และซ่อนของที่ไม่จำเป็น ═══
+  console.log('');
+  console.log('═══ 1ข. ไป-กลับตามปกติ ต้องเป็นค่าเริ่มต้น และไม่โชว์การ์ดขากลับ ═══');
+  const nm = await ev([
+    "return { normal: document.getElementById('tripModeNormal').checked,",
+    "         special: document.getElementById('tripModeSpecial').checked,",
+    "         backHidden: document.getElementById('legBackCardWrap').classList.contains('hidden'),",
+    "         noteShown: !document.getElementById('normalReturnNote').classList.contains('hidden'),",
+    "         title: document.getElementById('legOutTitle').textContent.trim() };"
+  ].join('\n'));
+  ok('ค่าเริ่มต้นคือ "ไป-กลับตามปกติ"', nm.normal === true && nm.special === false);
+  ok('การ์ดขากลับถูกซ่อน ไม่ต้องอ่านสองใบ', nm.backHidden === true);
+  ok('มีป้ายบอกว่ากลับเส้นทางเดิม ไม่ต้องกรอกเพิ่ม', nm.noteShown === true);
+  ok('หัวข้อเป็น "เส้นทาง" ไม่ใช่ "ขาไป"', nm.title === 'เส้นทาง', nm.title);
+
+  const one = await ev([
+    tick('legOutCar', true),
+    "return { car: document.getElementById('carType').value, t: " + total + ",",
+    "         backCar: document.getElementById('legBackCar').checked };"
+  ].join('\n'));
+  ok('ติ๊กรถส่วนตัวครั้งเดียว มีผลทั้งสองขา', one.car === 'ไป-กลับ' && one.backCar === true, one.car);
+  ok('คิดค่าน้ำมันทั้งไปและกลับ 800 บาท', one.t === 800, one.t + ' บาท');
+
+  const twoTaxi = await ev([
+    tick('legOutTaxi', true),
+    "const rows = [...document.querySelectorAll('#taxiEntriesList .taxi-entry')];",
+    "return { n: rows.length,",
+    "         dirs: rows.map(r => r.querySelector('.taxi-dir').value),",
+    "         dirVisible: rows.map(r => !r.querySelector('.taxi-dir').closest('div').classList.contains('hidden')),",
+    "         back: document.querySelectorAll('#taxiEntriesListBack .taxi-entry').length };"
+  ].join('\n'));
+  ok('ติ๊ก Taxi ครั้งเดียว ได้สองเที่ยว ไปและกลับ', twoTaxi.n === 2, twoTaxi.n + ' เที่ยว');
+  ok('สองเที่ยวนั้นคือขาไปกับขากลับ',
+     twoTaxi.dirs.join(',') === 'ขาไป,ขากลับ', twoTaxi.dirs.join(', '));
+  ok('เห็นได้ว่าแถวไหนขาไปขาไหนขากลับ',
+     twoTaxi.dirVisible.every(Boolean), JSON.stringify(twoTaxi.dirVisible));
+  ok('ไม่มีแถวหลงไปอยู่รายการของการ์ดขากลับที่ซ่อนอยู่', twoTaxi.back === 0, twoTaxi.back + ' แถว');
+
+  // ตั้งแต่นี้ไปทดสอบกรณีพิเศษ ซึ่งเปิดการ์ดสองใบ
+  await ev([
+    tick('legOutCar', false),
+    tick('legOutTaxi', false),
+    "const sp = document.getElementById('tripModeSpecial');",
+    "sp.checked = true; sp.dispatchEvent(new Event('change',{bubbles:true}));",
+    "await new Promise(r=>setTimeout(r,400)); return 1;"
+  ].join('\n'));
+
   // ═══ 2. ติ๊กทีละขา ═══
   console.log('');
   console.log('═══ 2. ติ๊กรถส่วนตัวทีละขา ยอดต้องขยับตามจริง ═══');
