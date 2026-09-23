@@ -322,6 +322,74 @@ try {
   ok('คำเตือนเก่าหายไป ไม่ค้างให้เข้าใจผิด',
      !/ไม่เจอ/.test(stale.hint), stale.hint);
 
+  // ═══ 13. เว้นปลายทางขากลับว่าง ต้องบันทึกได้ ไม่ใช่ถูกบล็อก ═══
+  // ช่องเขียนว่า "ว่าง = กลับที่จุดเริ่มต้น" แต่การตรวจก่อนบันทึกยังเป็นกติกาเก่า
+  // และอ้างถึงติ๊ก "ขากลับไปที่อื่น" ที่ยกเลิกไปแล้ว ผู้ใช้จึงติดโดยไม่มีทางออก
+  console.log('');
+  console.log('═══ 13. เว้นปลายทางขากลับว่าง ต้องไม่ถูกบล็อกตอนบันทึก ═══');
+  // เติมช่องบังคับอื่นให้ครบก่อน ไม่งั้นการตรวจหยุดที่ช่องแรกที่ว่าง
+  // แล้วไม่มีทางไปถึงส่วนขากลับที่เราตั้งใจจะทดสอบ
+  const FILL_REQUIRED = [
+    "const set = (id, v) => { const e = document.getElementById(id); if (e) {",
+    "  e.value = v; e.dispatchEvent(new Event('input',{bubbles:true}));",
+    "  e.dispatchEvent(new Event('change',{bubbles:true})); } };",
+    "set('requestedBy','ทดสอบ ขาเดินทาง'); set('position','ที่ปรึกษา');",
+    "set('affiliation','อิสระ'); set('activityName','ประชุมทดสอบ');",
+    "set('targetProv','กรุงเทพมหานคร');",
+    "set('addrNo','1'); set('addrSub','บางรัก'); set('addrDist','บางรัก');",
+    "set('addrProv','กรุงเทพมหานคร'); set('addrZip','10500');",
+    "set('dateStart','2025-10-20'); set('dateEnd','2025-10-22');",
+    "set('docDate','2025-10-20');"
+  ].join('\n');
+
+  const guard = await ev([
+    "window.__alerts = [];",
+    "window.alert = m => { window.__alerts.push(String(m)); };",
+    // กันไม่ให้บันทึกจริงและหน้าเด้งไปหน้าประวัติ ค้างคำขอ POST ไว้เฉยๆ
+    "if (!window.__blockedSave) { window.__blockedSave = true; const of = window.fetch;",
+    "  window.fetch = function (u, i) { const q = (typeof u === 'string') ? u : (u && u.url) || '';",
+    "    if (i && i.method === 'POST' && q.indexOf('/expenses') >= 0) return new Promise(() => {});",
+    "    return of(u, i); }; }",
+    FILL_REQUIRED,
+    tick('legOutCar', true),
+    tick('legBackCar', true),
+    "setPoint('from', 13.65, 100.49, 'บ้าน', 'exact', 'user');",
+    "setPoint('to',   13.75, 100.53, 'โรงแรม', 'exact', 'user');",
+    // กรอกเฉพาะจุดเริ่มต้นขากลับ และปักหมุดให้เรียบร้อย ส่วนปลายทางเว้นว่าง = กลับบ้าน
+    "const rf = document.getElementById('travelReturnFrom');",
+    "rf.value = 'โรงพยาบาลศิริราช'; rf.dispatchEvent(new Event('input',{bubbles:true}));",
+    "setPoint('retfrom', 13.76, 100.48, 'โรงพยาบาลศิริราช', 'exact', 'user');",
+    "document.getElementById('travelReturnTo').value = '';",
+    "await new Promise(r=>setTimeout(r,700));",
+    "const diffOn = document.getElementById('returnDiff').checked;",
+    "document.getElementById('submitBtn').click();",
+    "await new Promise(r=>setTimeout(r,1200));",
+    "return { diffOn: diffOn, alerts: window.__alerts.slice(0, 4) };"
+  ].join('\n'));
+  ok('ระบบถือว่าขากลับไปคนละทาง (เพราะกรอกจุดเริ่มต้นไว้)', guard.diffOn === true);
+  ok('ไม่มีคำเตือนบังคับให้พิมพ์ปลายทางขากลับอีกแล้ว',
+     !guard.alerts.some(a => /ปลายทางขากลับ/.test(a) && /ยังไม่ได้ระบุ|กรุณาพิมพ์/.test(a)),
+     guard.alerts.join(' || ').slice(0, 140) || '(ไม่มีคำเตือนเลย)');
+  ok('ไม่มีคำเตือนที่อ้างถึงติ๊กที่ยกเลิกไปแล้ว',
+     !guard.alerts.some(a => /ขากลับไปที่อื่น/.test(a)),
+     guard.alerts.join(' || ').slice(0, 140) || '(ไม่มีคำเตือนเลย)');
+
+  // พิมพ์ชื่อที่หาพิกัดไม่เจอ ยังต้องถูกกันไว้ เพราะระยะทางจะคิดผิด
+  const guard2 = await ev([
+    "window.__alerts = [];",
+    // ปุ่มถูกปิดค้างจากการกดครั้งก่อน (คำขอ POST ถูกกันไว้จึงไม่มีใครเปิดคืน)
+    "const sb = document.getElementById('submitBtn'); sb.disabled = false;",
+    "const rt = document.getElementById('travelReturnTo');",
+    "rt.value = 'ที่ไหนสักแห่งที่ไม่มีในแผนที่'; rt.dispatchEvent(new Event('input',{bubbles:true}));",
+    "await new Promise(r=>setTimeout(r,500));",
+    "sb.click();",
+    "await new Promise(r=>setTimeout(r,1200));",
+    "return window.__alerts.slice(0, 4);"
+  ].join('\n'));
+  ok('พิมพ์ชื่อที่หาพิกัดไม่เจอ ยังถูกกันไว้ พร้อมบอกว่าลบออกก็ได้',
+     guard2.some(a => /ปลายทางขากลับ/.test(a) && /ลบข้อความ/.test(a)),
+     guard2.join(' || ').slice(0, 160) || '(ไม่มีคำเตือนเลย)');
+
   ok('ไม่มี JavaScript error ตลอดการทดสอบ', pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '));
 
   console.log('');

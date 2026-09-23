@@ -1490,9 +1490,19 @@
         const g = getGeo(which);
         if (!inp) return;
         const txt = inp.value.trim();
-        if (txt && (!g || (g.label || '').trim() !== txt)) {
+        if (!txt) return;
+        if (!g) {
             pointHint(which, '<span class="text-amber-600">ยังไม่ได้ยืนยันสถานที่ — '
                 + 'กดเลือกจากรายการ หรือคลิกออกจากช่องแล้วระบบจะเลือกให้</span>');
+            return;
+        }
+        /* มีหมุดแล้วแต่ชื่อไม่ตรงเป๊ะกับที่พิมพ์ ไม่ใช่ "ยังไม่ได้ยืนยัน"
+           ของเดิมขึ้นข้อความเดียวกันทั้งสองกรณี ผู้ใช้เห็นแล้วนึกว่าระบบหาไม่เจอ
+           ทั้งที่ปักหมุดและคิดระยะทางให้เรียบร้อยแล้ว */
+        if ((g.label || '').trim() !== txt) {
+            pointHint(which, '<span class="text-slate-600">ระบบเลือก <b>'
+                + escHtml(g.label || '') + '</b> ให้ — ถ้าไม่ใช่ที่นี่ กดเลือกใหม่จากรายการ '
+                + 'หรือลากหมุดบนแผนที่</span>');
         }
     }
 
@@ -3125,11 +3135,23 @@
             const travelTo   = document.getElementById('travelTo')?.value   || '';
             if (needReceipt && (!travelFrom.trim() || !travelTo.trim()))
                 return alert("❌ กรุณาระบุสถานที่ 'จุดเริ่มต้น' และ 'จุดหมาย' ให้ครบถ้วน");
-            // ติ๊กว่าขากลับไปที่อื่นแล้วต้องกรอกให้ครบ ไม่งั้นเอกสารจะมีช่องว่าง
-            if (needReceipt && returnIsDifferent() &&
-                !(document.getElementById('travelReturnTo')?.value || '').trim())
-                return alert('❌ ติ๊กว่า "ขากลับไปที่อื่น" ไว้ แต่ยังไม่ได้ระบุปลายทางขากลับ\n\n' +
-                             'กรุณาพิมพ์ชื่อสถานที่ปลายทางขากลับ หรือเอาติ๊กออกถ้ากลับที่จุดเริ่มต้น');
+            /* ขากลับต้องรู้ทั้งจุดออกและจุดถึง แต่ "รู้" ไม่ได้แปลว่าต้องพิมพ์
+               เว้นว่าง = ใช้จุดของขาไป ซึ่งมีพิกัดอยู่แล้ว เป็นกติกาที่เขียนไว้ในช่องนั่นเอง
+               ของเดิมบังคับให้พิมพ์ปลายทางเสมอ และยังอ้างถึงติ๊ก "ขากลับไปที่อื่น"
+               ที่ถูกยกเลิกไปแล้วตอนเปลี่ยนเป็นการ์ดต่อขา ผู้ใช้จึงติดอยู่ตรงนี้โดยไม่มีทางออก
+               สิ่งที่ต้องกันจริงคือ พิมพ์ชื่อไว้แต่ระบบหาพิกัดไม่เจอ เพราะระยะทางจะคิดผิด */
+            if (needReceipt && returnIsDifferent()) {
+                const txtRetFrom = (document.getElementById('travelReturnFrom')?.value || '').trim();
+                const txtRetTo   = (document.getElementById('travelReturnTo')?.value   || '').trim();
+                if (txtRetFrom && !geoRetFrom)
+                    return alert('❌ ยังหาตำแหน่งของ "จุดเริ่มต้นขากลับ" ไม่เจอ\n\n' +
+                                 'กดเลือกจากรายการที่ขึ้นมา หรือลากหมุดสีม่วงบนแผนที่ให้ตรง\n' +
+                                 'ถ้าออกเดินทางกลับจากจุดหมายขาไป ให้ลบข้อความในช่องนั้นออก');
+                if (txtRetTo && !geoRet)
+                    return alert('❌ ยังหาตำแหน่งของ "ปลายทางขากลับ" ไม่เจอ\n\n' +
+                                 'กดเลือกจากรายการที่ขึ้นมา หรือลากหมุดสีม่วงบนแผนที่ให้ตรง\n' +
+                                 'ถ้ากลับที่จุดเริ่มต้น ให้ลบข้อความในช่องนั้นออก');
+            }
             const dateStart = document.getElementById('dateStart').value;
             const dateEnd   = document.getElementById('dateEnd').value;
             if (needReport && !dateStart) return alert("❌ กรุณาระบุวันที่ออกเดินทาง");
