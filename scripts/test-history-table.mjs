@@ -29,8 +29,12 @@ const ok = (n, pass, d = '') => { results.push(pass);
 
 const LONG = 'การอบรมเชิงปฏิบัติการเพื่อพัฒนาระบบการดูแลผู้ป่วยด้วยมิติจิตวิญญาณ '
            + 'ในสถานพยาบาลเพื่อความปลอดภัย โรงพยาบาลสมเด็จพระยุพราชด่านซ้าย จ.เลย วันที่ 11 กันยายน 2569';
+// ชื่อยาวที่สุดในทะเบียนที่ปรึกษา 161 คน (วัดด้วยฟอนต์จริงได้ 199px)
+// ถ้าคอลัมน์รองรับชื่อนี้ได้ ที่เหลือก็รอด
+const LONGEST_NAME = 'ศ.พญ.ยุวเรศมคฐ์ สิทธิชาญบัญชา';
 const REC = n => ({
-  id: 9400 + n, requestedBy: 'ทดสอบ ตารางยาว', amount: 1234.5,
+  id: 9400 + n, requestedBy: n === 0 ? LONGEST_NAME : 'ทดสอบ ตารางยาว',
+  ownerEmail: 'yuwaretmakot@ha.or.th', amount: n === 0 ? 28097 : 1234.5,
   date: '2026-09-11', description: 'เบิกค่าเดินทางไปปฏิบัติงาน',
   inputMetadata: { _activityName: n === 0 ? LONG : 'ประชุมสั้น ๆ', _pdfTemplates: ['REPORT'] }
 });
@@ -77,6 +81,10 @@ try {
     "const actCell = firstRow.children[3].querySelector('div');",
     "const pdfBtn = [...firstRow.querySelectorAll('button')].find(b => /PDF/.test(b.textContent));",
     "const actionTd = firstRow.children[6];",
+    "const btnBox = actionTd.querySelector('div');",
+    "const btns = [...actionTd.querySelectorAll('button,a')];",
+    "const btnTops = btns.map(b => b.getBoundingClientRect().top);",
+    "const nameDiv = firstRow.children[2].querySelector('.min-w-0 > div');",
     "const sr = scroller.getBoundingClientRect(), br = pdfBtn.getBoundingClientRect();",
     "return {",
     "  rows: rows.length,",
@@ -86,7 +94,28 @@ try {
     "  btnVisible: br.right <= sr.right + 1 && br.left >= sr.left - 1,",
     "  actTruncated: actCell.scrollWidth > actCell.clientWidth,",
     "  actTitle: (firstRow.children[3].querySelector('[title]')||{}).title || '',",
-    "  sticky: getComputedStyle(actionTd).position",
+    "  sticky: getComputedStyle(actionTd).position,",
+    // ปุ่มอยู่บรรทัดเดียวกันจริงไหม ยอมต่างได้ 4px เผื่อความสูงปุ่มไม่เท่ากันเป๊ะ
+    "  btnTopSpread: Math.round(Math.max(...btnTops) - Math.min(...btnTops)),",
+    "  btnHeights: [...new Set(btns.map(b => Math.round(b.getBoundingClientRect().height)))],",
+    "  btnNeed: Math.ceil(btns.reduce((a,b) => a + b.getBoundingClientRect().width, 0)",
+    "           + (btns.length - 1) * parseFloat(getComputedStyle(btnBox).columnGap || 0)),",
+    "  btnHas: Math.floor(btnBox.getBoundingClientRect().width),",
+    // ชื่อผู้ขอเบิกโดนตัดไหม
+    "  nameCut: nameDiv.scrollWidth > nameDiv.clientWidth,",
+    "  nameNeed: nameDiv.scrollWidth, nameHas: nameDiv.clientWidth,",
+    // ทุกแถวต้องสูงเท่ากัน ไม่งั้นแปลว่ามีแถวไหนเนื้อหาตกบรรทัด
+    "  rowHeights: [...new Set(rows.map(t => Math.round(t.getBoundingClientRect().height)))],",
+    // ช่องปุ่มถูกตรึงลอยอยู่ ต้องทาสีพื้นเดียวกับแถว ไม่งั้นจะเห็นแถวอื่นทะลุขึ้นมา
+    "  stickyBg: getComputedStyle(actionTd).backgroundColor,",
+    "  rowBg: getComputedStyle(firstRow).backgroundColor,",
+    "  stickyBgAlt: getComputedStyle(rows[1].children[6]).backgroundColor,",
+    "  rowBgAlt: getComputedStyle(rows[1]).backgroundColor,",
+    "  zebra: getComputedStyle(rows[0]).backgroundColor !== getComputedStyle(rows[1]).backgroundColor,",
+    // ตัวเลขเงินต้องกว้างเท่ากันทุกหลัก หลักพันจึงจะตรงกันทุกแถว
+    "  amountNums: getComputedStyle(firstRow.children[4]).fontVariantNumeric,",
+    // ทุกช่องต้องจัดกึ่งกลางแนวตั้ง
+    "  vAligns: [...new Set([...firstRow.children].map(td => getComputedStyle(td).verticalAlign))]",
     "};"
   ].join('\n'));
 
@@ -99,6 +128,29 @@ try {
   ok('ชื่อกิจกรรมยาวถูกตัดด้วย ... ไม่ดันตาราง', r.actTruncated === true);
   ok('ข้อความเต็มยังอ่านได้จากการชี้เมาส์', r.actTitle.length > 100, r.actTitle.length + ' ตัวอักษร');
   ok('คอลัมน์ปุ่มถูกตรึงไว้ขอบขวา เผื่อจอแคบ', r.sticky === 'sticky', r.sticky);
+
+  console.log('');
+  console.log('═══ ความเรียบร้อยของแถว (ที่ผู้ใช้ทักเมื่อ 25 ก.ย. 2569) ═══');
+  ok('ปุ่มทั้งสี่อยู่บรรทัดเดียวกัน ไม่ตกลงไปชั้นล่าง',
+     r.btnTopSpread <= 4, 'ขอบบนต่างกัน ' + r.btnTopSpread + 'px');
+  ok('คอลัมน์ปุ่มกว้างพอจริง ไม่ใช่พอดีเป๊ะจนขาดไม่กี่พิกเซล',
+     r.btnHas - r.btnNeed >= 8, 'ปุ่มต้องการ ' + r.btnNeed + 'px มีให้ ' + r.btnHas + 'px');
+  ok('ปุ่มทุกปุ่มสูงเท่ากัน จึงเรียงตรงแนวเดียวกัน',
+     r.btnHeights.length === 1, 'ความสูงที่พบ ' + r.btnHeights.join(' / ') + 'px');
+  ok('ชื่อผู้ขอเบิกที่ยาวที่สุดในทะเบียนแสดงครบ ไม่โดนตัด',
+     r.nameCut === false, 'ต้องการ ' + r.nameNeed + 'px มีให้ ' + r.nameHas + 'px');
+  ok('ทุกแถวสูงเท่ากัน', r.rowHeights.length === 1, 'ความสูงที่พบ ' + r.rowHeights.join(' / ') + 'px');
+  ok('ทุกช่องจัดกึ่งกลางแนวตั้ง',
+     r.vAligns.length === 1 && r.vAligns[0] === 'middle', r.vAligns.join(' / '));
+  ok('ยอดเงินใช้ตัวเลขความกว้างเท่ากัน หลักจึงตรงกันทุกแถว',
+     /tabular-nums/.test(r.amountNums), r.amountNums);
+  ok('แถวคู่-แถวคี่สีต่างกัน กวาดตาตามแนวนอนได้', r.zebra === true);
+  ok('สีพื้นของช่องปุ่มทึบ ไม่โปร่งแสง เวลาเลื่อนตารางจึงไม่เห็นข้อความไหลผ่านข้างใต้',
+     !/rgba\([^)]*,\s*0?\.\d+\s*\)/.test(r.stickyBg) && !/rgba\([^)]*,\s*0?\.\d+\s*\)/.test(r.stickyBgAlt),
+     r.stickyBg + ' | ' + r.stickyBgAlt);
+  ok('ช่องปุ่มที่ถูกตรึงทาสีพื้นเดียวกับแถวของตัวเอง แถวอื่นจึงไม่ทะลุขึ้นมา',
+     r.stickyBg === r.rowBg && r.stickyBgAlt === r.rowBgAlt,
+     'แถว 1 ' + r.rowBg + ' vs ' + r.stickyBg + ' | แถว 2 ' + r.rowBgAlt + ' vs ' + r.stickyBgAlt);
 
   // จอแคบ ต้องยังกดปุ่มได้เพราะคอลัมน์ถูกตรึง
   await send('Emulation.setDeviceMetricsOverride', { width: 760, height: 900, deviceScaleFactor: 1, mobile: false });
