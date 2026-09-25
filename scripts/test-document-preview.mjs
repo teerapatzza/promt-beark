@@ -37,6 +37,9 @@ try {
     if (m.method==='Page.javascriptDialogOpening') send('Page.handleJavaScriptDialog',{accept:true});
   });
   await send('Page.enable'); await send('Runtime.enable');
+  // ปิดแคชของเบราว์เซอร์ ไม่งั้นโปรไฟล์ที่ใช้ซ้ำจะเสิร์ฟไฟล์เก่าจากดิสก์
+  // แล้วผลทดสอบจะเป็นของโค้ดรุ่นก่อนโดยไม่มีใครรู้
+  await send('Network.enable'); await send('Network.setCacheDisabled', { cacheDisabled: true });
 
   const cred={email:'tester@ha.or.th',password:'testpass123'};
   let tok=await fetch(APP+'/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},

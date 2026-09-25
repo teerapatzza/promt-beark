@@ -293,16 +293,26 @@ function validateExpense(expense, category, globalTaxiMax) {
         // ต้องฟังค่าที่แอดมินตั้งไว้ในหมวดหมู่ ไม่ใช่บังคับตายตัวจากโค้ด
         // หมวดที่แอดมินไม่ได้ติ๊ก "บังคับแนบ" ไว้เลย ต้องบันทึกได้โดยไม่ต้องแนบไฟล์
         // (รูปแบบเดียวกับวงเงิน Taxi ที่เคยฝังค่า 300 ไว้ในโค้ดจนไม่ฟังค่าแอดมิน)
+        /* ช่อง LOCATION ("ภาพแผนที่ / เส้นทาง") ไม่ใช่ช่องแนบไฟล์
+           ผู้ใช้ติ๊ก "ใช้แผนที่จากระบบ" แล้วระบบวาดแผนที่จากพิกัดให้ตอนพิมพ์ ไม่มีไฟล์รูป
+           เอามานับว่า "แอดมินบังคับแนบ" ไม่ได้ ไม่งั้นช่องใบเสร็จที่หน้าจอเขียนว่า
+           (ไม่บังคับ) จะถูกเซิร์ฟเวอร์ปฏิเสธ ทั้งที่ผ่านการตรวจฝั่งหน้าเว็บมาแล้ว
+           (เจอจริง 25 ก.ย. 2569 — หน้าเว็บผ่าน แต่เซิร์ฟเวอร์ตีกลับด้วยข้อความเดียวกัน) */
         const attachRules = (category && category.attachmentRules) || null;
         const requiredAttach = attachRules
-            ? Object.keys(attachRules).filter(k => attachRules[k] && attachRules[k].required)
-            : (Array.isArray(category && category.requiredFields) ? category.requiredFields : []);
+            ? Object.keys(attachRules).filter(k => k !== 'LOCATION' && attachRules[k] && attachRules[k].required)
+            : (Array.isArray(category && category.requiredFields)
+                ? category.requiredFields.filter(k => k !== 'LOCATION') : []);
         const adminRequiresAttachment = requiredAttach.length > 0;
 
         // ค่าตั๋วเครื่องบินอยู่บนใบรายงานการเดินทางเท่านั้น เหมือนค่าที่พัก
         const airAmount = onReport ? (parseFloat(costs.airAmount) || 0) : 0;
         const tollAmount = parseFloat(costs.tollAmount) || 0;   // มีทั้งสองใบ
-        const hasExpensesRequiringReceipt = totalHotelCost > 0 || airAmount > 0 || tollAmount > 0;
+        // ค่าที่จอดรถเพิ่มเข้ามาทีหลัง ฝั่งหน้าเว็บนับแล้วแต่ตรงนี้ยังไม่นับ
+        // สองฝั่งต้องตัดสินเหมือนกัน ไม่งั้นหน้าเว็บผ่านแล้วเซิร์ฟเวอร์ตีกลับ หรือกลับกัน
+        const parkingAmount = parseFloat(costs.parkingAmount) || 0;
+        const hasExpensesRequiringReceipt =
+            totalHotelCost > 0 || airAmount > 0 || tollAmount > 0 || parkingAmount > 0;
 
         if (hasExpensesRequiringReceipt && adminRequiresAttachment) {
             const hasAttachments = expense.attachments &&
@@ -314,6 +324,7 @@ function validateExpense(expense, category, globalTaxiMax) {
                 if (totalHotelCost > 0) expenseList.push(`ค่าที่พัก ${totalHotelCost.toLocaleString()} บาท`);
                 if (airAmount > 0) expenseList.push(`ค่าตั๋วเครื่องบิน ${airAmount.toLocaleString()} บาท`);
                 if (tollAmount > 0) expenseList.push(`ค่าทางด่วน ${tollAmount.toLocaleString()} บาท`);
+                if (parkingAmount > 0) expenseList.push(`ค่าที่จอดรถ ${parkingAmount.toLocaleString()} บาท`);
 
                 errors.push({
                     field: 'attachments',

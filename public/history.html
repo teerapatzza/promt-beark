@@ -678,6 +678,7 @@
                 const fuelOut = (carType === 'ขาไป'   || carType === 'ไป-กลับ') ? distOut * fRate : 0;
                 const fuelRet = (carType === 'ขากลับ' || carType === 'ไป-กลับ') ? distRet * fRate : 0;
 
+
                 /* ── ตัวช่วยวาดแถวในใบรับรองค่าพาหนะ ──
                    เอกสารต้นแบบตีเส้นทุกบรรทัดครบทั้งสามคอลัมน์
                    ของเดิมเชื่อมช่องเป็นบล็อกด้วย border-bottom:none หน้าตาจึงไม่ตรงแบบ
@@ -710,6 +711,31 @@
                 // ใบเก่าไม่มีคีย์นี้ ได้ 0 เอกสารจึงออกมาเหมือนเดิมทุกตัวอักษร
                 const parkingTotal = parseFloat(c.parkingAmount || 0);
                 const otherTotal = parseFloat(c.otherAmount || 0);
+
+                /* ── ข้อ 3 ของใบรายงาน แยกเป็นรายการละบรรทัด ──
+                   ฟอร์มแยกช่อง ค่าทางด่วน / ค่าที่จอดรถ / ค่าเบี้ยเลี้ยง-อื่นๆ ไว้อยู่แล้ว
+                   แต่เอกสารเคยยุบรวมเป็นก้อนเดียว คนตรวจจึงแยกไม่ออกว่ายอดมาจากอะไรบ้าง
+                   ใบรับรองค่าพาหนะแยกให้อยู่แล้ว ใบรายงานก็ควรตรงกัน
+                   แบบฟอร์มมีสองบรรทัด ถ้ามีรายการน้อยกว่านั้นก็เว้นว่างไว้ให้เหมือนกระดาษจริง */
+                const reportOtherItems = [
+                    ['ค่าทางด่วน',            tollTotal],
+                    ['ค่าที่จอดรถ',           parkingTotal],
+                    ['ค่าเบี้ยเลี้ยง / อื่นๆ', otherTotal]
+                ].filter(function (it) { return it[1] > 0; });
+                while (reportOtherItems.length < 2) reportOtherItems.push(['', 0]);
+
+                const reportOtherRows = reportOtherItems.map(function (it, i) {
+                    return '<tr>' +
+                        '<td style="border: none; padding: 0;"></td>' +
+                        '<td style="border: none; padding: 0; padding-left: 5px;">3.' + (i + 1) +
+                            ' &nbsp;&nbsp; <span class="solid-line" style="width: 300px; text-align:left;">' +
+                            it[0] + '</span></td>' +
+                        '<td style="text-align: right; border: none; padding: 0;">เป็นเงิน</td>' +
+                        '<td style="border-bottom: 1px solid #000; text-align: right; padding: 0 5px;">' +
+                            (it[1] > 0 ? formatNumber(it[1]) : '') + '</td>' +
+                        '<td style="text-align: right; border: none; padding: 0;">บาท</td>' +
+                        '</tr>';
+                }).join('');
                 const airTotal = parseFloat(c.airAmount || 0);
 
                 // Calculate hotel total (support both old and new format)
@@ -943,20 +969,7 @@
                             <tr><td colspan="5" style="border: none; height: 10px;"></td></tr>
 
                             <tr><td colspan="5" style="border: none; padding: 0;"><b>3. ค่าใช้จ่ายอื่นๆ (ระบุรายการ)</b></td></tr>
-                            <tr>
-                                <td style="border: none; padding: 0;"></td>
-                                <td style="border: none; padding: 0; padding-left: 5px;">3.1 &nbsp;&nbsp; <span class="solid-line" style="width: 300px; text-align:left;">${(tollTotal+parkingTotal+otherTotal) > 0 ? 'ค่าเบี้ยเลี้ยง / ค่าทางด่วน / อื่นๆ' : ''}</span></td>
-                                <td style="text-align: right; border: none; padding: 0;">เป็นเงิน</td>
-                                <td style="border-bottom: 1px solid #000; text-align: right; padding: 0 5px;">${(tollTotal+parkingTotal+otherTotal) > 0 ? formatNumber(tollTotal+parkingTotal+otherTotal) : ''}</td>
-                                <td style="text-align: right; border: none; padding: 0;">บาท</td>
-                            </tr>
-                            <tr>
-                                <td style="border: none; padding: 0;"></td>
-                                <td style="border: none; padding: 0; padding-left: 5px;">3.2 &nbsp;&nbsp; <span class="solid-line" style="width: 300px; text-align:left;"></span></td>
-                                <td style="text-align: right; border: none; padding: 0;">เป็นเงิน</td>
-                                <td style="border-bottom: 1px solid #000; text-align: right; padding: 0 5px;"></td>
-                                <td style="text-align: right; border: none; padding: 0;">บาท</td>
-                            </tr>
+                            ${reportOtherRows}
                         </table>
 
                         <table style="width: 100%; border: none; font-size: 13.5px; line-height: 1.8; margin-top: 10px;">

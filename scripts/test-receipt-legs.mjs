@@ -76,6 +76,9 @@ try {
       pageErrors.push(m.params.exceptionDetails.exception?.description || m.params.exceptionDetails.text);
     if (m.method === 'Page.javascriptDialogOpening') send('Page.handleJavaScriptDialog', { accept: true }); });
   await send('Page.enable'); await send('Runtime.enable');
+  // ปิดแคชของเบราว์เซอร์ ไม่งั้นโปรไฟล์ที่ใช้ซ้ำจะเสิร์ฟไฟล์เก่าจากดิสก์
+  // แล้วผลทดสอบจะเป็นของโค้ดรุ่นก่อนโดยไม่มีใครรู้
+  await send('Network.enable'); await send('Network.setCacheDisabled', { cacheDisabled: true });
   await send('Page.addScriptToEvaluateOnNewDocument', { source: [
     "localStorage.setItem('token','x');",
     "const of = window.fetch;",
@@ -219,6 +222,41 @@ try {
      form['มี'] && !form['ปิดอยู่'] && form['กว้าง'] > 60 && form['สูง'] > 20
      && form['ค่าที่พิมพ์'] === 'รพ.กรุงเทพสุราษฎร์',
      form['กว้าง'] + 'x' + form['สูง']);
+
+  // ═══ 7. ใบรายงาน ข้อ 3 ต้องแยกเป็นรายการละบรรทัด ═══
+  console.log('');
+  console.log('═══ 7. ใบรายงานการเดินทาง ข้อ 3 — แยกรายการละบรรทัด ไม่ยุบรวม ═══');
+  // ข้อ 6 พาไปหน้า expense.html แล้ว ต้องกลับมาหน้าประวัติที่มี buildDocumentHtml
+  await send('Page.navigate', { url: APP + '/history.html' }); await sleep(4500);
+  const rep3 = async costs => ev([
+    "window.renderRouteMapImage = async () => null;",
+    "const rec = " + JSON.stringify(mk({ _pdfTemplates: ['REPORT'] })) + ";",
+    "rec.inputMetadata._costs = Object.assign({}, rec.inputMetadata._costs, " + JSON.stringify(costs) + ");",
+    "const b = await buildDocumentHtml(rec, function(){});",
+    "const d = document.createElement('div'); d.innerHTML = b.html;",
+    "const rows = [...d.querySelectorAll('tr')].filter(tr =>",
+    "  /^3\.[0-9]/.test((tr.children[1]||{}).textContent ? tr.children[1].textContent.trim() : ''));",
+    "return rows.map(tr => [...tr.children].map(td => (td.textContent||'').replace(/\s+/g,' ').trim()));"
+  ].join('\n'));
+
+  const three = await rep3({ tollAmount: 140, parkingAmount: 300, otherAmount: 1500 });
+  ok('สามรายการ ได้สามบรรทัด 3.1 3.2 3.3', three.length === 3, three.length + ' บรรทัด');
+  ok('3.1 คือค่าทางด่วน 140',
+     /3\.1/.test(three[0][1]) && /ค่าทางด่วน/.test(three[0][1]) && three[0][3] === '140.00',
+     (three[0] || []).join(' | '));
+  ok('3.2 คือค่าที่จอดรถ 300',
+     /3\.2/.test(three[1][1]) && /ค่าที่จอดรถ/.test(three[1][1]) && three[1][3] === '300.00',
+     (three[1] || []).join(' | '));
+  ok('3.3 คือค่าเบี้ยเลี้ยง/อื่นๆ 1,500',
+     /3\.3/.test(three[2][1]) && /เบี้ยเลี้ยง/.test(three[2][1]) && three[2][3] === '1,500.00',
+     (three[2] || []).join(' | '));
+
+  const one = await rep3({ tollAmount: 140, parkingAmount: 0, otherAmount: 0 });
+  ok('มีรายการเดียว ยังคงสองบรรทัดเหมือนแบบฟอร์มจริง', one.length === 2, one.length + ' บรรทัด');
+  ok('บรรทัดที่สองเว้นว่างไว้ ไม่มียอด', one[1] && one[1][3] === '', JSON.stringify(one[1]));
+
+  const none = await rep3({ tollAmount: 0, parkingAmount: 0, otherAmount: 0 });
+  ok('ไม่มีรายการเลย ก็ยังมีสองบรรทัดว่างไว้ให้เขียนมือ', none.length === 2, none.length + ' บรรทัด');
 
   ok('ไม่มี JavaScript error ตลอดการทดสอบ', pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '));
 
