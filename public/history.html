@@ -16,7 +16,16 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         body { font-family: 'IBM Plex Sans Thai', 'IBM Plex Sans', sans-serif; }
-        #pdf-wrapper { position: fixed; top: 200%; left: -9999px; width: 0; height: 0; overflow: hidden; z-index: -9999; }
+        /* กล่องซ่อนเอกสารก่อนแปลงเป็น PDF
+           top ต้องเป็น 0 ห้ามใช้ 200% หรือค่าอื่นที่ไม่ใช่ศูนย์
+           html2pdf อ่านตำแหน่งแนวตั้งของก้อนเอกสารไปคำนวณว่าจะขึ้นหน้าใหม่ตรงไหน
+           (กฎ page-break-inside: avoid ของ .pdf-page)
+           ถ้ากล่องลอยอยู่ที่ 200% ของความสูงจอ ก้อนเอกสารจะถูกส่งไปที่ y ~1,600-1,900px
+           ปกติ html2pdf หักล้างค่านี้ให้ แต่บางจังหวะหักไม่หมด ค่าจะรั่วออกมาเป็น
+           หน้าเปล่านำหน้า 1 หน้า แล้วเนื้อหาถูกผ่าครึ่งคาบสองหน้า (เจอจริง 25 ก.ย. 2569)
+           ซ่อนด้วย left ติดลบ + width/height 0 + overflow hidden ก็พอแล้ว
+           ไม่ต้องดันลงแนวตั้งซึ่งเป็นแกนเดียวกับที่ใช้แบ่งหน้า */
+        #pdf-wrapper { position: fixed; top: 0; left: -10000px; width: 0; height: 0; overflow: hidden; z-index: -9999; }
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 10px; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
