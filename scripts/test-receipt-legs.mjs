@@ -196,6 +196,10 @@ try {
     "await new Promise(r => setTimeout(r, 900));",
     "const inp = document.getElementById('travelReturnFrom');",
     "if (!inp) return { มี: false };",
+    // การ์ดขากลับโผล่เฉพาะกรณีพิเศษ ต้องเลือกเคสก่อน
+    "const sp = document.getElementById('tripModeSpecial');",
+    "sp.checked = true; sp.dispatchEvent(new Event('change',{bubbles:true}));",
+    "await new Promise(r=>setTimeout(r,400));",
     // ช่องขากลับอยู่ในการ์ด "ขากลับ" ติ๊กรถส่วนตัวของขานั้นแล้วจึงโผล่
     "const hiddenBefore = document.getElementById('legBackCarBox').classList.contains('hidden');",
     "const cb = document.getElementById('legBackCar');",

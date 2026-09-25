@@ -1058,7 +1058,10 @@
        เคสปกติซ่อนการ์ดขากลับทั้งใบ แล้วให้ติ๊กของขาไปมีผลกับทั้งสองขา
        ค่าที่บันทึกยังเป็นชุดเดิมทุกอย่าง (carType / taxiEntries / returnFrom)
        เปลี่ยนแค่ว่าผู้ใช้ต้องกรอกอะไรบ้าง */
-    function onTripModeChange() {
+    /* จัดหน้าตาให้ตรงกับเคสที่เลือก — อ่านอย่างเดียว ไม่เขียนค่าอะไรทั้งนั้น
+       แยกออกมาเพราะตอนเปิดใบเก่ามาแก้ ต้องจัดหน้าตาก่อนที่ค่าจะถูกกู้คืนครบ
+       ถ้าเผลอไปเรียกส่วนที่เขียนค่า carType ที่เพิ่งกู้คืนมาจะถูกล้างทิ้ง */
+    function applyTripModeLayout() {
         const normal = isNormalTrip();
         document.getElementById('legBackCardWrap')?.classList.toggle('hidden', normal);
         document.getElementById('normalReturnNote')?.classList.toggle('hidden', !normal);
@@ -1069,6 +1072,11 @@
         if (rt) rt.textContent = normal ? 'เส้นทาง' : 'เส้นทางของขาไป';
         const ab = document.getElementById('addTaxiOutBtn');
         if (ab) ab.textContent = normal ? '+ เพิ่มเที่ยว Taxi' : '+ เพิ่มเที่ยว Taxi ขาไป';
+    }
+
+    function onTripModeChange() {
+        const normal = isNormalTrip();
+        applyTripModeLayout();
 
         if (normal) {
             // กลับเส้นทางเดิมเสมอ ช่องขากลับจึงต้องว่าง ไม่ให้ค่าค้างจากตอนลองกรณีพิเศษ
@@ -1151,7 +1159,10 @@
         const nm = document.getElementById('tripModeNormal');
         if (sp) sp.checked = special;
         if (nm) nm.checked = !special;
-        onTripModeChange();
+        // จัดหน้าตาอย่างเดียว ห้ามเรียก onTripModeChange ตรงนี้
+        // เพราะมันจะไปเรียก onLegModeChange ซึ่งเขียนทับ carType ที่เพิ่งกู้คืนมา
+        // ตอนนั้นติ๊กการ์ดยังไม่ถูกตั้ง carType จึงกลายเป็น "ไม่ระบุ" แล้วยอดหายไป
+        applyTripModeLayout();
         return special;
     }
 
@@ -1168,6 +1179,7 @@
         box('legBackCarBox',  document.getElementById('legBackCar')?.checked);
         box('legOutTaxiBox',  document.getElementById('legOutTaxi')?.checked);
         box('legBackTaxiBox', document.getElementById('legBackTaxi')?.checked);
+        if (typeof applyTripModeLayout === 'function') applyTripModeLayout();
         if (typeof updateLegDateLabels === 'function') updateLegDateLabels();
     }
 
@@ -3426,7 +3438,13 @@
             // หมวดที่ไม่ได้ติ๊ก "บังคับแนบ" ไว้เลย ต้องบันทึกได้โดยไม่ต้องแนบไฟล์
             // (ช่องที่ติ๊กบังคับไว้ยังถูกตรวจแยกอีกชั้นด้วย .required-file ด้านล่าง)
             const attachRulesNow = getAttachmentRules(categories.find(c => c.id === document.getElementById('categorySelect').value));
-            const adminRequiresAttachment = Object.keys(attachRulesNow).some(id => attachRulesNow[id] && attachRulesNow[id].required);
+            /* ช่อง "ภาพแผนที่ / เส้นทาง" (LOCATION) ไม่ใช่ช่องแนบไฟล์
+               ติ๊ก "ใช้แผนที่จากระบบ" ก็ถือว่าครบแล้ว และมีการตรวจของตัวเองอยู่ด้านล่าง
+               เอามานับรวมว่า "แอดมินบังคับแนบ" ไม่ได้ ไม่งั้นช่องใบเสร็จที่เขียนไว้ว่า
+               (ไม่บังคับ) จะกลายเป็นบังคับไปด้วย ซึ่งขัดกับป้ายที่ผู้ใช้เห็นบนหน้าจอ
+               (เจอจริง 25 ก.ย. 2569 — ทุกช่องขึ้นว่าไม่บังคับ แต่กดบันทึกแล้วไม่ยอม) */
+            const adminRequiresAttachment = Object.keys(attachRulesNow).some(
+                id => id !== 'LOCATION' && attachRulesNow[id] && attachRulesNow[id].required);
 
             if (hasExpensesRequiringReceipt && adminRequiresAttachment) {
                 const attachmentInputs = document.querySelectorAll('.general-file-upload');
