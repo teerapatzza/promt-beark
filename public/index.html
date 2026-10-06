@@ -291,6 +291,11 @@
             .glow { display: none; }
         }
     </style>
+    <!-- ธีม: ความคมชัดของช่องกรอก และโหมดมืด
+         theme.js ต้องไม่ใส่ defer เพราะมันตั้งธีมทันทีที่ถูกอ่าน
+         ถ้ารอถึง DOMContentLoaded ผู้ใช้จะเห็นหน้าขาววาบก่อนแล้วค่อยมืด -->
+    <link rel="stylesheet" href="theme.css">
+    <script src="theme.js"></script>
 </head>
 <body>
     <div class="photo" aria-hidden="true"></div>

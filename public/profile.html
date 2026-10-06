@@ -49,6 +49,11 @@
         /* กล่องที่อยู่ต้องไม่ครอบตัด dropdown ที่ยื่นออกนอกกล่อง */
         #profileForm, #profileForm > div { overflow: visible; }
     </style>
+    <!-- ธีม: ความคมชัดของช่องกรอก และโหมดมืด
+         theme.js ต้องไม่ใส่ defer เพราะมันตั้งธีมทันทีที่ถูกอ่าน
+         ถ้ารอถึง DOMContentLoaded ผู้ใช้จะเห็นหน้าขาววาบก่อนแล้วค่อยมืด -->
+    <link rel="stylesheet" href="theme.css">
+    <script src="theme.js"></script>
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-800">
 

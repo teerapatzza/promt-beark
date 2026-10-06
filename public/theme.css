@@ -1,0 +1,343 @@
+/* ══════════════════════════════════════════════════════════════════
+   ธีมของพร้อมเบิก — ความคมชัดของช่องกรอก และโหมดมืด
+   ──────────────────────────────────────────────────────────────────
+   ที่มา: 6 ต.ค. 2569 ผู้ใช้แจ้งว่า "ขาวสว่างจ้าไปหมด ต้องเพ่งถึงจะกรอกต่อ"
+   วัดแล้วพบว่าช่องกรอกไม่ได้ตั้งสีพื้นไว้เลย จึงเป็นสีขาวนั่งบนการ์ดสีขาว
+   เหลือแต่ขอบ #E2E8F0 เป็นตัวบอกขอบเขต ซึ่งต่างจากพื้นแค่ 1.23:1
+   มาตรฐาน WCAG 2.1 ข้อ 1.4.11 กำหนดขอบของตัวควบคุมไว้ที่อย่างน้อย 3:1
+
+   วิธีแก้ที่เลือก: ไม่ไล่แก้คลาสทีละช่อง (มี 126 ช่องใน 7 หน้า เสี่ยงตกหล่น)
+   แต่คุมจากที่เดียวด้วยตัวเลือกที่มีน้ำหนักสูงกว่าคลาสของ Tailwind
+     [data-theme] input   = 0,1,1   ชนะ   .border-slate-200 = 0,1,0
+   จึงไม่ต้องใช้ !important เลยสักที่ อ่านง่ายและย้อนรอยง่ายกว่า
+
+   data-theme ถูกตั้งโดย theme.js ตั้งแต่ก่อนหน้าเว็บวาด จึงไม่มีอาการกระพริบ
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ───────── ค่าสีกลาง ───────── */
+:root {
+    --pb-field-bg:        #F1F5F9;   /* พื้นช่องกรอก ต่างจากการ์ดขาวพอให้เห็นขอบเขต */
+    --pb-field-bg-focus:  #FFFFFF;   /* ตอนกำลังพิมพ์ สว่างขึ้นเพื่อบอกว่าอยู่ตรงนี้ */
+    --pb-field-border:    #64748B;   /* วัดแล้วได้ 4.76:1 บนพื้นขาว — #94A3B8 ได้แค่ 2.51 ไม่ถึงเกณฑ์ 3:1 */
+    --pb-field-text:      #0F172A;
+    --pb-field-ph:        #94A3B8;
+    --pb-focus:           #2563EB;
+    --pb-focus-ring:      rgba(37, 99, 235, .18);
+    --pb-invalid:         #DC2626;
+}
+
+[data-theme="dark"] {
+    /* ไล่เฉดกลับด้าน โดยยังคงลำดับความสว่างเดิมไว้
+       พื้นหลังหน้าเข้มสุด การ์ดยกขึ้นมาหนึ่งขั้น ช่องกรอกจมลงหนึ่งขั้น
+       เพื่อให้สายตาแยก "พื้นที่กรอกได้" ออกจาก "พื้นที่อ่านอย่างเดียว" เหมือนโหมดสว่าง */
+    --pb-page:            #0B1120;
+    --pb-surface:         #182234;
+    --pb-surface-2:       #1E293B;
+    --pb-surface-3:       #334155;
+    --pb-line:            #334155;
+    --pb-line-soft:       #263347;
+    --pb-line-strong:     #475569;
+    --pb-ink:             #E6EDF7;
+    --pb-ink-2:           #C7D2E0;
+    --pb-ink-3:           #9FB0C4;
+    --pb-ink-4:           #8296AE;
+    --pb-ink-5:           #64748B;
+
+    --pb-field-bg:        #0E1626;
+    --pb-field-bg-focus:  #111C2F;
+    --pb-field-border:    #708199;   /* วัดแล้วได้ 3.92:1 บนการ์ดมืด — #55657C ได้แค่ 2.69 */
+    --pb-field-text:      #E6EDF7;
+    --pb-field-ph:        #7E8EA4;
+    --pb-focus:           #60A5FA;
+    --pb-focus-ring:      rgba(96, 165, 250, .22);
+    --pb-invalid:         #F87171;
+}
+
+/* ═══════════ 1. ช่องกรอก — ใช้ได้ทั้งสองโหมด ═══════════
+   ยกเว้น checkbox/radio/ปุ่ม/ช่องแนบไฟล์ ซึ่งมีหน้าตาของตัวเองอยู่แล้ว */
+[data-theme] input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="submit"]):not([type="button"]):not([type="range"]):not([type="color"]),
+[data-theme] select,
+[data-theme] textarea {
+    background-color: var(--pb-field-bg);
+    border-color: var(--pb-field-border);
+    color: var(--pb-field-text);
+}
+
+[data-theme] input::placeholder,
+[data-theme] textarea::placeholder { color: var(--pb-field-ph); opacity: 1; }
+
+[data-theme] input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus,
+[data-theme] select:focus,
+[data-theme] textarea:focus {
+    background-color: var(--pb-field-bg-focus);
+    border-color: var(--pb-focus);
+    box-shadow: 0 0 0 3px var(--pb-focus-ring);
+}
+
+/* ช่องที่ยังกรอกไม่ครบ ต้องเห็นว่าแดงจริง ไม่ใช่แดงจาง */
+[data-theme] input.border-red-400,
+[data-theme] input.border-red-500,
+[data-theme] input.border-rose-400,
+[data-theme] textarea.border-red-400 { border-color: var(--pb-invalid); }
+
+/* ช่องที่ระบบกรอกให้ ไม่ให้แก้ ต้องดูออกว่าแตะไม่ได้ ไม่ใช่แค่สีจาง */
+[data-theme] input:disabled,
+[data-theme] select:disabled,
+[data-theme] textarea:disabled,
+[data-theme] input[readonly] {
+    background-color: transparent;
+    border-style: dashed;
+    cursor: not-allowed;
+}
+
+/* ═══════════ 2. โหมดมืด — ทับคลาสสีของ Tailwind ที่หน้าเว็บใช้จริง ═══════════
+   รายการนี้มาจากการนับคลาสที่ใช้จริงทั้ง 7 หน้า ไม่ได้เดาเอา
+   ถ้าเพิ่มหน้าใหม่หรือใช้เฉดใหม่ ต้องมาเติมที่นี่ */
+
+[data-theme="dark"] body { background-color: var(--pb-page); color: var(--pb-ink); }
+
+[data-theme="dark"] .bg-white      { background-color: var(--pb-surface); }
+[data-theme="dark"] .bg-slate-50   { background-color: var(--pb-page); }
+[data-theme="dark"] .bg-slate-100  { background-color: var(--pb-surface-2); }
+[data-theme="dark"] .bg-slate-200  { background-color: var(--pb-surface-3); }
+[data-theme="dark"] .bg-slate-300  { background-color: var(--pb-line-strong); }
+[data-theme="dark"] .bg-slate-700,
+[data-theme="dark"] .bg-slate-800  { background-color: #060B16; }
+
+[data-theme="dark"] .border-white     { border-color: var(--pb-line); }
+[data-theme="dark"] .border-slate-50,
+[data-theme="dark"] .border-slate-100 { border-color: var(--pb-line-soft); }
+[data-theme="dark"] .border-slate-200 { border-color: var(--pb-line); }
+[data-theme="dark"] .border-slate-300 { border-color: var(--pb-line-strong); }
+[data-theme="dark"] .divide-slate-100 > * + * { border-color: var(--pb-line-soft); }
+
+[data-theme="dark"] .text-slate-900,
+[data-theme="dark"] .text-slate-800,
+[data-theme="dark"] .text-slate-700 { color: var(--pb-ink); }
+[data-theme="dark"] .text-slate-600 { color: var(--pb-ink-2); }
+[data-theme="dark"] .text-slate-500 { color: var(--pb-ink-3); }
+[data-theme="dark"] .text-slate-400 { color: var(--pb-ink-4); }
+[data-theme="dark"] .text-slate-300 { color: var(--pb-ink-5); }
+
+/* ไล่สีพื้นหลังที่ใช้ตกแต่งหัวข้อ ให้กลืนไปกับพื้นมืด */
+[data-theme="dark"] .from-slate-50,
+[data-theme="dark"] .from-slate-100,
+[data-theme="dark"] .from-slate-200 { --tw-gradient-from: var(--pb-surface-2) var(--tw-gradient-from-position); }
+[data-theme="dark"] .to-white,
+[data-theme="dark"] .to-slate-50,
+[data-theme="dark"] .to-slate-100   { --tw-gradient-to: var(--pb-surface) var(--tw-gradient-to-position); }
+
+/* กล่องแจ้งเตือนสีอ่อน ถ้าปล่อยไว้จะสว่างแสบตากลางพื้นมืด
+   ลดลงเหลือแค่พอบอกสถานะ แล้วไปเน้นที่ตัวอักษรกับขอบแทน */
+[data-theme="dark"] .bg-blue-50    { background-color: rgba(59, 130, 246, .12); }
+[data-theme="dark"] .bg-blue-100   { background-color: rgba(59, 130, 246, .20); }
+[data-theme="dark"] .bg-emerald-50,
+[data-theme="dark"] .bg-green-50   { background-color: rgba(16, 185, 129, .12); }
+[data-theme="dark"] .bg-green-100  { background-color: rgba(16, 185, 129, .20); }
+[data-theme="dark"] .bg-amber-50   { background-color: rgba(245, 158, 11, .12); }
+[data-theme="dark"] .bg-amber-100  { background-color: rgba(245, 158, 11, .20); }
+[data-theme="dark"] .bg-red-50,
+[data-theme="dark"] .bg-rose-50    { background-color: rgba(244, 63, 94, .12); }
+[data-theme="dark"] .bg-sky-50     { background-color: rgba(14, 165, 233, .12); }
+
+[data-theme="dark"] .text-blue-600,  [data-theme="dark"] .text-blue-700    { color: #7DB3FF; }
+[data-theme="dark"] .text-emerald-700, [data-theme="dark"] .text-green-700 { color: #5EE9B5; }
+[data-theme="dark"] .text-amber-600, [data-theme="dark"] .text-amber-700   { color: #FBBF55; }
+[data-theme="dark"] .text-red-600,   [data-theme="dark"] .text-rose-600    { color: #FF8A9B; }
+
+/* เฉดเข้มของสีเน้น ใช้เป็นตัวอักษรบนพื้นอ่อน พอพื้นกลายเป็นมืดก็จมหายไปเลย
+   เช่น text-emerald-800 (#065F46) บนพื้นเขียวจาง อ่านไม่ออกเลยในโหมดมืด
+   รายการนี้มาจากการนับคลาสที่ใช้จริงทั้ง 6 หน้า */
+[data-theme="dark"] .text-blue-800,    [data-theme="dark"] .text-blue-900    { color: #9EC5FF; }
+[data-theme="dark"] .text-emerald-800, [data-theme="dark"] .text-green-800   { color: #6FEFC0; }
+[data-theme="dark"] .text-amber-800,   [data-theme="dark"] .text-amber-900   { color: #FFCE7A; }
+[data-theme="dark"] .text-red-800,     [data-theme="dark"] .text-red-900,
+[data-theme="dark"] .text-rose-700,    [data-theme="dark"] .text-rose-800    { color: #FFA7B4; }
+[data-theme="dark"] .text-violet-700,  [data-theme="dark"] .text-violet-800  { color: #C4AFFF; }
+[data-theme="dark"] .text-sky-800,     [data-theme="dark"] .text-sky-900     { color: #8FD6FF; }
+[data-theme="dark"] .text-red-700                                            { color: #FF8A9B; }
+
+/* คลาสที่มีตัวหารความทึบ เช่น bg-amber-50/50 เป็นคนละชื่อคลาสกับ bg-amber-50
+   จึงต้องเขียนทับแยกต่างหาก ไม่งั้นจะเหลือเป็นแผ่นสว่างค้างอยู่กลางพื้นมืด
+   (เจอจริงที่กล่อง "เอกสาร PDF ที่จะสร้าง" ในหน้ากรอกเบิก) */
+[data-theme="dark"] .bg-slate-50\/60    { background-color: rgba(30, 41, 59, .60); }
+[data-theme="dark"] .bg-blue-50\/60,
+[data-theme="dark"] .bg-blue-50\/50,
+[data-theme="dark"] .bg-blue-50\/30     { background-color: rgba(59, 130, 246, .10); }
+[data-theme="dark"] .bg-emerald-50\/60  { background-color: rgba(16, 185, 129, .10); }
+[data-theme="dark"] .bg-amber-50\/60,
+[data-theme="dark"] .bg-amber-50\/50    { background-color: rgba(245, 158, 11, .10); }
+[data-theme="dark"] .border-slate-200\/60 { border-color: rgba(51, 65, 85, .60); }
+
+[data-theme="dark"] .shadow-sm, [data-theme="dark"] .shadow,
+[data-theme="dark"] .shadow-md, [data-theme="dark"] .shadow-lg,
+[data-theme="dark"] .shadow-xl, [data-theme="dark"] .shadow-2xl {
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .55), 0 6px 20px rgba(0, 0, 0, .35);
+}
+
+/* คลาสขาว/ดำที่มีตัวหารความทึบ ใช้ทำแถบหัวข้อแบบกระจกฝ้า
+   ถ้าไม่ทับ จะเหลือเป็นแผ่นขาวโพลนพาดกลางหน้าจอมืด (เจอจริงที่แถบ Dashboard ของ Admin) */
+[data-theme="dark"] .bg-white\/80  { background-color: rgba(24, 34, 52, .80); }
+[data-theme="dark"] .bg-white\/70  { background-color: rgba(24, 34, 52, .70); }
+[data-theme="dark"] .bg-white\/60  { background-color: rgba(24, 34, 52, .60); }
+[data-theme="dark"] .border-white\/40 { border-color: rgba(148, 163, 184, .22); }
+
+/* ชั้นคอมโพเนนต์ที่หน้ากรอกเบิกเขียน CSS เอง ไม่ได้ใช้คลาสของ Tailwind
+   จึงไม่โดนกฎข้างบนเลย ต้องเขียนทับตรง ๆ ทีละตัว */
+[data-theme="dark"] .fld {
+    background: var(--pb-field-bg); border-color: var(--pb-field-border); color: var(--pb-field-text);
+}
+[data-theme="dark"] .fld:focus {
+    border-color: var(--pb-focus); box-shadow: 0 0 0 3px var(--pb-focus-ring);
+}
+[data-theme="dark"] .seg          { background: #0E1626; }
+[data-theme="dark"] .seg-btn      { color: var(--pb-ink-3); }
+[data-theme="dark"] .seg-btn:hover{ color: var(--pb-ink); }
+[data-theme="dark"] .seg-btn.is-on{ background: #223049; color: #9EC5FF; box-shadow: 0 1px 3px rgba(0,0,0,.5); }
+[data-theme="dark"] .chip         { background: #0E1626; border-color: var(--pb-line-strong); color: var(--pb-ink-3); }
+[data-theme="dark"] .chip:hover   { background: rgba(59,130,246,.14); border-color: #3B6FB8; color: #9EC5FF; }
+[data-theme="dark"] .chip.is-on   { background: #2563EB; border-color: #2563EB; color: #fff; }
+[data-theme="dark"] .tl-dot-start { background: rgba(16,185,129,.16);  color: #5EE9B5; box-shadow: inset 0 0 0 1.5px rgba(16,185,129,.38); }
+[data-theme="dark"] .tl-dot-mid   { background: rgba(59,130,246,.16);  color: #9EC5FF; box-shadow: inset 0 0 0 1.5px rgba(59,130,246,.38); }
+[data-theme="dark"] .tl-dot-end   { background: rgba(234,88,12,.16);   color: #FFB183; box-shadow: inset 0 0 0 1.5px rgba(234,88,12,.38); }
+[data-theme="dark"] .tl-label     { color: var(--pb-ink-2); }
+
+/* ช่องเลือกจังหวัด/อำเภอ ใช้ไลบรารี Choices.js ซึ่งมีสีของตัวเอง
+   ไฟล์ CSS ของมันถูกโหลดจากภายนอก แก้ไม่ได้ จึงต้องทับจากฝั่งเรา */
+[data-theme="dark"] .choices__inner,
+[data-theme="dark"] .choices__list--dropdown,
+[data-theme="dark"] .choices__list[aria-expanded] {
+    background-color: var(--pb-field-bg);
+    border-color: var(--pb-field-border);
+    color: var(--pb-field-text);
+}
+[data-theme="dark"] .choices__list--dropdown .choices__item--selectable.is-highlighted,
+[data-theme="dark"] .choices__list[aria-expanded] .choices__item--selectable.is-highlighted {
+    background-color: rgba(59, 130, 246, .22);
+}
+[data-theme="dark"] .choices[data-type*="select-one"]::after { border-top-color: var(--pb-ink-3); }
+[data-theme="dark"] .choices__placeholder { color: var(--pb-field-ph); opacity: 1; }
+/* สถานะปิดใช้งานของไลบรารี (เช่น ช่องอำเภอก่อนเลือกจังหวัด) ตั้งพื้นเทาสว่างไว้
+   ด้วยตัวเลือกที่หนักกว่า .choices__inner เฉย ๆ จึงต้องระบุให้ตรงกว่า */
+[data-theme="dark"] .choices.is-disabled .choices__inner,
+[data-theme="dark"] .choices.is-disabled .choices__input {
+    background-color: #0A1120; border-color: var(--pb-line); color: var(--pb-ink-5);
+}
+
+/* หน้าต่าง "เปลี่ยนรหัสผ่าน" ที่ auth-guard.js สร้าง เขียนสีไว้เป็น inline style ทุกชิ้น
+   ซึ่งมีน้ำหนักสูงกว่าตัวเลือกทุกแบบ ทับได้ทางเดียวคือใช้ !important
+   เป็นที่เดียวในไฟล์นี้ที่จำเป็นต้องใช้ — ที่อื่นใช้น้ำหนักของตัวเลือกเอาชนะได้หมด
+   ทางที่สะอาดกว่าคือย้ายสีออกจาก inline ไปไว้ในไฟล์นี้ แต่นั่นต้องแก้ auth-guard.js
+   ซึ่งทุกหน้าเรียกใช้ จึงขอเลี่ยงไว้ก่อนเพื่อไม่ให้กระทบการล็อกอิน */
+[data-theme="dark"] #change-pw-modal > div   { background: var(--pb-surface) !important; color: var(--pb-ink); }
+[data-theme="dark"] #change-pw-modal h3      { color: var(--pb-ink); }
+[data-theme="dark"] #change-pw-modal label   { color: var(--pb-ink-2) !important; }
+[data-theme="dark"] #change-pw-modal input   { background: var(--pb-field-bg) !important;
+                                               border-color: var(--pb-field-border) !important;
+                                               color: var(--pb-field-text) !important; }
+[data-theme="dark"] #change-pw-modal button[style*="background:#fff"] {
+    background: #223049 !important; border-color: var(--pb-line-strong) !important; color: var(--pb-ink) !important;
+}
+[data-theme="dark"] #cpw-error   { background: rgba(244, 63, 94, .16) !important;
+                                   border-color: rgba(244, 63, 94, .45) !important; color: #FFA7B4 !important; }
+[data-theme="dark"] #cpw-success { background: rgba(16, 185, 129, .16) !important;
+                                   border-color: rgba(16, 185, 129, .45) !important; color: #6FEFC0 !important; }
+
+/* ช่องเลือกจังหวัดตัวจริงที่ Choices.js ซ่อนไว้ ยังมีคลาส bg-white ติดอยู่
+   ปกติผู้ใช้ไม่เห็น แต่ถ้าไลบรารีโหลดไม่ทัน จะโผล่มาเป็นแผ่นขาว */
+[data-theme="dark"] select.bg-white,
+[data-theme="dark"] input.bg-white,
+[data-theme="dark"] textarea.bg-white { background-color: var(--pb-field-bg); }
+
+/* ═══════════ 3. สิ่งที่ห้ามโดนโหมดมืดเด็ดขาด ═══════════
+   เอกสารราชการต้องเป็นหมึกดำบนกระดาษขาวเสมอ ไม่ว่าหน้าจอจะเป็นโหมดไหน
+   ถ้าปล่อยให้กฎข้างบนลงมาถึง เอกสารจะถูกพิมพ์ออกมาพื้นดำ
+   แผนที่ก็เช่นกัน ภาพแผนที่จาก Longdo เป็นภาพสว่าง ถ้าใส่พื้นมืดจะดูขัดกัน */
+[data-theme="dark"] #pdf-wrapper,
+[data-theme="dark"] #pdf-container,
+[data-theme="dark"] .pdf-page,
+[data-theme="dark"] .doc-preview-inner,
+[data-theme="dark"] .leaflet-container {
+    background-color: #FFFFFF;
+    color: #000000;
+}
+[data-theme="dark"] .pdf-page *,
+[data-theme="dark"] .doc-preview-inner * { color: #000000; border-color: #000000; }
+[data-theme="dark"] .pdf-page input,
+[data-theme="dark"] .doc-preview-inner input {
+    background-color: #FFFFFF; border-color: #000000; box-shadow: none;
+}
+
+/* ═══════════ 4. ปุ่มสลับโหมด ═══════════ */
+#pb-theme-toggle {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: rgba(255, 255, 255, .15);
+    border: 1px solid rgba(255, 255, 255, .3);
+    color: #fff; padding: 4px 10px; border-radius: 6px;
+    cursor: pointer; font-size: 12px; font-weight: 600;
+    font-family: inherit; line-height: 1.4; white-space: nowrap;
+}
+#pb-theme-toggle:hover  { background: rgba(255, 255, 255, .26); }
+#pb-theme-toggle:active { transform: scale(.97); }
+#pb-theme-toggle svg    { width: 13px; height: 13px; flex: none; }
+
+/* หน้าเข้าสู่ระบบกับหน้าเลือกเมนูไม่มีแถบหัวเว็บ ปุ่มจึงลอยอยู่มุมขวาบนแทน */
+#pb-theme-toggle.pb-floating {
+    position: fixed; top: 12px; right: 12px; z-index: 9999;
+    background: rgba(15, 23, 42, .78); border-color: rgba(255, 255, 255, .22);
+    backdrop-filter: blur(6px);
+}
+
+/* ตอนสั่งพิมพ์ ต้องเป็นกระดาษขาวหมึกดำเสมอ ไม่ว่าจอจะตั้งโหมดอะไรไว้ */
+@media print {
+    [data-theme="dark"] body,
+    [data-theme="dark"] .bg-white,
+    [data-theme="dark"] .bg-slate-50 { background: #fff; color: #000; }
+    #pb-theme-toggle { display: none; }
+}
+
+/* ═══════════ 5. สองหน้าที่ไม่ได้ใช้ Tailwind ═══════════
+   หน้าแรก (index) กับหน้าเข้าสู่ระบบ (login) เขียน CSS เองด้วยตัวแปรของตัวเอง
+   กฎทับคลาส Tailwind ข้างบนจึงไม่มีผล ต้องสลับที่ตัวแปรต้นทางแทน
+   ข้อดีคือแก้จุดเดียวแล้วทั้งหน้าเปลี่ยนตาม ไม่ต้องไล่ทับทีละชิ้น
+   (หน้าเลือกเมนู portal เป็นหน้าพื้นมืดอยู่แล้ว จึงไม่มีอะไรต้องสลับ) */
+
+[data-theme="dark"] {
+    /* index.html */
+    --bg:        #0B1120;
+    --bg-deep:   #070C17;
+    --surface:   #182234;
+    --hairline:  #334155;
+    --ink:       #E6EDF7;
+    --ink-soft:  #A9B8CC;
+    --ink-faint: #7E8EA4;
+    --brand-lo:  #8A8AE8;
+
+    /* login.html */
+    --bg-light:      #0B1120;
+    --bg-secondary:  #182234;
+    --card-white:    #182234;
+    --border-light:  #334155;
+    --text-dark:     #E6EDF7;
+    --text-muted:    #9FB0C4;
+}
+
+/* คอมโพเนนต์ของหน้าแรกที่เขียนสีขาวไว้ตรง ๆ ไม่ได้ผ่านตัวแปรข้างบน
+   ถ้าไม่ทับ จะเหลือเป็นการ์ดขาวโพลนลอยอยู่บนพื้นมืด */
+[data-theme="dark"] .topbar          { background: rgba(11, 17, 32, .82); }
+[data-theme="dark"] .menu-card       { background: var(--pb-surface); border-color: var(--pb-line); }
+[data-theme="dark"] body.has-photo .menu-card {
+    background: rgba(24, 34, 52, .92); border-color: rgba(148, 163, 184, .28);
+}
+[data-theme="dark"] body.has-photo .welcome-card h2,
+[data-theme="dark"] body.has-photo .eyebrow { text-shadow: 0 1px 3px rgba(0, 0, 0, .85); }
+[data-theme="dark"] body.has-photo .eyebrow { color: #C7D2E0; }
+[data-theme="dark"] .btn-logout      { background: rgba(244, 63, 94, .16); border-color: rgba(244, 63, 94, .42); color: #FFA7B4; }
+[data-theme="dark"] .btn-logout:hover{ background: rgba(244, 63, 94, .26); border-color: rgba(244, 63, 94, .60); }
+[data-theme="dark"] .badge           { background: rgba(245, 158, 11, .18); color: #FFCE7A; border-color: rgba(245, 158, 11, .42); }
+[data-theme="dark"] .badge.admin     { background: rgba(139, 92, 246, .20); color: #C4AFFF; border-color: rgba(139, 92, 246, .45); }
+
+/* ตัวอักษรบนพื้นมืดต้องไม่ใช้สีน้ำเงินเข้มของโลโก้ จะจมหายไปกับพื้น */
+[data-theme="dark"] { --brand: #9C9CF2; }
+/* ยกเว้นตรงที่เป็นพื้นสีแบรนด์จริง ๆ ซึ่งยังต้องเป็นน้ำเงินเข้มเหมือนเดิม */
+[data-theme="dark"] [style*="--brand"], [data-theme="dark"] .brand-fill { color: inherit; }
