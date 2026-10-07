@@ -31,8 +31,13 @@ const CFG = {
 /** เปิดใช้เฉพาะเมื่อตั้งค่าครบทั้ง 4 ตัว */
 const ENABLED = !!(CFG.tenantId && CFG.clientId && CFG.clientSecret && CFG.redirectUri);
 
-/** ให้คนใช้ใหม่ที่ล็อกอินผ่าน M365 ครั้งแรกถูกสร้างบัญชีอัตโนมัติหรือไม่ */
-const AUTO_CREATE = (process.env.MS_AUTO_CREATE_USERS || 'true') !== 'false';
+/* ให้คนที่ล็อกอิน M365 ครั้งแรกถูกสร้างบัญชีอัตโนมัติหรือไม่
+   ค่าเริ่มต้นเปลี่ยนจากเปิดเป็นปิดเมื่อ 7 ต.ค. 2569
+   เหตุผล: ของเดิมถ้า Microsoft ส่งชื่อผู้ใช้มาไม่ตรงกับที่สมัครไว้
+   ระบบจะสร้างบัญชีใหม่เงียบ ๆ ผู้ใช้เข้ามาเจอหน้าว่าง นึกว่าข้อมูลหาย
+   ปิดไว้แล้วแจ้งให้ติดต่อผู้ดูแลระบบ ตรงไปตรงมากว่า
+   เปิดกลับได้ด้วย MS_AUTO_CREATE_USERS=true */
+const AUTO_CREATE = (process.env.MS_AUTO_CREATE_USERS || 'false') === 'true';
 
 const AUTHORITY = () => `https://login.microsoftonline.com/${CFG.tenantId}`;
 const STATE_COOKIE = 'ms_oauth_state';
@@ -177,11 +182,33 @@ function mountMicrosoftAuth(app, { db, createSession, sessionTtlHours }) {
       const email = emailFromClaims(claims);
       if (!email) throw new Error('บัญชี Microsoft นี้ไม่มีอีเมล');
 
-      // จับคู่กับผู้ใช้เดิม หรือสร้างใหม่ถ้าอนุญาต
+      /* จับคู่กับผู้ใช้เดิม
+         ลำดับการหา: อีเมลหลัก -> อีเมลสำรอง
+         ต้องมีขั้นอีเมลสำรองเพราะบัญชี Entra บางคนไม่ได้ตั้งช่อง Email ไว้
+         Microsoft จึงส่ง UPN มาแทน เช่น teerapat@hathailand.onmicrosoft.com
+         ซึ่งไม่ตรงกับ teerapat@ha.or.th ที่สมัครไว้
+         (7 ต.ค. 2569 เคยทำให้ระบบสร้างบัญชีซ้ำให้ผู้ใช้โดยที่เขาไม่รู้ตัว) */
       let user = db.prepare('SELECT id, email, role FROM users WHERE email = ?').get(email);
+
+      if (!user) {
+        const alias = db.prepare(
+          'SELECT u.id, u.email, u.role FROM user_aliases a JOIN users u ON u.id = a.user_id WHERE a.email = ?'
+        ).get(email);
+        if (alias) {
+          user = alias;
+          console.log('[microsoft-auth] ' + email + ' -> บัญชี ' + alias.email + ' (ผ่านอีเมลสำรอง)');
+        }
+      }
+
       if (!user) {
         if (!AUTO_CREATE)
-          throw new Error(`ยังไม่มีบัญชี ${email} ในระบบ กรุณาติดต่อผู้ดูแลระบบ`);
+          throw new Error(
+            'ยังไม่มีบัญชี ' + email + ' ในระบบ\n\n' +
+            'ถ้าคุณเคยใช้งานด้วยอีเมลอื่นอยู่แล้ว แปลว่าบัญชี Microsoft ของคุณ\n' +
+            'ส่งชื่อผู้ใช้มาคนละอันกับอีเมลที่สมัครไว้\n' +
+            'แจ้งผู้ดูแลระบบให้เพิ่ม "' + email + '" เป็นอีเมลสำรองของบัญชีเดิม\n' +
+            'ข้อมูลเดิมของคุณยังอยู่ครบ ไม่ได้หายไปไหน'
+          );
         const ins = db.prepare('INSERT INTO users (email, password_hash, role) VALUES (?, ?, ?)')
                       .run(email, NO_PASSWORD, 'user');
         user = { id: ins.lastInsertRowid, email, role: 'user' };

@@ -1949,6 +1949,9 @@
                         <div style="display:inline-flex;gap:6px;">
                             <button onclick="openResetModal(${u.id}, '${u.email.replace(/'/g,"\\'")}')"
                                 style="padding:5px 12px;background:#fff;border:1.5px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:.8rem;">Reset PW</button>
+                            <button onclick="manageAliases(${u.id}, '${u.email}')"
+                                title="อีเมลสำรองที่ให้เข้าบัญชีนี้ได้ ใช้ตอน M365 ส่งชื่อผู้ใช้มาคนละอันกับอีเมลที่สมัครไว้"
+                                style="padding:5px 12px;background:#fff;border:1.5px solid #e2e8f0;border-radius:6px;cursor:pointer;font-size:.8rem;">อีเมลสำรอง</button>
                             ${!isSelf ? `<button onclick="deleteUser(${u.id})"
                                 style="padding:5px 12px;background:#fff;border:1.5px solid #fecaca;color:#dc2626;border-radius:6px;cursor:pointer;font-size:.8rem;">ลบ</button>` : ''}
                         </div>
@@ -1956,6 +1959,51 @@
                 </tr>
             `;
         });
+    }
+
+    /* ── อีเมลสำรอง ──────────────────────────────────────────
+       7 ต.ค. 2569 บัญชี Entra ที่ไม่ได้ตั้งช่อง Email ไว้ จะส่ง UPN มาแทน
+       (เช่น teerapat@hathailand.onmicrosoft.com แทน teerapat@ha.or.th)
+       ทำให้ระบบมองไม่เห็นว่าเป็นคนเดิม ผูกอีเมลสำรองไว้แล้วจะเข้าบัญชีเดิมได้
+       ไม่ต้องไปแก้ที่ Entra ซึ่งต้องรอทีม IT */
+    async function manageAliases(userId, email) {
+        let list = [];
+        try {
+            const res = await fetch('/users/' + userId + '/aliases');
+            if (!res.ok) throw new Error(await explainError(res, 'โหลดอีเมลสำรอง'));
+            list = await res.json();
+        } catch (e) { alert(e.message || 'โหลดอีเมลสำรองไม่สำเร็จ'); return; }
+
+        const shown = list.length
+            ? list.map(function (a, i) { return '  ' + (i + 1) + '. ' + a.email; }).join('\n')
+            : '  (ยังไม่มี)';
+        const answer = prompt(
+            'อีเมลสำรองของ ' + email + '\n' + shown + '\n\n' +
+            'พิมพ์อีเมลที่ต้องการเพิ่ม แล้วกดตกลง\n' +
+            'ถ้าต้องการลบ ให้พิมพ์เครื่องหมายลบนำหน้า เช่น -someone@example.com\n' +
+            'เว้นว่างแล้วกดตกลง = ไม่เปลี่ยนอะไร', '');
+        if (answer === null) return;
+        const val = String(answer).trim();
+        if (!val) return;
+
+        const remove = val.charAt(0) === '-';
+        const target = (remove ? val.slice(1) : val).trim().toLowerCase();
+        if (!target) return;
+
+        try {
+            let res;
+            if (remove) {
+                res = await fetch('/users/' + userId + '/aliases/' + encodeURIComponent(target),
+                                  { method: 'DELETE' });
+            } else {
+                res = await fetch('/users/' + userId + '/aliases', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: target })
+                });
+            }
+            if (!res.ok) throw new Error(await explainError(res, remove ? 'ลบอีเมลสำรอง' : 'เพิ่มอีเมลสำรอง'));
+            alert((remove ? 'ลบ' : 'เพิ่ม') + 'อีเมลสำรอง ' + target + ' เรียบร้อย');
+        } catch (e) { alert(e.message || 'ทำรายการไม่สำเร็จ'); }
     }
 
     async function changeRole(userId, role) {

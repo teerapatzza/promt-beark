@@ -27,6 +27,20 @@ db.exec(`
     created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
   );
 
+  /* อีเมลสำรองของผู้ใช้หนึ่งคน
+     ที่มา: 7 ต.ค. 2569 บัญชี Entra ของผู้ใช้บางคนไม่ได้ตั้งช่อง Email ไว้
+     Microsoft จึงส่ง UPN มาแทน (เช่น teerapat@hathailand.onmicrosoft.com)
+     ซึ่งไม่ตรงกับอีเมลที่ใช้สมัครไว้ (teerapat@ha.or.th)
+     ตารางนี้ให้ผูกอีเมลหลายอันเข้ากับคนเดียวกันได้ โดยไม่ต้องแก้ที่ Entra
+     COLLATE NOCASE เพราะอีเมลไม่แยกตัวพิมพ์เล็กใหญ่
+     ON DELETE CASCADE เพื่อไม่ให้มีอีเมลสำรองลอยค้างหลังลบผู้ใช้ */
+  CREATE TABLE IF NOT EXISTS user_aliases (
+    email      TEXT    PRIMARY KEY COLLATE NOCASE,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    note       TEXT,
+    created_at TEXT    NOT NULL DEFAULT (datetime('now'))
+  );
+
   CREATE TABLE IF NOT EXISTS sessions (
     token      TEXT    PRIMARY KEY,
     user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -331,6 +345,45 @@ app.delete('/users/:id', requireAdmin, (req, res) => {
 
   const result = db.prepare('DELETE FROM users WHERE id = ?').run(id);
   if (result.changes === 0) return res.status(404).json({ error: 'User not found' });
+  res.json({ ok: true });
+});
+
+// ── อีเมลสำรองของผู้ใช้ (admin only) ──────────────────────
+// ใช้ตอนที่บัญชี M365 ส่งอีเมลมาคนละอันกับที่สมัครไว้ ดูเหตุผลที่ตาราง user_aliases
+
+app.get('/users/:id/aliases', requireAdmin, (req, res) => {
+  const id = parseInt(req.params.id);
+  res.json(db.prepare('SELECT email, note, created_at FROM user_aliases WHERE user_id = ? ORDER BY email').all(id));
+});
+
+app.post('/users/:id/aliases', requireAdmin, (req, res) => {
+  const id = parseInt(req.params.id);
+  const email = String((req.body || {}).email || '').trim().toLowerCase();
+  const note  = String((req.body || {}).note  || '').trim() || null;
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
+    return res.status(400).json({ error: 'อีเมลไม่ถูกต้อง' });
+
+  const user = db.prepare('SELECT id FROM users WHERE id = ?').get(id);
+  if (!user) return res.status(404).json({ error: 'ไม่พบผู้ใช้' });
+
+  // กันผูกอีเมลที่เป็นบัญชีหลักของคนอื่นอยู่แล้ว ไม่งั้นคนสองคนจะเข้าบัญชีเดียวกันได้
+  const owner = db.prepare('SELECT id, email FROM users WHERE email = ?').get(email);
+  if (owner && owner.id !== id)
+    return res.status(409).json({ error: 'อีเมลนี้เป็นบัญชีหลักของผู้ใช้ id ' + owner.id + ' อยู่แล้ว' });
+
+  const taken = db.prepare('SELECT user_id FROM user_aliases WHERE email = ?').get(email);
+  if (taken && taken.user_id !== id)
+    return res.status(409).json({ error: 'อีเมลนี้ถูกผูกกับผู้ใช้ id ' + taken.user_id + ' อยู่แล้ว' });
+
+  db.prepare('INSERT OR REPLACE INTO user_aliases (email, user_id, note) VALUES (?, ?, ?)').run(email, id, note);
+  res.json({ ok: true });
+});
+
+app.delete('/users/:id/aliases/:email', requireAdmin, (req, res) => {
+  const id = parseInt(req.params.id);
+  const email = String(req.params.email || '').trim().toLowerCase();
+  const r = db.prepare('DELETE FROM user_aliases WHERE user_id = ? AND email = ?').run(id, email);
+  if (r.changes === 0) return res.status(404).json({ error: 'ไม่พบอีเมลสำรองนี้' });
   res.json({ ok: true });
 });
 
