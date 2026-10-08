@@ -86,6 +86,20 @@
         .seg-btn:hover { color: #334155; }
         .seg-btn.is-on { background: #fff; color: #1d4ed8; box-shadow: 0 1px 3px rgba(15,23,42,.12); }
 
+        /* กล่องวัดการตัดบรรทัดของชื่อกิจกรรม
+           ค่าทุกตัวต้องตรงกับ .pdf-page .free-text ในไฟล์ history.html
+           ถ้าที่นั่นเปลี่ยน ต้องตามมาแก้ที่นี่ด้วย ไม่งั้นพรีวิวจะโกหก */
+        #activityRuler {
+            position: absolute; left: -99999px; top: 0;
+            width: 482px; font-family: 'Sarabun', sans-serif; font-size: 13.5px;
+            line-height: 1.7; word-break: break-word; overflow-wrap: anywhere;
+            white-space: normal; visibility: hidden;
+        }
+        .act-line {
+            font-family: 'Sarabun', sans-serif; font-size: 12.5px; line-height: 1.55;
+            padding: 1px 0 1px 7px; border-left: 2px solid #cbd5e1;
+        }
+
         /* ปุ่มลัดกำหนดจำนวนวัน */
         .chip {
             border: 1px solid #e2e8f0; background: #fff; color: #64748b;
@@ -98,6 +112,10 @@
     <!-- ธีม: ความคมชัดของช่องกรอก และโหมดมืด
          theme.js ต้องไม่ใส่ defer เพราะมันตั้งธีมทันทีที่ถูกอ่าน
          ถ้ารอถึง DOMContentLoaded ผู้ใช้จะเห็นหน้าขาววาบก่อนแล้วค่อยมืด -->
+    <!-- ฟอนต์เดียวกับที่เอกสาร PDF ใช้ โหลดมาเพื่อวัดการตัดบรรทัดให้ตรงกับกระดาษจริง
+         ถ้าวัดด้วยฟอนต์อื่น จำนวนบรรทัดที่บอกผู้ใช้จะไม่ตรงกับที่พิมพ์ออกมา -->
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap">
     <link rel="stylesheet" href="theme.css">
     <script src="theme.js"></script>
 </head>
@@ -193,6 +211,10 @@
                      ใบที่ยาวที่สุดที่ใช้งานจริงอยู่ที่ 158 ตัวอักษร -->
                 <input type="text" id="activityName" maxlength="200" placeholder="ระบุชื่อกิจกรรม (จะแสดงเฉพาะในใบรับรองแทนใบเสร็จฯ)" class="w-full border-2 border-slate-200 p-3.5 rounded-xl text-lg focus:border-blue-500 outline-none transition-all" oninput="syncActivityFromMainToExtra(); updateActivityCounter()">
                 <div id="activityCounter" class="hidden text-xs mt-1.5 text-right"></div>
+                <!-- พรีวิวว่าชื่อกิจกรรมจะขึ้นกี่บรรทัดบนเอกสารจริง -->
+                <div id="activityPreview" class="hidden mt-2"></div>
+                <!-- กล่องวัด ซ่อนไว้นอกจอ ตั้งความกว้างและฟอนต์เท่าเซลล์บนเอกสารเป๊ะ -->
+                <div id="activityRuler" aria-hidden="true"></div>
                 <p class="text-xs text-slate-500 mt-2"><svg class="inline w-3.5 h-3.5 -mt-0.5 flex-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2Z"/></svg> หากไม่ระบุ ระบบจะเว้นว่างไว้ในเอกสาร PDF <span class="text-blue-600">🔄 ข้อมูลจะ sync กับกิจกรรมด้านล่างอัตโนมัติ</span></p>
 
                 <!-- วันที่ที่พิมพ์ลงเอกสาร — เดิมใช้วันที่กดบันทึกเสมอ แก้ไม่ได้
@@ -2442,12 +2464,109 @@
        เงียบไว้ตอนยังสั้น แล้วค่อยเตือนเมื่อเข้าใกล้เพดาน
        เลข 200 มาจากการวัดความสูงหน้าเอกสารจริง ดูคอมเมนต์ที่ช่องกรอก */
     const ACTIVITY_MAX = 200;
+    /* ══════════ พรีวิวชื่อกิจกรรมบนเอกสาร ══════════
+       ผู้ใช้ขอให้เห็นตั้งแต่ตอนพิมพ์ว่าจะขึ้นกี่บรรทัด ไม่ใช่มารู้ตอนเปิด PDF
+       ตัวนับตัวอักษรอย่างเดียวบอกอะไรไม่ได้ — ชื่อที่ทำให้เกิดปัญหามีแค่ 74 ตัวอักษร
+       ต่ำกว่าเพดาน 200 ที่ตั้งไว้มาก สิ่งที่คนกรอกอยากรู้คือจำนวนบรรทัดบนกระดาษ
+
+       วัดด้วยกล่องซ่อนที่ตั้งความกว้างและฟอนต์เท่าเซลล์จริงบนเอกสาร
+       แล้วหาจุดตัดบรรทัดแบบเดียวกับที่ freezeLineBreaks() ใช้ตอนออก PDF */
+    /* บรรทัดแรกบนเอกสารมีคำว่า "กิจกรรม" กินที่อยู่ข้างหน้า
+       ถ้าวัดเต็มความกว้าง พรีวิวจะบอกจำนวนบรรทัดน้อยกว่าจริง
+       (เจอจริง: ชื่อ 74 ตัวอักษร พรีวิวบอก 1 บรรทัด แต่เอกสารออกมา 2 บรรทัด)
+       วัดความกว้างของป้ายด้วยฟอนต์เดียวกัน แล้วเว้นเป็นย่อหน้าแรกให้เท่ากัน
+       วัดเอาแทนที่จะใส่ตัวเลขตายตัว เผื่อวันหน้าป้ายเปลี่ยนคำ */
+    let _actIndent = null;
+    function activityLabelWidth() {
+        if (_actIndent !== null) return _actIndent;
+        const ruler = document.getElementById('activityRuler');
+        if (!ruler) return 0;
+        const keep = ruler.innerHTML;
+        // ต้องห่อด้วย inline-block แล้ววัดตัวห่อ
+        // ถ้าวัด ruler ตรง ๆ จะได้ความกว้างของไม้บรรทัดทั้งอัน (482px) ไม่ใช่ความกว้างป้าย
+        ruler.innerHTML = '<span id="_actLbl" style="display:inline-block;white-space:pre">' +
+                          '<b>กิจกรรม</b>   </span>';
+        const span = ruler.querySelector('#_actLbl');
+        // ความกว้างของป้าย + ช่องไฟสามตัวที่คั่นอยู่ (ดูบรรทัด rcRow ใน history.html)
+        _actIndent = span ? Math.ceil(span.getBoundingClientRect().width) : 0;
+        ruler.innerHTML = keep;
+        return _actIndent;
+    }
+
+    function activityLines(text) {
+        const ruler = document.getElementById('activityRuler');
+        if (!ruler || !text) return [];
+        ruler.style.textIndent = activityLabelWidth() + 'px';
+        ruler.textContent = text;
+        const node = ruler.firstChild;
+        if (!node) return [];
+
+        const rng = document.createRange();
+        const breaks = [];
+        let prevTop = null;
+        for (let i = 0; i < text.length; i++) {
+            rng.setStart(node, i);
+            rng.setEnd(node, i + 1);
+            const r = rng.getBoundingClientRect();
+            if (r.height === 0) continue;
+            if (prevTop !== null && r.top - prevTop > 1) breaks.push(i);
+            prevTop = r.top;
+        }
+        const lines = [];
+        let from = 0;
+        breaks.forEach(function (at) { lines.push(text.slice(from, at)); from = at; });
+        lines.push(text.slice(from));
+        ruler.textContent = '';
+        return lines.map(function (l, i) { return i ? l.replace(/^\s+/, '') : l; });
+    }
+
+    /** กี่บรรทัดถึงจะเริ่มเบียดเอกสาร — วัดจากเทมเพลตจริงแล้ว เซลล์เริ่มต้นรับได้ 2 บรรทัด */
+    const ACT_LINES_OK = 2;
+
+    function updateActivityPreview() {
+        const input = document.getElementById('activityName');
+        const box = document.getElementById('activityPreview');
+        if (!input || !box) return;
+        const text = (input.value || '').trim();
+
+        // ชื่อกิจกรรมพิมพ์เฉพาะบนใบรับรองค่าพาหนะ ใบอื่นไม่ต้องเตือน
+        if (!text || typeof usesReceipt !== 'function' || !usesReceipt()) {
+            box.className = 'hidden'; box.innerHTML = ''; return;
+        }
+
+        const lines = activityLines(text);
+        if (lines.length <= 1) { box.className = 'hidden'; box.innerHTML = ''; return; }
+
+        const over = lines.length > ACT_LINES_OK;
+        const tone = over
+            ? { bd: 'border-amber-300', bg: 'bg-amber-50', ink: 'text-amber-800' }
+            : { bd: 'border-slate-200',  bg: 'bg-slate-50',  ink: 'text-slate-600' };
+
+        box.className = 'mt-2 rounded-lg border ' + tone.bd + ' ' + tone.bg + ' px-3 py-2';
+        box.innerHTML =
+            '<div class="text-xs font-semibold ' + tone.ink + ' mb-1.5">' +
+                'บนเอกสารจะขึ้น ' + lines.length + ' บรรทัด' +
+                (over ? ' — ยาวกว่าช่องที่เตรียมไว้ ตารางจะยืดลงมา ถ้าอยากให้พอดีลองย่อให้เหลือ '
+                      + ACT_LINES_OK + ' บรรทัด' : '') +
+            '</div>' +
+            lines.map(function (l) {
+                return '<div class="act-line ' + (over ? 'text-amber-900' : 'text-slate-700') + '">' +
+                    escHtml(l) + '</div>';
+            }).join('');
+    }
+
+    function escHtml(s) {
+        return String(s).replace(/[&<>"]/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+        });
+    }
+
     function updateActivityCounter() {
         const input = document.getElementById('activityName');
         const box = document.getElementById('activityCounter');
         if (!input || !box) return;
         const n = input.value.length;
-        if (n < 150) { box.className = 'hidden'; return; }
+        if (n < 150) { box.className = 'hidden'; updateActivityPreview(); return; }
         // ใบเก่าบางใบถูกบันทึกไว้ก่อนมีเพดานนี้ และยาวเกินจริง
         // ต้องบอกให้ย่อ ไม่ใช่ตัดทิ้งเงียบๆ เพราะเป็นข้อมูลที่ผู้ใช้ตั้งใจกรอก
         box.textContent = n + ' / ' + ACTIVITY_MAX + ' ตัวอักษร'
@@ -2455,6 +2574,7 @@
              : n === ACTIVITY_MAX ? '  — พิมพ์ได้เท่านี้ ยาวกว่านี้เอกสารจะล้นหน้า' : '');
         box.className = 'text-xs mt-1.5 text-right '
             + (n >= ACTIVITY_MAX ? 'text-rose-600 font-semibold' : 'text-amber-600');
+        updateActivityPreview();
     }
 
     function syncActivityFromMainToExtra() {
@@ -2788,7 +2908,10 @@
         // เดิมกันไว้ให้ใบพาหนะอย่างเดียว หมวดที่ใช้ใบรายงานอย่างเดียวจึงกรอกที่อยู่ไม่ได้
         // แล้ว PDF พิมพ์ออกมาเป็นเส้นว่างทุกช่อง
         show('addressSection',   hasTravel);             // ที่อยู่ผู้เดินทาง (ทั้งสองใบ)
-        show('travelTimeBox',    hasReport);             // วัน-เวลา · ออกจากไหน · จังหวัดปลายทาง
+        // 8 ต.ค. 2569 เดิมเป็น hasReport ทำให้เลือกใบรับรองค่าพาหนะอย่างเดียวแล้วไม่มีช่องกรอกวันที่
+        // แต่ใบนั้นพิมพ์วันที่ลงคอลัมน์ "วัน เดือน ปี" ของบรรทัดรถส่วนตัว (ดู dateGo/dateBack ใน history.html)
+        // ผลคือคอลัมน์วันที่ว่างทั้งใบ ผู้ใช้ต้องมาเขียนมือเอง
+        show('travelTimeBox',    hasTravel);             // วัน-เวลา · ออกจากไหน · จังหวัดปลายทาง
         // ช่องกรอกระยะทางมีอยู่บนใบรับรองค่าพาหนะใบเดียว ("ระยะทาง ___ ก.ม. x อัตรา")
         // ใบรายงานมีแค่บรรทัด 2.2 ค่าน้ำมันรถ ซึ่งเป็นช่องยอดเงิน ไม่มีช่องระยะทางบนกระดาษ
         // ตรวจด้วยการนับวงเล็บใน history.html แล้ว: บรรทัดระยะทางอยู่ในบล็อก TRANSPORT_RECEIPT
@@ -3264,8 +3387,11 @@
             }
             const dateStart = document.getElementById('dateStart').value;
             const dateEnd   = document.getElementById('dateEnd').value;
-            if (needReport && !dateStart) return alert("❌ กรุณาระบุวันที่ออกเดินทาง");
-            if (needReport && !dateEnd)   return alert("❌ กรุณาระบุวันที่กลับถึง");
+            // ทั้งใบรายงานและใบรับรองค่าพาหนะต่างพิมพ์วันที่ลงกระดาษ
+            // ถ้าปล่อยว่าง ใบที่ออกมาจะมีช่องวันที่โล่ง ต้องเขียนมือเอง
+            const needDates = needReport || needReceipt;
+            if (needDates && !dateStart) return alert("❌ กรุณาระบุวันที่ออกเดินทาง");
+            if (needDates && !dateEnd)   return alert("❌ กรุณาระบุวันที่กลับถึง");
 
             // Validate date range: end date must be >= start date
             // ตรวจเฉพาะเมื่อมีวันที่ทั้งคู่ (ถ้าไม่ได้ติ๊กใบรายงานการเดินทาง อาจเว้นว่างได้)

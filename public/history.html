@@ -85,6 +85,12 @@
              เพราะแถวเว้นวรรค (10px) และช่องเซ็นชื่อ (60-85px) ต้องคงความสูงไว้
              ช่องที่มีข้อความยืดหยุ่นได้ ให้ใส่ min-height เป็นรายจุดแทน */
 
+
+          /* ข้อความที่ถูกตรึงจุดตัดบรรทัดไว้แล้วโดย freezeLineBreaks()
+             pre-wrap: เคารพ <br> ที่ใส่ไว้ และยังยอมตัดเองได้ถ้าจำเป็น
+             (ถ้าใช้ nowrap แล้ววัดคลาดนิดเดียว ข้อความจะล้นออกนอกกรอบแทนที่จะตัด) */
+          .pdf-page .free-text.lines-frozen { white-space: pre-wrap; }
+
           /* ข้อความอิสระที่ผู้ใช้พิมพ์เอง (กิจกรรม รายละเอียด) ต้องมีที่หายใจพอ */
           .pdf-page .free-text {
               display: block; line-height: 1.7;
@@ -1389,6 +1395,71 @@
         }
 
 
+
+        /* ══════════ ตัดบรรทัดไว้ล่วงหน้า ก่อนแปลงเป็นภาพ ══════════
+           html2canvas ไม่ได้ใช้การตัดบรรทัดของเบราว์เซอร์ แต่วัดข้อความเองแล้ววาดเอง
+           ถ้าค่าที่วัดกับตอนวาดไม่ตรงกัน ข้อความชุดเดียวจะถูกวาดซ้อนกันสองรอบ
+           ภาษาไทยเจอง่ายกว่าภาษาอื่นเพราะไม่มีช่องว่างคั่นคำ จุดตัดจึงไม่ตายตัว
+           (8 ต.ค. 2569 ผู้ใช้ส่ง PDF ที่ "23-24 กันยายน 69" พิมพ์ทับกันจนอ่านไม่ออก)
+
+           วิธี: ใช้จุดตัดบรรทัดที่เบราว์เซอร์คำนวณไว้แล้ว แยกเป็น <div> ละบรรทัด
+           html2canvas จึงไม่เหลือการตัดบรรทัดให้ตัดสินใจ วาดทีละบล็อกตามตำแหน่งเดิม
+
+           ตัวอักษรรวมต้องเท่าเดิมเป๊ะ ถ้าไม่เท่าให้คืนของเดิมไป
+           ยอมให้เอกสารเสี่ยงทับ ดีกว่าทำข้อความหาย */
+        function freezeLineBreaks(root) {
+            const targets = root.querySelectorAll('.free-text');
+            let changed = 0;
+
+            targets.forEach(function (el) {
+                const text = el.textContent || '';
+                if (!text.trim()) return;
+                if (el.querySelector('*')) return;      // มีแท็กอื่นข้างใน ไม่แตะ กันพัง
+
+                const node = el.firstChild;
+                if (!node || node.nodeType !== 3) return;
+
+                // หาตำแหน่งที่เบราว์เซอร์ขึ้นบรรทัดใหม่ โดยไล่ทีละตัวอักษร
+                // แล้วดูว่าขอบบนของตัวนั้นขยับลงจากตัวก่อนหน้าหรือยัง
+                const rng = document.createRange();
+                const breaks = [];
+                let prevTop = null;
+                for (let i = 0; i < text.length; i++) {
+                    rng.setStart(node, i);
+                    rng.setEnd(node, i + 1);
+                    const r = rng.getBoundingClientRect();
+                    if (r.height === 0) continue;       // ช่องว่างท้ายบรรทัด
+                    if (prevTop !== null && r.top - prevTop > 1) breaks.push(i);
+                    prevTop = r.top;
+                }
+                if (!breaks.length) return;             // บรรทัดเดียว ไม่ต้องทำอะไร
+
+                const lines = [];
+                let from = 0;
+                breaks.forEach(function (at) { lines.push(text.slice(from, at)); from = at; });
+                lines.push(text.slice(from));
+
+                // ด่านกันข้อความหาย: ตัวอักษรที่ไม่ใช่ช่องว่างต้องเท่าเดิมทุกตัว
+                const strip = s => s.replace(/\s+/g, '');
+                if (strip(lines.join('')) !== strip(text)) return;
+
+                /* ใช้ <br> ไม่ใช่ <div>
+                   เพราะ .free-text เป็น inline และนั่งอยู่บรรทัดเดียวกับคำว่า "กิจกรรม"
+                   ถ้าเปลี่ยนเป็นบล็อก บรรทัดแรกจะตกลงไปอยู่ใต้ป้าย เอกสารสูงขึ้นหนึ่งบรรทัด
+                   (วัดได้ +23px ทุกเคส — ชุดทดสอบจับได้ตอนลองวิธีนั้น) */
+                el.textContent = '';
+                lines.forEach(function (ln, i) {
+                    if (i) el.appendChild(document.createElement('br'));
+                    // ช่องว่างหน้าบรรทัดถูกเบราว์เซอร์กลืนไปตอนตัดบรรทัดเอง
+                    // ถ้าเก็บไว้กับ pre-wrap บรรทัดจะเขยิบขวาผิดจากเดิม
+                    el.appendChild(document.createTextNode(i ? ln.replace(/^\s+/, '') : ln));
+                });
+                el.classList.add('lines-frozen');
+                changed++;
+            });
+            return changed;
+        }
+
         /** ทำไฟล์ PDF แล้วดาวน์โหลด — ตัวเอกสารมาจาก buildDocumentHtml */
         /* ══════════ รอให้ฟอนต์ของเอกสารพร้อมจริง ก่อนแปลงเป็น PDF ══════════
            html2canvas วัดความกว้างข้อความรอบหนึ่ง แล้ววาดจริงอีกรอบ
@@ -1447,6 +1518,15 @@
             // ต้องรอฟอนต์ให้ครบ "ทุกชุดอักษร" ก่อน ไม่ใช่แค่ชุดละติน
             // ดูคำอธิบายเต็มที่ waitForDocumentFonts()
             await waitForDocumentFonts();
+
+            // ต้องทำหลังฟอนต์พร้อมเท่านั้น ไม่งั้นจุดตัดบรรทัดจะเป็นของฟอนต์สำรอง
+            // แล้วพอฟอนต์จริงมาถึง ตำแหน่งจะเพี้ยนกว่าเดิม
+            try {
+                const frozen = freezeLineBreaks(element);
+                if (frozen) console.log('[pdf] ตรึงการตัดบรรทัดไว้แล้ว ' + frozen + ' ก้อน');
+            } catch (e) {
+                console.warn('[pdf] ตรึงการตัดบรรทัดไม่สำเร็จ ใช้วิธีเดิมต่อ', e);
+            }
 
             setTimeout(() => {
                 btn.innerHTML = '⏳ กำลังสร้าง PDF...';
