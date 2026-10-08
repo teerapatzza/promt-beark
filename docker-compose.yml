@@ -13,6 +13,11 @@ services:
       - MS_CLIENT_ID=${MS_CLIENT_ID:-}
       - MS_CLIENT_SECRET=${MS_CLIENT_SECRET:-}
       - MS_REDIRECT_URI=${MS_REDIRECT_URI:-}
+      # โดเมนอีเมลจริงขององค์กร — ใช้แปลง UPN ที่ Entra ส่งมา
+      #   tippayarat@hathailand.onmicrosoft.com -> tippayarat@ha.or.th
+      # จำเป็นเพราะบัญชีใน Entra ไม่ได้ตั้งช่อง Email ไว้ Microsoft จึงส่ง UPN มาแทน
+      # ถ้าวันหน้า IT ตั้งช่อง Email ครบแล้ว ค่านี้จะกลายเป็นตัวสำรองที่ไม่ได้ถูกใช้
+      - MS_PRIMARY_DOMAIN=${MS_PRIMARY_DOMAIN:-ha.or.th}
       - LONGDO_API_KEY=${LONGDO_API_KEY:-}
 
   frontend:

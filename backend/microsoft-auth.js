@@ -32,12 +32,15 @@ const CFG = {
 const ENABLED = !!(CFG.tenantId && CFG.clientId && CFG.clientSecret && CFG.redirectUri);
 
 /* ให้คนที่ล็อกอิน M365 ครั้งแรกถูกสร้างบัญชีอัตโนมัติหรือไม่
-   ค่าเริ่มต้นเปลี่ยนจากเปิดเป็นปิดเมื่อ 7 ต.ค. 2569
-   เหตุผล: ของเดิมถ้า Microsoft ส่งชื่อผู้ใช้มาไม่ตรงกับที่สมัครไว้
-   ระบบจะสร้างบัญชีใหม่เงียบ ๆ ผู้ใช้เข้ามาเจอหน้าว่าง นึกว่าข้อมูลหาย
-   ปิดไว้แล้วแจ้งให้ติดต่อผู้ดูแลระบบ ตรงไปตรงมากว่า
-   เปิดกลับได้ด้วย MS_AUTO_CREATE_USERS=true */
-const AUTO_CREATE = (process.env.MS_AUTO_CREATE_USERS || 'false') === 'true';
+   7 ต.ค. 2569 เคยปิดไว้ เพราะระบบสร้างบัญชีซ้ำให้ผู้ใช้เงียบ ๆ
+   8 ต.ค. 2569 เปิดกลับ เพราะการปิดทำให้พนักงานใหม่เข้าระบบไม่ได้เลย
+   ตอนนี้ปลอดภัยแล้วเพราะมี normalizeEmail() แปลงโดเมนให้ถูกก่อนเสมอ
+   บัญชีที่สร้างใหม่จึงใช้อีเมลจริงขององค์กร ไม่ใช่ UPN แบบ onmicrosoft */
+const AUTO_CREATE = (process.env.MS_AUTO_CREATE_USERS || 'true') !== 'false';
+
+/* โดเมนอีเมลจริงขององค์กร ใช้แปลง UPN แบบ onmicrosoft ให้กลับมาเป็นอีเมลจริง
+   ตั้งว่างไว้ = ไม่แปลงอะไรเลย (ใช้กับองค์กรที่ UPN กับอีเมลตรงกันอยู่แล้ว) */
+const PRIMARY_DOMAIN = String(process.env.MS_PRIMARY_DOMAIN || '').trim().toLowerCase();
 
 const AUTHORITY = () => `https://login.microsoftonline.com/${CFG.tenantId}`;
 const STATE_COOKIE = 'ms_oauth_state';
@@ -67,6 +70,26 @@ function assertClaimsAreOurs(claims) {
 function emailFromClaims(claims) {
   const raw = claims.email || claims.preferred_username || claims.upn || '';
   return String(raw).trim().toLowerCase();
+}
+
+/**
+ * แปลง UPN แบบ *.onmicrosoft.com ให้เป็นอีเมลจริงขององค์กร
+ *   tippayarat@hathailand.onmicrosoft.com  ->  tippayarat@ha.or.th
+ *
+ * ทำไมปลอดภัย: ส่วนหน้า @ ของ UPN ไม่ซ้ำกันภายใน tenant เดียว (Entra บังคับ)
+ * และเราตรวจ claims.tid แล้วว่าเป็น tenant ขององค์กรเราจริงก่อนถึงตรงนี้
+ * จึงไม่มีทางที่คนนอกจะใช้ชื่อซ้ำกับพนักงานเพื่อเข้าบัญชีคนอื่น
+ *
+ * คืนค่าเดิมถ้าไม่เข้าเงื่อนไข — ตั้งใจให้เป็น no-op ถ้าไม่ได้ตั้ง MS_PRIMARY_DOMAIN
+ */
+function normalizeEmail(email) {
+  if (!PRIMARY_DOMAIN) return email;
+  const at = email.lastIndexOf('@');
+  if (at < 1) return email;
+  const local = email.slice(0, at);
+  const domain = email.slice(at + 1);
+  if (!/\.onmicrosoft\.com$/.test(domain)) return email;
+  return local + '@' + PRIMARY_DOMAIN;
 }
 
 /**
@@ -182,12 +205,13 @@ function mountMicrosoftAuth(app, { db, createSession, sessionTtlHours }) {
       const email = emailFromClaims(claims);
       if (!email) throw new Error('บัญชี Microsoft นี้ไม่มีอีเมล');
 
-      /* จับคู่กับผู้ใช้เดิม
-         ลำดับการหา: อีเมลหลัก -> อีเมลสำรอง
-         ต้องมีขั้นอีเมลสำรองเพราะบัญชี Entra บางคนไม่ได้ตั้งช่อง Email ไว้
-         Microsoft จึงส่ง UPN มาแทน เช่น teerapat@hathailand.onmicrosoft.com
-         ซึ่งไม่ตรงกับ teerapat@ha.or.th ที่สมัครไว้
-         (7 ต.ค. 2569 เคยทำให้ระบบสร้างบัญชีซ้ำให้ผู้ใช้โดยที่เขาไม่รู้ตัว) */
+      /* จับคู่กับผู้ใช้เดิม — หาสามทางตามลำดับ
+           1. อีเมลตรงตัว
+           2. อีเมลสำรองที่ผู้ดูแลระบบผูกไว้เอง (เคสเฉพาะราย)
+           3. อีเมลที่แปลงโดเมนแล้ว (เคสทั้งองค์กรที่ Entra ส่ง UPN มาแทนอีเมล)
+         ขั้นที่ 3 คือตัวที่แก้ปัญหาให้คนส่วนใหญ่ ส่วนขั้นที่ 2 เก็บไว้สำหรับ
+         รายที่ชื่อหน้า @ ไม่ตรงกัน ซึ่งการแปลงโดเมนช่วยไม่ได้ */
+      const normalized = normalizeEmail(email);
       let user = db.prepare('SELECT id, email, role FROM users WHERE email = ?').get(email);
 
       if (!user) {
@@ -200,6 +224,19 @@ function mountMicrosoftAuth(app, { db, createSession, sessionTtlHours }) {
         }
       }
 
+      if (!user && normalized !== email) {
+        const byDomain = db.prepare('SELECT id, email, role FROM users WHERE email = ?').get(normalized);
+        if (byDomain) {
+          user = byDomain;
+          console.log('[microsoft-auth] ' + email + ' -> บัญชี ' + byDomain.email + ' (แปลงโดเมน)');
+          // บันทึกไว้ให้ผู้ดูแลระบบเห็นว่าใครเข้ามาด้วย UPN อะไร
+          try {
+            db.prepare('INSERT OR IGNORE INTO user_aliases (email, user_id, note) VALUES (?, ?, ?)')
+              .run(email, byDomain.id, 'บันทึกอัตโนมัติจากการแปลงโดเมน');
+          } catch (e) { /* บันทึกไม่ได้ก็ไม่เป็นไร การล็อกอินสำคัญกว่า */ }
+        }
+      }
+
       if (!user) {
         if (!AUTO_CREATE)
           throw new Error(
@@ -209,10 +246,18 @@ function mountMicrosoftAuth(app, { db, createSession, sessionTtlHours }) {
             'แจ้งผู้ดูแลระบบให้เพิ่ม "' + email + '" เป็นอีเมลสำรองของบัญชีเดิม\n' +
             'ข้อมูลเดิมของคุณยังอยู่ครบ ไม่ได้หายไปไหน'
           );
+        // สร้างด้วยอีเมลที่แปลงโดเมนแล้ว ไม่ใช่ UPN ดิบ
+        // ไม่งั้นพนักงานใหม่จะได้บัญชีชื่อ @...onmicrosoft.com ติดตัวไปตลอด
         const ins = db.prepare('INSERT INTO users (email, password_hash, role) VALUES (?, ?, ?)')
-                      .run(email, NO_PASSWORD, 'user');
-        user = { id: ins.lastInsertRowid, email, role: 'user' };
-        console.log('[microsoft-auth] สร้างบัญชีใหม่จาก M365: ' + email);
+                      .run(normalized, NO_PASSWORD, 'user');
+        user = { id: ins.lastInsertRowid, email: normalized, role: 'user' };
+        if (normalized !== email)
+          try {
+            db.prepare('INSERT OR IGNORE INTO user_aliases (email, user_id, note) VALUES (?, ?, ?)')
+              .run(email, user.id, 'UPN ที่ Entra ส่งมาตอนสร้างบัญชี');
+          } catch (e) { /* ไม่สำคัญพอจะล้มการล็อกอิน */ }
+        console.log('[microsoft-auth] สร้างบัญชีใหม่จาก M365: ' + normalized +
+                    (normalized !== email ? ' (UPN: ' + email + ')' : ''));
       }
 
       const token = createSession(user.id);
