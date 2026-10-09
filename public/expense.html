@@ -186,9 +186,9 @@
                 </div>
                 <!-- เลือกจากรายการก็ได้ พิมพ์เองก็ได้ — ค่าที่พิมพ์ใหม่จะถูกเก็บเข้ารายการกลาง -->
                 <div>
-                    <label class="block text-sm font-bold text-slate-700 mb-2">ตำแหน่งงาน</label>
+                    <label class="block text-sm font-bold text-slate-700 mb-2">บทบาทที่ไปปฏิบัติหน้าที่</label>
                     <input type="text" id="position" autocomplete="off"
-                        placeholder="เลือกจากรายการ หรือพิมพ์ตำแหน่งใหม่..."
+                        placeholder="เลือกจากรายการ หรือพิมพ์บทบาทใหม่..."
                         class="w-full border border-slate-200 p-3.5 rounded-xl text-lg focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all bg-white">
                 </div>
                 <div class="md:col-span-2">
@@ -233,7 +233,7 @@
                     <!-- บอกตรง ๆ ว่าวันที่นี้ไปโผล่ตรงไหนของใบไหน เปลี่ยนตามหมวดที่เลือก
                          เพราะพอออกสองใบพร้อมกันแล้วมีวันที่สามชุด ต้องรู้ว่าอันไหนคุมอะไร -->
                     <span id="docDateWhere" class="text-xs text-slate-400 w-full">
-                        เลือกหมวดการเบิกก่อน แล้วระบบจะบอกว่าวันที่นี้จะไปพิมพ์ตรงไหนบ้าง
+                        เลือกชุดเอกสารก่อน แล้วระบบจะบอกว่าวันที่นี้จะไปพิมพ์ตรงไหนบ้าง
                     </span>
 
                     <!-- ปกติทุกใบใช้วันเดียวกัน แต่บางครั้งวันบนสองใบไม่ตรงกัน
@@ -271,15 +271,15 @@
             <div class="p-6">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-semibold text-slate-600 mb-2">หมวดงบประมาณ (ระบุสูตร)</label>
+                        <label class="block text-sm font-semibold text-slate-600 mb-2">ชุดเอกสารสำหรับเบิก</label>
                         <select id="categorySelect" onchange="generateInputs()" class="w-full border-2 border-slate-200 p-3.5 rounded-xl text-lg focus:border-blue-500 outline-none transition-all cursor-pointer">
-                            <option value="">-- กรุณาเลือกหมวดการเบิก --</option>
+                            <option value="">-- กรุณาเลือกชุดเอกสาร --</option>
                         </select>
                     </div>
                     <div>
                         <label class="block text-sm font-semibold text-slate-600 mb-2">เอกสาร PDF ที่จะสร้าง</label>
                         <div id="pdfTemplatesDisplay" class="flex flex-wrap gap-2 p-3 bg-amber-50/50 border border-amber-200 rounded-xl min-h-[44px] items-center">
-                            <span class="text-slate-400 text-sm">กรุณาเลือกหมวดการเบิกก่อน</span>
+                            <span class="text-slate-400 text-sm">กรุณาเลือกชุดเอกสารก่อน</span>
                         </div>
                     </div>
                 </div>
@@ -2247,7 +2247,7 @@
         buildDocDateSplit(active);
 
         if (!spots.length) {
-            el.textContent = 'เลือกหมวดการเบิกก่อน แล้วระบบจะบอกว่าวันที่นี้จะไปพิมพ์ตรงไหนบ้าง';
+            el.textContent = 'เลือกชุดเอกสารก่อน แล้วระบบจะบอกว่าวันที่นี้จะไปพิมพ์ตรงไหนบ้าง';
             return;
         }
         el.innerHTML = 'วันที่นี้จะพิมพ์ลงที่ &nbsp;·&nbsp; ' + spots.join(' &nbsp;·&nbsp; ') +
@@ -2278,7 +2278,7 @@
         attachPlaceSearch('travelReturnFrom', 'returnFromSuggest', 'retfrom');
         attachPlaceSearch('travelReturnTo', 'returnToSuggest', 'ret');
         const sel = document.getElementById('categorySelect');
-        sel.innerHTML = '<option value="">-- กรุณาเลือกหมวดการเบิก --</option>';
+        sel.innerHTML = '<option value="">-- กรุณาเลือกชุดเอกสาร --</option>';
         try {
             const res = await fetch(`${API_BASE}/budget-categories`);
             if (res.ok) categories = await res.json();
@@ -4423,7 +4423,7 @@
         if (!_cb[id]) {
             const isPos = id === 'positionOptions';
             _cb[id] = Combobox.attach(inputId, {
-                addLabel: isPos ? 'ตำแหน่ง' : 'ส่วนงาน',
+                addLabel: isPos ? 'บทบาท' : 'ส่วนงาน',
                 // เพิ่มปุ๊บเก็บขึ้นเซิร์ฟเวอร์ปั๊บ ไม่ต้องรอกดบันทึกทั้งใบ
                 // คนถัดไปจะเห็นในรายการทันที และถ้าผู้ใช้ทิ้งฟอร์มไปค่าก็ไม่หาย
                 onCreate: (v) => rememberListValue(
