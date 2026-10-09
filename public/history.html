@@ -694,7 +694,11 @@
                 if(carType === 'ขาไป') fuelDist = distOut;
                 else if(carType === 'ขากลับ') fuelDist = distRet;
                 else if(carType === 'ไป-กลับ') fuelDist = distOut + distRet;
-                const fuelTotal = fuelDist * fRate;
+                /* ใบที่เลือกเหมาจ่าย ต้องใช้ยอดก้อนที่เก็บไว้ตอนกรอก ไม่ใช่คำนวณใหม่จากระยะ
+                   ถ้าใช้สูตรเดิม ยอดรวมท้ายใบจะไม่ตรงกับยอดรายขาที่พิมพ์ไว้ข้างบน
+                   (ชุดทดสอบจับได้ตอนแรก — รายขาถูกแล้ว แต่ยอดรวมยังเป็น 200 แทนที่จะเป็น 600) */
+                const _flat = (meta._fuelMethod === 'flat' && meta._flatRate) ? meta._flatRate : null;
+                const fuelTotal = _flat ? (Number(_flat.total) || 0) : (fuelDist * fRate);
 
                 /* ── วันที่ของแต่ละขาเดินทาง ──
                    เอกสารต้นแบบเขียนวันที่ไว้บรรทัดเดียวกับขาเดินทางนั้น
@@ -711,8 +715,22 @@
 
                 /* ค่าน้ำมันแยกยอดรายขา เอกสารต้นแบบเขียนยอดไว้ที่บรรทัดระยะทางของขานั้น
                    ไม่ใช่ยอดรวมก้อนเดียวคร่อมห้าบรรทัด  สองยอดนี้บวกกันได้ fuelTotal พอดี */
-                const fuelOut = (carType === 'ขาไป'   || carType === 'ไป-กลับ') ? distOut * fRate : 0;
-                const fuelRet = (carType === 'ขากลับ' || carType === 'ไป-กลับ') ? distRet * fRate : 0;
+                /* ค่าพาหนะเหมาจ่าย (บัญชี ๘ ข้อ ๕) — ถ้าใบนี้เลือกวิธีเหมาจ่าย
+                   ต้องพิมพ์ยอดก้อนที่คิดไว้ตอนกรอก ไม่ใช่คำนวณ ระยะ × อัตรา ใหม่
+                   ยอดที่เก็บไว้คือยอดที่ผู้ใช้เห็นและกดยืนยัน ถ้าคิดใหม่ตอนพิมพ์
+                   แล้วแอดมินแก้ตารางทีหลัง ใบเก่าจะเปลี่ยนยอดเองโดยไม่มีใครรู้ */
+                const flatInfo = _flat;
+                const flatLeg = dir => {
+                    if (!flatInfo || !Array.isArray(flatInfo.legs)) return null;
+                    return flatInfo.legs.find(function (l) { return l.dir === dir; }) || null;
+                };
+
+                const fuelOut = flatInfo
+                    ? ((flatLeg('ขาไป') || {}).amount || 0)
+                    : ((carType === 'ขาไป'   || carType === 'ไป-กลับ') ? distOut * fRate : 0);
+                const fuelRet = flatInfo
+                    ? ((flatLeg('ขากลับ') || {}).amount || 0)
+                    : ((carType === 'ขากลับ' || carType === 'ไป-กลับ') ? distRet * fRate : 0);
 
 
                 /* ── ตัวช่วยวาดแถวในใบรับรองค่าพาหนะ ──
@@ -735,10 +753,20 @@
                     '<td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:30px;line-height:1.6;">ถึง</td>' +
                     '<td style="border:none;padding:0;vertical-align:top;width:calc(50% - 30px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;font-size:11.5px;">' + wrapCell(t, 28) + '</td>' +
                     '</tr></table>';
-                const rcDist = km =>
-                    'ระยะทาง &nbsp;<span style="display:inline-block;width:44px;text-align:center;">' + (km || '') + '</span> ก.ม. x ' +
-                    '<span style="display:inline-block;width:24px;text-align:center;">' + (km ? '1' : '') + '</span> เที่ยว x ' +
-                    '<span style="display:inline-block;width:32px;text-align:center;">' + (km ? fRate : '') + '</span> บาท';
+                /* บรรทัดระยะทาง
+                   วิธีคิดตามระยะจริง: ระยะทาง __ ก.ม. x __ เที่ยว x __ บาท  (ตามแบบฟอร์มเดิม)
+                   วิธีเหมาจ่าย: ไม่มีสูตรให้คูณ เขียนช่วงที่เข้าเงื่อนไขแทน ให้คนตรวจเห็นที่มาของยอด */
+                const rcDist = km => {
+                    if (!flatInfo)
+                        return 'ระยะทาง &nbsp;<span style="display:inline-block;width:44px;text-align:center;">' + (km || '') + '</span> ก.ม. x ' +
+                            '<span style="display:inline-block;width:24px;text-align:center;">' + (km ? '1' : '') + '</span> เที่ยว x ' +
+                            '<span style="display:inline-block;width:32px;text-align:center;">' + (km ? fRate : '') + '</span> บาท';
+                    if (!km) return '';
+                    const leg = (flatInfo.legs || []).find(function (l) {
+                        return Math.abs((Number(l.km) || 0) - (Number(km) || 0)) < 0.005; });
+                    return 'ระยะทาง &nbsp;<span style="display:inline-block;width:44px;text-align:center;">' + km + '</span> ก.ม. &nbsp;' +
+                           '(เหมาจ่าย' + (leg && leg.label ? ' — ' + leg.label : '') + ' รวมค่าทางด่วนแล้ว)';
+                };
                 // เอกสารต้นแบบใช้ช่องสี่เหลี่ยมกับ "ประเภทค่าใช้จ่าย" และวงกลมกับ "ทิศทาง"
                 const rcSquare = on => '<span style="font-family:Arial;font-size:15px;vertical-align:middle;">' + (on ? '☑' : '☐') + '</span>';
                 const rcCircle = on => '<span style="font-family:Arial;font-size:18px;vertical-align:middle;">' + (on ? fontCircleCheck : fontCircleEmpty) + '</span>';

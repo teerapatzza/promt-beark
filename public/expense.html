@@ -116,6 +116,8 @@
          ถ้าวัดด้วยฟอนต์อื่น จำนวนบรรทัดที่บอกผู้ใช้จะไม่ตรงกับที่พิมพ์ออกมา -->
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap">
+    <!-- ตัวคำนวณค่าพาหนะเหมาจ่าย ใช้ร่วมกับหน้าแอดมินและฝั่งเซิร์ฟเวอร์ -->
+    <script src="flat-rate.js"></script>
     <link rel="stylesheet" href="theme.css">
     <script src="theme.js"></script>
 </head>
@@ -597,6 +599,27 @@
                     <p id="normalReturnNote" class="text-[11px] text-slate-600 mb-3 px-2.5 py-1.5 rounded-md bg-emerald-50 border border-emerald-200">
                         ขากลับใช้เส้นทางเดิม กลับที่จุดเริ่มต้น — ไม่ต้องกรอกอะไรเพิ่ม
                     </p>
+
+                    <!-- ── วิธีคิดค่าพาหนะรถส่วนตัว (บัญชี ๘) ──
+                         โผล่เฉพาะหมวดที่แอดมินเปิดเหมาจ่ายไว้
+                         ระเบียบห้ามเบิกทั้งสองวิธีในช่วงเดียวกัน จึงเป็นตัวเลือกเดียว ไม่ใช่ติ๊กได้ทั้งคู่ -->
+                    <div id="fuelMethodBox" class="hidden mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+                        <div class="text-xs font-bold text-slate-700 mb-1.5">วิธีคิดค่าพาหนะรถส่วนตัว</div>
+                        <label class="flex items-start gap-2 text-xs text-slate-700 cursor-pointer mb-1">
+                            <input type="radio" name="fuelMethod" value="distance" checked
+                                onchange="onFuelMethodChange()" class="mt-0.5 cursor-pointer">
+                            <span><b>คิดตามระยะทางจริง</b>
+                                <span class="text-slate-500">— ระยะทาง × อัตราต่อกิโลเมตร (ค่าทางด่วนเบิกแยก)</span></span>
+                        </label>
+                        <label class="flex items-start gap-2 text-xs text-slate-700 cursor-pointer">
+                            <input type="radio" name="fuelMethod" value="flat"
+                                onchange="onFuelMethodChange()" class="mt-0.5 cursor-pointer">
+                            <span><b>เหมาจ่าย</b>
+                                <span class="text-slate-500">— คิดเป็นก้อนตามช่วงระยะทาง แยกทีละเที่ยว รวมค่าทางด่วนแล้ว</span></span>
+                        </label>
+                        <div id="flatRateNote" class="hidden mt-2 text-[11px] leading-relaxed"></div>
+                    </div>
+
                     <p class="text-[11px] text-slate-500 mb-3" id="fuelRateNote">
                         ค่าน้ำมัน <b id="fuelRateLabel">—</b> บาท/กม. — อัตรานี้กำหนดโดยผู้ดูแลระบบ แก้ไขไม่ได้
                     </p>
@@ -1213,6 +1236,103 @@
     /* แสดงอัตราค่าน้ำมันที่ใช้จริง พร้อมวิธีคิดแบบที่ตรวจตามได้ด้วยเครื่องคิดเลข
        ยอดค่าน้ำมันเป็นเลขที่ผู้ใช้คำนวณเองในใจได้ ถ้าตัวเลขบนจอไม่ตรงกับที่เขาคิด
        เขาจะไม่รู้ว่าผิดที่ตรงไหน จึงต้องกางให้เห็นทั้งระยะทางและอัตรา */
+
+    /* ══════════ ค่าพาหนะเหมาจ่าย (บัญชี ๘ ข้อ ๕) ══════════
+       ตัวคำนวณอยู่ที่ flat-rate.js ใช้ร่วมกับหน้าแอดมินและฝั่งเซิร์ฟเวอร์
+       ที่นี่ทำแค่สามอย่าง: เปิด/ปิดตัวเลือก · ล็อกช่องค่าทางด่วน · แสดงที่มาของเงิน */
+
+    /** ค่าเหมาจ่ายของหมวดที่เลือกอยู่ (null = หมวดนี้ไม่เปิดให้ใช้) */
+    let flatRateCfg = null;
+
+    function flatMethodOn() {
+        const r = document.querySelector('input[name="fuelMethod"]:checked');
+        return !!(flatRateCfg && r && r.value === 'flat');
+    }
+
+    /** ระยะทางของแต่ละขาที่ใช้คิดเงิน อ่านจากช่องเดียวกับวิธีคิดตามระยะจริง */
+    function currentTrip() {
+        return {
+            distOut: parseFloat(document.getElementById('distOutbound')?.value) || 0,
+            distRet: parseFloat(document.getElementById('distReturn')?.value) || 0,
+            carType: document.getElementById('carType')?.value || 'ไป-กลับ'
+        };
+    }
+
+    function flatResult() {
+        if (!flatRateCfg) return null;
+        const metro = (typeof isMetroTripFE === 'function') ? isMetroTripFE() : { inMetro: null };
+        return FlatRate.tripTotal(currentTrip(), flatRateCfg, metro.inMetro);
+    }
+
+    function onFuelMethodChange() {
+        const flat = flatMethodOn();
+
+        /* อัตราเหมาจ่ายรวมค่าทางด่วนแล้ว ถ้าปล่อยให้กรอกอีกจะเป็นการเบิกซ้ำ
+           ล็อกพร้อมบอกเหตุผล ดีกว่าปล่อยให้กรอกแล้วค่อยตีกลับตอนกดบันทึก */
+        const toll = document.getElementById('tollCost');
+        if (toll) {
+            toll.readOnly = flat;
+            toll.classList.toggle('bg-slate-100', flat);
+            toll.classList.toggle('cursor-not-allowed', flat);
+            toll.title = flat ? 'อัตราเหมาจ่ายรวมค่าทางด่วนแล้ว จึงกรอกเพิ่มไม่ได้' : '';
+            if (flat && parseFloat(toll.value) > 0) toll.value = '';
+        }
+        const tollBox = document.getElementById('costTollBox');
+        if (tollBox) {
+            let hint = document.getElementById('tollLockedHint');
+            if (flat && !hint) {
+                hint = document.createElement('p');
+                hint.id = 'tollLockedHint';
+                hint.className = 'text-[11px] text-amber-700 mt-1';
+                hint.textContent = 'อัตราเหมาจ่ายรวมค่าทางด่วนแล้ว จึงเบิกเพิ่มไม่ได้';
+                tollBox.appendChild(hint);
+            } else if (!flat && hint) hint.remove();
+        }
+
+        // กล่องอธิบายวิธีคิดตามระยะจริง ไม่ต้องโชว์ตอนใช้เหมาจ่าย
+        const fuelNote = document.getElementById('fuelRateNote');
+        if (fuelNote) fuelNote.classList.toggle('hidden', flat);
+
+        showFlatRateNote();
+        if (typeof calculateTravelTotal === 'function') calculateTravelTotal();
+    }
+
+    /** บอกผู้ใช้ว่าเงินก้อนนี้มาจากไหน ทีละเที่ยว ไม่ใช่โชว์แค่ยอดรวม */
+    function showFlatRateNote() {
+        const box = document.getElementById('flatRateNote');
+        if (!box) return;
+        if (!flatMethodOn()) { box.className = 'hidden'; box.innerHTML = ''; return; }
+
+        const r = flatResult();
+        if (!r) { box.className = 'hidden'; return; }
+
+        if (!r.ok) {
+            box.className = 'mt-2 text-[11px] leading-relaxed px-2.5 py-1.5 rounded-md bg-amber-50 border border-amber-200 text-amber-800';
+            box.innerHTML = (r.why || 'ยังคิดเหมาจ่ายไม่ได้') +
+                '<br>ระบบจะใช้วิธีคิดตามระยะทางจริงแทน จนกว่าจะแก้ไขให้เข้าเงื่อนไข';
+            return;
+        }
+        box.className = 'mt-2 text-[11px] leading-relaxed px-2.5 py-1.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-900';
+        box.innerHTML = r.legs.map(function (l) {
+            return l.dir + ' ' + l.km.toFixed(2) + ' กม. → ' + l.label + ' = <b>' +
+                   l.amount.toLocaleString() + '</b> บาท';
+        }).join('<br>') +
+        '<br>รวม <b>' + r.total.toLocaleString() + ' บาท</b> (รวมค่าทางด่วนแล้ว)';
+    }
+
+    /** เปิด/ปิดตัวเลือกตามหมวดที่เลือก */
+    function applyCategoryFlatRate(category) {
+        const cfg = category && category.flatRate;
+        flatRateCfg = (cfg && cfg.enabled) ? cfg : null;
+        const box = document.getElementById('fuelMethodBox');
+        if (box) box.classList.toggle('hidden', !flatRateCfg);
+        if (!flatRateCfg) {
+            const d = document.querySelector('input[name="fuelMethod"][value="distance"]');
+            if (d) d.checked = true;
+        }
+        onFuelMethodChange();
+    }
+
     function showFuelWorking() {
         const rate = parseFloat(document.getElementById('fuelRate')?.value) || 0;
         const lbl = document.getElementById('fuelRateLabel');
@@ -2839,13 +2959,25 @@
         else if(carType === 'ขากลับ') fuelDist = ret;
         else if(carType === 'ไป-กลับ') fuelDist = out + ret;
 
-        const fuelTotal = fuelRate * fuelDist;
+        /* เลือกเหมาจ่ายแล้วใช้ยอดก้อนแทนสูตรระยะ × อัตรา
+           ถ้าเงื่อนไขไม่ผ่าน (เช่นระยะเกินเพดาน) ให้ตกกลับไปคิดตามระยะจริง
+           ไม่ปล่อยให้ยอดเป็นศูนย์เงียบ ๆ ซึ่งผู้ใช้จะไม่รู้ว่าเกิดอะไรขึ้น */
+        let fuelTotal = fuelRate * fuelDist;
+        let usedFlat = false;
+        if (onReceipt && flatMethodOn()) {
+            const fr = flatResult();
+            if (fr && fr.ok) { fuelTotal = fr.total; usedFlat = true; }
+        }
+        window.__flatRateUsed = usedFlat;
         if (typeof showFuelWorking === 'function') showFuelWorking();
+        if (typeof showFlatRateNote === 'function') showFlatRateNote();
 
         const taxiTotal = onReceipt ? getTaxiTotal() : 0;
 
         const air = onReport ? (parseFloat(document.getElementById('airfareCost').value)||0) : 0;
-        const toll = onTravel ? (parseFloat(document.getElementById('tollCost').value)||0) : 0;
+        // อัตราเหมาจ่ายรวมค่าทางด่วนแล้ว นับซ้ำไม่ได้
+        const toll = (onTravel && !window.__flatRateUsed)
+            ? (parseFloat(document.getElementById('tollCost').value)||0) : 0;
         const parking = onTravel ? (parseFloat(document.getElementById('parkingCost')?.value)||0) : 0;
         const other = onTravel ? (parseFloat(document.getElementById('otherCost').value)||0) : 0;
 
@@ -2974,6 +3106,7 @@
         taxiCapCategory = (catTaxi != null && catTaxi > 0) ? catTaxi : Infinity;
         recomputeTaxiCap();
         applyCategoryPdfTemplate(category);
+        applyCategoryFlatRate(category);
 
         // Apply fuel rate from category (if defined by admin)
         const fuelRateInput = document.getElementById('fuelRate');
@@ -3459,7 +3592,9 @@
                 fuelRate:     needTravel  ? (document.getElementById('fuelRate')?.value || 0) : 0,
                 taxiEntries:  needReceipt ? collectTaxiEntries() : [],
                 airAmount:    needReport  ? (document.getElementById('airfareCost')?.value || 0) : 0,
-                tollAmount:    document.getElementById('tollCost')?.value    || 0,
+                // เลือกเหมาจ่ายแล้วค่าทางด่วนรวมอยู่ในอัตราแล้ว ห้ามเก็บยอดซ้ำ
+                tollAmount:    window.__flatRateUsed ? 0
+                               : (document.getElementById('tollCost')?.value || 0),
                 parkingAmount: document.getElementById('parkingCost')?.value || 0,
                 otherAmount:   document.getElementById('otherCost')?.value   || 0
             };
@@ -3467,6 +3602,23 @@
             // ช่องจะถูกซ่อน แต่ยังค้างค่าเดิมไว้จากตอนเลือกหมวดอื่น
             // ส่งค่าค้างไปจะกลายเป็นข้อมูลขยะในใบที่ไม่มีช่องนี้บนกระดาษ
             // ประเภทรถใช้คู่กับระยะทางเพื่อคิดค่าน้ำมัน จึงต้องเก็บทั้งสองใบ
+            /* วิธีคิดค่าพาหนะรถส่วนตัว เก็บไว้เพื่อให้เอกสารพิมพ์ได้ตรงกับที่คิดเงินจริง
+               เก็บรายละเอียดทีละเที่ยวไปด้วย จะได้ไม่ต้องคิดใหม่ตอนออกเอกสาร
+               (ถ้าคิดใหม่แล้วค่าของหมวดถูกแก้ทีหลัง ใบเก่าจะเปลี่ยนยอดเองโดยไม่มีใครรู้) */
+            if (needReceipt && typeof flatMethodOn === 'function' && flatMethodOn()) {
+                const fr = typeof flatResult === 'function' ? flatResult() : null;
+                if (fr && fr.ok) {
+                    metadata._fuelMethod = 'flat';
+                    metadata._flatRate = {
+                        total: fr.total,
+                        legs: fr.legs.map(function (l) {
+                            return { dir: l.dir, km: l.km, amount: l.amount, label: l.label };
+                        })
+                    };
+                }
+            }
+            if (!metadata._fuelMethod) metadata._fuelMethod = 'distance';
+
             metadata._carType = needTravel
                 ? (document.getElementById('carType')?.value || 'ไม่ระบุ')
                 : 'ไม่ระบุ';

@@ -228,6 +228,8 @@
     <!-- ธีม: ความคมชัดของช่องกรอก และโหมดมืด
          theme.js ต้องไม่ใส่ defer เพราะมันตั้งธีมทันทีที่ถูกอ่าน
          ถ้ารอถึง DOMContentLoaded ผู้ใช้จะเห็นหน้าขาววาบก่อนแล้วค่อยมืด -->
+    <!-- ตัวคำนวณค่าพาหนะเหมาจ่าย ใช้ร่วมกับหน้าผู้เบิกและฝั่งเซิร์ฟเวอร์ -->
+    <script src="flat-rate.js"></script>
     <link rel="stylesheet" href="theme.css">
     <script src="theme.js"></script>
 </head>
@@ -517,6 +519,58 @@
                                 </div>
                                 <p class="text-[10px] text-slate-400 mt-0.5">ถ้าไม่กำหนด ผู้ใช้จะสามารถกรอกเองได้</p>
                             </div>
+
+                            <!-- ── ค่าพาหนะเหมาจ่าย (บัญชี ๘ ข้อ ๕) ──
+                                 ทางเลือกแทนการคิดตามระยะทางจริง คิดเป็นก้อนตามช่วงระยะทาง
+                                 อัตรานี้รวมค่าทางด่วนแล้ว ฝั่งผู้เบิกจึงล็อกช่องค่าทางด่วนไว้
+                                 ระเบียบห้ามเบิกทั้งสองวิธีสำหรับการเดินทางช่วงเดียวกัน -->
+                            <div class="md:col-span-2 border border-slate-200 rounded-xl p-3 mt-1">
+                                <label class="flex items-center gap-2 text-xs font-bold text-slate-600 cursor-pointer select-none">
+                                    <input type="checkbox" id="catFlatEnabled" onchange="onFlatEnabledChange()"
+                                        class="w-3.5 h-3.5 cursor-pointer">
+                                    🧾 เปิดให้เลือก "ค่าพาหนะเหมาจ่าย" ในหมวดนี้
+                                </label>
+                                <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                                    ผู้เบิกจะเลือกได้ว่าจะคิดตามระยะทางจริง หรือเหมาจ่ายตามตารางข้างล่าง
+                                    คิดแยกทีละเที่ยว (ไป-กลับ = 2 เที่ยว) และอัตรานี้รวมค่าทางด่วนแล้ว
+                                </p>
+
+                                <div id="catFlatBox" class="mt-3 hidden">
+                                    <div class="flex flex-wrap items-center gap-x-5 gap-y-2 mb-3">
+                                        <label class="text-xs text-slate-600">
+                                            ระยะทางสูงสุดที่ใช้เหมาจ่ายได้
+                                            <input type="number" id="catFlatMaxKm" step="1" min="1" placeholder="200"
+                                                class="w-20 border border-slate-200 px-2 py-1 rounded-lg text-sm ml-1">
+                                            <span class="text-slate-400">กม.</span>
+                                        </label>
+                                        <label class="text-xs text-slate-600">
+                                            นอกเขต กทม.ปริมณฑล เหมาจ่าย
+                                            <input type="number" id="catFlatOutside" step="1" min="0" placeholder="1200"
+                                                class="w-24 border border-slate-200 px-2 py-1 rounded-lg text-sm ml-1">
+                                            <span class="text-slate-400">บาท/เที่ยว</span>
+                                        </label>
+                                    </div>
+
+                                    <table class="w-full text-sm">
+                                        <thead>
+                                            <tr class="text-xs text-slate-500">
+                                                <th class="text-left font-semibold pb-1">ช่วงระยะทาง (กม.)</th>
+                                                <th class="text-left font-semibold pb-1 w-36">อัตรา (บาท/เที่ยว)</th>
+                                                <th class="w-10"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="catFlatBands"></tbody>
+                                    </table>
+                                    <div class="flex items-center gap-2 mt-2">
+                                        <button type="button" onclick="addFlatBand()"
+                                            class="text-xs px-2.5 py-1 rounded-lg border border-slate-200 hover:bg-slate-50">+ เพิ่มช่วง</button>
+                                        <button type="button" onclick="resetFlatBands()"
+                                            class="text-xs px-2.5 py-1 rounded-lg border border-slate-200 hover:bg-slate-50">ใช้ค่าตามระเบียบ</button>
+                                        <span class="text-[11px] text-slate-400">ช่วงสุดท้ายเว้นช่องว่างไว้ = ไม่มีขอบบน</span>
+                                    </div>
+                                </div>
+                            </div>
+
                             <div>
                                 <label class="block text-[11px] font-bold text-slate-500 mb-2 uppercase tracking-wide">เอกสาร PDF ที่สร้าง</label>
                                 <div class="space-y-2 p-3 rounded-xl bg-slate-50 border border-slate-200">
@@ -1435,6 +1489,9 @@
         document.getElementById('catHotelDouble').value = (hotelDouble != null && hotelDouble > 0) ? hotelDouble : '';
         document.getElementById('catHotelDouble').disabled = isHotelDoubleUnlimited;
 
+        // ค่าพาหนะเหมาจ่าย — เอาค่าที่เคยตั้งไว้ขึ้นหน้าจอ
+        fillFlatRate(cat.flatRate);
+
         const rules = getAttachmentRules(cat);
         const order = (cat.attachmentOrder && cat.attachmentOrder.length) ? cat.attachmentOrder : [...ATTACHMENT_IDS];
         renderAttachmentRows(order, rules);
@@ -1588,6 +1645,7 @@
             pdfTemplates: pdfTemplates.length > 0 ? pdfTemplates : undefined,
             taxiMaxPerTrip,
             fuelRate,
+            flatRate: collectFlatRate(),
             hotelRateSingle,
             hotelRateDouble
         };
@@ -2004,6 +2062,76 @@
             if (!res.ok) throw new Error(await explainError(res, remove ? 'ลบอีเมลสำรอง' : 'เพิ่มอีเมลสำรอง'));
             alert((remove ? 'ลบ' : 'เพิ่ม') + 'อีเมลสำรอง ' + target + ' เรียบร้อย');
         } catch (e) { alert(e.message || 'ทำรายการไม่สำเร็จ'); }
+    }
+
+
+    /* ══════════ ค่าพาหนะเหมาจ่าย (บัญชี ๘ ข้อ ๕) ══════════
+       ตั้งรายหมวดงบ เหมือนอัตราค่าน้ำมันและวงเงิน Taxi
+       ตัวคำนวณอยู่ที่ public/flat-rate.js ใช้ร่วมกับฝั่งผู้เบิกและฝั่งเซิร์ฟเวอร์
+       จงใจให้มีที่เดียว เพราะกฎที่เขียนสองที่เคยทำให้สองฝั่งตัดสินไม่ตรงกัน */
+
+    function onFlatEnabledChange() {
+        const on = document.getElementById('catFlatEnabled').checked;
+        document.getElementById('catFlatBox').classList.toggle('hidden', !on);
+        if (on && !document.querySelectorAll('#catFlatBands tr').length) resetFlatBands();
+    }
+
+    function flatBandRow(upTo, amount) {
+        const tr = document.createElement('tr');
+        tr.innerHTML =
+            '<td class="py-1 pr-2"><span class="text-slate-400 text-xs">ไม่เกิน</span> ' +
+            '<input type="number" step="0.01" min="0" value="' + (upTo == null ? '' : upTo) + '" ' +
+            'placeholder="เว้นว่าง = ไม่มีขอบบน" ' +
+            'class="flat-upto w-40 border border-slate-200 px-2 py-1 rounded-lg text-sm"></td>' +
+            '<td class="py-1 pr-2"><input type="number" step="1" min="0" value="' + (amount == null ? '' : amount) + '" ' +
+            'class="flat-amount w-28 border border-slate-200 px-2 py-1 rounded-lg text-sm"></td>' +
+            '<td class="py-1"><button type="button" class="text-rose-500 text-xs px-2 py-1 rounded hover:bg-rose-50">ลบ</button></td>';
+        tr.querySelector('button').onclick = function () { tr.remove(); };
+        return tr;
+    }
+
+    function addFlatBand(upTo, amount) {
+        document.getElementById('catFlatBands').appendChild(flatBandRow(upTo, amount));
+    }
+
+    function resetFlatBands() {
+        const body = document.getElementById('catFlatBands');
+        body.innerHTML = '';
+        FlatRate.DEFAULT.bands.forEach(function (b) { addFlatBand(b.upTo, b.amount); });
+        const mk = document.getElementById('catFlatMaxKm');
+        const out = document.getElementById('catFlatOutside');
+        if (!mk.value)  mk.value  = FlatRate.DEFAULT.maxKm;
+        if (!out.value) out.value = FlatRate.DEFAULT.outsideMetro;
+    }
+
+    /** อ่านค่าจากหน้าจอ -> โครงที่เก็บลงหมวด (undefined = ไม่ต้องเก็บอะไรเลย) */
+    function collectFlatRate() {
+        if (!document.getElementById('catFlatEnabled').checked) return undefined;
+        const bands = [...document.querySelectorAll('#catFlatBands tr')].map(function (tr) {
+            const u = tr.querySelector('.flat-upto').value.trim();
+            const a = parseFloat(tr.querySelector('.flat-amount').value);
+            return { upTo: u === '' ? null : parseFloat(u), amount: isFinite(a) ? a : 0 };
+        }).filter(function (b) { return b.amount > 0 && (b.upTo === null || isFinite(b.upTo)); });
+        if (!bands.length) return undefined;
+        return {
+            enabled: true,
+            maxKm:        parseFloat(document.getElementById('catFlatMaxKm').value)   || FlatRate.DEFAULT.maxKm,
+            outsideMetro: parseFloat(document.getElementById('catFlatOutside').value) || FlatRate.DEFAULT.outsideMetro,
+            bands: bands
+        };
+    }
+
+    /** เอาค่าที่เก็บไว้ขึ้นหน้าจอตอนเปิดหมวดมาแก้ */
+    function fillFlatRate(cfg) {
+        const on = !!(cfg && cfg.enabled);
+        document.getElementById('catFlatEnabled').checked = on;
+        document.getElementById('catFlatMaxKm').value   = cfg && cfg.maxKm        != null ? cfg.maxKm        : '';
+        document.getElementById('catFlatOutside').value = cfg && cfg.outsideMetro != null ? cfg.outsideMetro : '';
+        const body = document.getElementById('catFlatBands');
+        body.innerHTML = '';
+        if (on && Array.isArray(cfg.bands) && cfg.bands.length)
+            cfg.bands.forEach(function (b) { addFlatBand(b.upTo, b.amount); });
+        onFlatEnabledChange();
     }
 
     async function changeRole(userId, role) {
