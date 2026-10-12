@@ -355,3 +355,26 @@
 [data-theme="dark"] { --brand: #9C9CF2; }
 /* ยกเว้นตรงที่เป็นพื้นสีแบรนด์จริง ๆ ซึ่งยังต้องเป็นน้ำเงินเข้มเหมือนเดิม */
 [data-theme="dark"] [style*="--brand"], [data-theme="dark"] .brand-fill { color: inherit; }
+
+/* ═══════════ ฟอนต์ตามอัตลักษณ์ของ สรพ. ═══════════
+   12 ต.ค. 2569 — หัวเรื่องใช้ Kanit เนื้อหาใช้ Prompt ตามคู่มือ CI
+   (เดิมทั้งเว็บใช้ IBM Plex Sans Thai ซึ่งไม่ได้อยู่ในอัตลักษณ์)
+
+   กฎนี้อยู่ที่เดียวเพราะทั้ง 6 หน้าโหลด theme.css อยู่แล้ว
+   ไม่ต้องไล่แก้ทีละหน้าและไม่มีทางตกหล่น
+
+   ⚠ เอกสารราชการต้องเป็น Sarabun เท่านั้น และเอกสารใช้แท็ก <h2> เป็นชื่อเรื่องจริง
+     (ใบรายงานการเดินทาง / ใบรับรองแทนใบเสร็จรับเงิน ใน history.html)
+     ถ้าไม่กันไว้ ชื่อเอกสารจะกลายเป็น Kanit ทันที
+   ⚠ #activityRuler คือไม้บรรทัดที่วัดว่าชื่อกิจกรรมจะตัดกี่บรรทัดบนกระดาษ
+     ต้องวัดด้วยฟอนต์เดียวกับกระดาษ ไม่งั้นพรีวิวจะบอกจำนวนบรรทัดผิด */
+
+h1, h2, h3, h4 { font-family: 'Kanit', 'Prompt', system-ui, sans-serif; }
+
+.pdf-page, .pdf-page h1, .pdf-page h2, .pdf-page h3, .pdf-page h4,
+.doc-preview-inner, .doc-preview-inner h1, .doc-preview-inner h2,
+.doc-preview-inner h3, .doc-preview-inner h4,
+#activityRuler, .act-line {
+    font-family: 'Sarabun', sans-serif;
+}
+

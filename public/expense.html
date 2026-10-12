@@ -7,7 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ทำรายการเบิก — พร้อมเบิก</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
@@ -19,7 +19,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <style>
-        body { font-family: 'IBM Plex Sans Thai', 'IBM Plex Sans', sans-serif; }
+        body { font-family: 'Prompt', 'Kanit', system-ui, -apple-system, sans-serif; }
         .animate-fade-in { animation: fadeIn 0.3s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 
@@ -4619,10 +4619,39 @@
     const PB_BREAKDOWN_ROWS = ['breakdownFuel', 'breakdownHotel', 'breakdownTaxi',
                                'breakdownAir', 'breakdownToll', 'breakdownParking', 'breakdownOther'];
 
-    function pbGoTo(id) {
-        const el = document.getElementById(id);
+    /* กดเช็กลิสต์แล้วต้องไปถึงที่หมายจริง
+       12 ต.ค. 2569 ผู้ใช้แจ้งว่า "กดตามจุดแต่มันไม่ไป มันมั่ว" วัดแล้วเจอสองสาเหตุ
+         1. "ค่าใช้จ่าย" เคยชี้ไป #totalAmount ซึ่งอยู่ในแถบสรุปที่ "ตรึงติดจอ"
+            เลื่อนไปหาจึงไม่เกิดอะไรเลย หน้าค้างอยู่ที่เดิม
+         2. บางเป้าหมายถูกซ่อนตามหมวดที่เลือก scrollIntoView กับของที่ซ่อนอยู่ = ไม่ทำอะไร
+       แก้โดยรับเป้าหมายได้หลายตัว เลือกตัวแรกที่ "มองเห็นได้จริง"
+       และถ้าไม่เจอเลย ให้ไต่ขึ้นไปหาตัวที่มองเห็นได้ที่ใกล้ที่สุด */
+    function pbIsVisible(el) {
+        return !!(el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length));
+    }
+
+    function pbGoTo(ids) {
+        const list = String(ids || '').split(',').map(s => s.trim()).filter(Boolean);
+        let el = null;
+        for (const id of list) {
+            const c = document.getElementById(id);
+            if (c && pbIsVisible(c) && !c.closest('#pbSummary')) { el = c; break; }
+        }
+        if (!el) {
+            // ไม่มีตัวไหนมองเห็นได้ ไต่ขึ้นจากตัวแรกที่มีอยู่จริง
+            let c = list.map(id => document.getElementById(id)).find(Boolean);
+            while (c && c !== document.body && !pbIsVisible(c)) c = c.parentElement;
+            if (c && c !== document.body && !c.closest('#pbSummary')) el = c;
+        }
         if (!el) return;
+
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+        // กระพริบขอบให้รู้ว่ามาถึงตรงไหน ไม่งั้นผู้ใช้ไม่แน่ใจว่าเลื่อนไปถูกที่ไหม
+        el.style.transition = 'box-shadow .25s';
+        el.style.boxShadow = '0 0 0 3px rgba(207,149,43,.55)';
+        setTimeout(() => { el.style.boxShadow = ''; }, 1400);
+
         if (el.tagName === 'INPUT' && !el.disabled) setTimeout(() => el.focus(), 450);
     }
 
@@ -4651,14 +4680,16 @@
             const mapOn = !!document.getElementById('useAppMapImage')?.checked;
 
             const items = [
+                /* go รับได้หลายเป้าหมาย คั่นด้วยจุลภาค pbGoTo จะเลือกตัวแรกที่มองเห็นได้จริง
+                   เพราะหลายกล่องถูกซ่อนตามชุดเอกสารที่หมวดนั้นกำหนด */
                 { go: 'requestedBy', title: 'ผู้ขอเบิก',
                   value: name || 'ยังไม่ได้กรอก', ok: !!name, sub: sub1 },
-                { go: 'dateStart', title: 'ช่วงเวลาเดินทาง',
+                { go: 'dateStart,travelTimeBox,categorySelect', title: 'ช่วงเวลาเดินทาง',
                   value: trip || 'ยังไม่ได้ระบุ', ok: !!trip, sub: '' },
-                { go: 'totalAmount', title: 'ค่าใช้จ่าย',
+                { go: 'costHotelBox,travelDetailsBox,categorySelect', title: 'ค่าใช้จ่าย',
                   value: lines.length ? (lines.length + ' รายการ') : 'ยังไม่มีรายการ',
                   ok: lines.length > 0, sub: '' },
-                { go: 'evidenceBox', title: 'เอกสารแนบ',
+                { go: 'evidenceBox,existingAttachList,categorySelect', title: 'เอกสารแนบ',
                   value: files ? (files + ' ไฟล์') : (mapOn ? 'ใช้แผนที่จากระบบ' : 'ยังไม่ได้แนบ'),
                   ok: files > 0 || mapOn, sub: (files && mapOn) ? '+ แผนที่จากระบบ' : '' }
             ];

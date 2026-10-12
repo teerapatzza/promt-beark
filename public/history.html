@@ -7,7 +7,7 @@
     <title>ประวัติการเบิก — พร้อมเบิก</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Prompt = หน้าจอ / Sarabun = เอกสาร PDF ราชการ (ห้ามเปลี่ยน) -->
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&family=Prompt:wght@300;400;500;600&family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <!-- ใช้วาดแผนที่เส้นทางลงเอกสารตอนพิมพ์ (ไม่ได้เก็บรูปไว้ในฐานข้อมูล) -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -15,7 +15,7 @@
     <!-- โหลด html2canvas ตรงๆ ไม่พึ่ง bundle ของ html2pdf ซึ่งอาจไม่เผยเป็นตัวแปรสาธารณะ -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
-        body { font-family: 'IBM Plex Sans Thai', 'IBM Plex Sans', sans-serif; }
+        body { font-family: 'Prompt', 'Kanit', system-ui, -apple-system, sans-serif; }
         /* กล่องซ่อนเอกสารก่อนแปลงเป็น PDF
            top ต้องเป็น 0 ห้ามใช้ 200% หรือค่าอื่นที่ไม่ใช่ศูนย์
            html2pdf อ่านตำแหน่งแนวตั้งของก้อนเอกสารไปคำนวณว่าจะขึ้นหน้าใหม่ตรงไหน
@@ -1499,7 +1499,8 @@
            และ load() ถ้าไม่ระบุข้อความ จะใช้ข้อความทดสอบภาษาอังกฤษ
            คำสั่งเดิมจึงดึงมาแค่ชุดละติน ส่วนชุดอักษรไทยยังไม่ถูกขอ
 
-           ซ้ำร้าย หน้าเว็บทั้งหน้าใช้ IBM Plex Sans Thai ส่วนเอกสารใช้ Sarabun
+           ซ้ำร้าย หน้าเว็บทั้งหน้าใช้ฟอนต์คนละตัวกับเอกสาร (เดิม IBM Plex Sans Thai
+           ตั้งแต่ 12 ต.ค. 2569 เป็น Prompt/Kanit) ส่วนเอกสารใช้ Sarabun
            ชุดอักษรไทยของ Sarabun จึงไม่เคยถูกโหลดเลยตลอดอายุหน้าเว็บ
            จนกว่าจะแทรกเอกสารลงไป แล้วมันก็มาไม่ทัน html2canvas
 
