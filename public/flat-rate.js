@@ -117,7 +117,10 @@
             else if (!bad) bad = r.why;
         });
 
-        return { total: total, legs: legs, ok: legs.length > 0 && !bad, why: bad };
+        // ไม่มีเที่ยวเลย = ยังไม่ได้เลือกพาหนะ ต้องบอกให้ชัด
+        // เดิมคืน why ว่าง หน้าจอเลยขึ้นข้อความสำรองที่ไม่บอกอะไร ผู้ใช้ไม่รู้ว่าต้องทำอะไรต่อ
+        var why = bad || (legs.length ? '' : 'ยังไม่ได้เลือกพาหนะของเที่ยวเดินทาง (รถส่วนตัว หรือ Taxi)');
+        return { total: total, legs: legs, ok: legs.length > 0 && !bad, why: why };
     }
 
     return {

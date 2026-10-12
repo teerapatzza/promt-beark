@@ -984,6 +984,19 @@
                                 </div>
                             </div>
 
+                            <!-- วงเงิน Taxi นอกเขต กทม.ปริมณฑล — บัญชี ๘ ข้อ ๑ กำหนดไม่เกิน ๑,๒๐๐ บาท -->
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center p-5 bg-gradient-to-r from-slate-50 to-white rounded-2xl border-2 border-slate-200 shadow-sm">
+                                <div>
+                                    <label class="block text-sm font-bold text-slate-700">🚕 ค่าแท็กซี่สูงสุด (นอกเขต)</label>
+                                    <p class="text-xs text-slate-500 mt-1">นอกเขต กทม.และปริมณฑล · ประกาศกำหนดไม่เกิน 1,200</p>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <input type="number" id="setting-taxiMaxOutsidePerTrip" step="1" min="0"
+                                        class="input-glow w-full border-2 border-slate-200 px-4 py-3 rounded-xl text-base font-bold outline-none transition-all duration-300 bg-white/80 hover:bg-white hover:border-slate-300">
+                                    <span class="text-base text-slate-700 whitespace-nowrap font-semibold">บาท/เที่ยว</span>
+                                </div>
+                            </div>
+
                             <!-- Hotel Rate Single -->
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center p-5 bg-gradient-to-r from-slate-50 to-white rounded-2xl border-2 border-slate-200 shadow-sm">
                                 <div>
@@ -2218,8 +2231,9 @@
             const settings = await res.json();
 
             // Populate form
-            document.getElementById('setting-fuelRate').value = settings.fuelRate || 4;
+            document.getElementById('setting-fuelRate').value = settings.fuelRate || 5;
             document.getElementById('setting-taxiMaxPerTrip').value = settings.taxiMaxPerTrip || 300;
+            document.getElementById('setting-taxiMaxOutsidePerTrip').value = settings.taxiMaxOutsidePerTrip || 1200;
             document.getElementById('setting-hotelRateSingle').value = settings.hotelRateSingle || 1500;
             document.getElementById('setting-hotelRateDouble').value = settings.hotelRateDouble || 1000;
 
@@ -2248,8 +2262,9 @@
         successBox.classList.add('hidden');
 
         const settings = {
-            fuelRate: parseFloat(document.getElementById('setting-fuelRate').value) || 4,
+            fuelRate: parseFloat(document.getElementById('setting-fuelRate').value) || 5,
             taxiMaxPerTrip: parseInt(document.getElementById('setting-taxiMaxPerTrip').value) || 300,
+                taxiMaxOutsidePerTrip: parseInt(document.getElementById('setting-taxiMaxOutsidePerTrip').value) || 1200,
             hotelRateSingle: parseInt(document.getElementById('setting-hotelRateSingle').value) || 1500,
             hotelRateDouble: parseInt(document.getElementById('setting-hotelRateDouble').value) || 1000,
             positionList: window.positionList || []
@@ -2334,8 +2349,9 @@
 
         try {
             const settings = {
-                fuelRate: parseFloat(document.getElementById('setting-fuelRate').value) || 4,
+                fuelRate: parseFloat(document.getElementById('setting-fuelRate').value) || 5,
                 taxiMaxPerTrip: parseInt(document.getElementById('setting-taxiMaxPerTrip').value) || 300,
+                taxiMaxOutsidePerTrip: parseInt(document.getElementById('setting-taxiMaxOutsidePerTrip').value) || 1200,
                 hotelRateSingle: parseInt(document.getElementById('setting-hotelRateSingle').value) || 1500,
                 hotelRateDouble: parseInt(document.getElementById('setting-hotelRateDouble').value) || 1000,
                 positionList: window.positionList || [],
@@ -2414,8 +2430,9 @@
     async function autoSaveAffiliations() {
         try {
             const settings = {
-                fuelRate: parseFloat(document.getElementById('setting-fuelRate').value) || 4,
+                fuelRate: parseFloat(document.getElementById('setting-fuelRate').value) || 5,
                 taxiMaxPerTrip: parseInt(document.getElementById('setting-taxiMaxPerTrip').value) || 300,
+                taxiMaxOutsidePerTrip: parseInt(document.getElementById('setting-taxiMaxOutsidePerTrip').value) || 1200,
                 hotelRateSingle: parseInt(document.getElementById('setting-hotelRateSingle').value) || 1500,
                 hotelRateDouble: parseInt(document.getElementById('setting-hotelRateDouble').value) || 1000,
                 positionList: window.positionList || [],

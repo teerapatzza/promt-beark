@@ -199,13 +199,21 @@ try {
   ok('หมุดอยู่ใน กทม. → วงเงินค่า Taxi 600 บาทถูกบังคับ',
      p4.shown === true && /600/.test(p4.text), p4.text.slice(0, 80));
 
+  /* 12 ต.ค. 2569 — ข้อนี้เคยคาดว่า "ออกนอก กทม. แล้ววงเงินไม่บังคับ"
+     ซึ่งหลุดจากประกาศ บัญชี ๘ ข้อ ๑ ที่กำหนดนอกเขตไว้ไม่เกิน ๑,๒๐๐ บาท/เที่ยว
+     เจ้าของระบบสั่งให้ยึดตามประกาศ จึงแก้ค่าที่คาดหวังตามนโยบายใหม่
+     ไม่ใช่แก้เพื่อให้เทสต์ผ่าน */
   const p5 = await ev([
     "setPoint('to'," + CNX[0] + "," + CNX[1] + ",'เชียงใหม่','exact','user');",
     "await new Promise(r=>setTimeout(r,400));",
     "recomputeTaxiCap();",
-    "return !document.getElementById('taxiCapNote').classList.contains('hidden');"
+    "return { shown: !document.getElementById('taxiCapNote').classList.contains('hidden'),",
+    "         text: document.getElementById('taxiCapNote').textContent.replace(/\s+/g,' ').trim() };"
   ].join('\n'));
-  ok('ย้ายหมุดออกนอก กทม. → วงเงินไม่บังคับแล้ว', p5 === false);
+  ok('ย้ายหมุดออกนอก กทม. → ยังมีวงเงิน 1,200 บาทตามบัญชี ๘ ข้อ ๑',
+     p5.shown === true && /1,200/.test(p5.text), p5.text.slice(0, 90));
+  ok('ข้อความบอกว่าเป็นการเดินทางนอกเขต ไม่ใช่ในเขต',
+     /นอกเขต/.test(p5.text), p5.text.slice(0, 90));
 
   const p6 = await ev([
     "setPoint('to'," + BKK_B[0] + "," + BKK_B[1] + ",'จุดหมาย','exact','user');",

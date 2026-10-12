@@ -33,7 +33,7 @@ function _renderUserBar(user) {
   bar.id = 'auth-user-bar';
   bar.style.cssText = `
     position: fixed; top: 0; right: 0; left: 0;
-    height: 40px; background: #1a237e; color: #fff;
+    height: 52px; background: #1a237e; color: #fff;
     display: flex; align-items: center; padding: 0 16px;
     font-family: 'Segoe UI', sans-serif; font-size: 13px;
     z-index: 9999; gap: 10px;
@@ -45,15 +45,15 @@ function _renderUserBar(user) {
   ">${roleLabels[user.role] || user.role}</span>`;
 
   bar.innerHTML = `
-    <span style="flex:1;display:flex;align-items:center;gap:8px;font-weight:600;">
-      <span style="flex:none;height:28px;padding:0 6px;border-radius:7px;background:#fff;display:inline-flex;align-items:center"
+    <span style="flex:1;display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px;letter-spacing:.2px;">
+      <span style="flex:none;height:38px;padding:0 8px;border-radius:9px;background:#fff;display:inline-flex;align-items:center"
             title="สถาบันรับรองคุณภาพสถานพยาบาล (องค์การมหาชน)">
         <img src="ha-logo.png" alt="สถาบันรับรองคุณภาพสถานพยาบาล (องค์การมหาชน)"
-             style="height:22px;width:auto;object-fit:contain;display:block"
+             style="height:30px;width:auto;object-fit:contain;display:block"
              onerror="this.parentElement.style.display='none'">
       </span>
-      <span style="width:1px;height:18px;background:rgba(255,255,255,.3);flex:none"></span>
-      <img src="app-logo.png" alt="" style="height:24px;width:24px;object-fit:contain;border-radius:5px;background:#fff;flex:none"
+      <span style="width:1px;height:24px;background:rgba(255,255,255,.3);flex:none"></span>
+      <img src="app-logo.png" alt="" style="height:32px;width:32px;object-fit:contain;border-radius:7px;background:#fff;flex:none"
            onerror="this.style.display='none'">
       พร้อมเบิก
     </span>
@@ -74,7 +74,7 @@ function _renderUserBar(user) {
   document.body.insertBefore(bar, document.body.firstChild);
 
   const style = document.createElement('style');
-  style.textContent = 'body { padding-top: 40px !important; }';
+  style.textContent = 'body { padding-top: 52px !important; }';
   document.head.appendChild(style);
 
   _showVersionBadge(bar);

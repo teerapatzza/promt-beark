@@ -133,9 +133,11 @@
                 grid-row: 1 / span 12;
                 align-self: start;
                 position: sticky;
-                top: 84px;                      /* ต่ำกว่าแถบบนที่ sticky อยู่แล้ว */
+                /* ต้องพ้นทั้งแถบผู้ใช้ (fixed 52px) และแถบหัวของหน้า (sticky สูง 67px)
+                   วัดจากเบราว์เซอร์จริง 52 + 67 = 119 เผื่อช่องไฟอีก 8 */
+                top: 127px;
                 margin-bottom: 0;
-                max-height: calc(100vh - 104px);
+                max-height: calc(100vh - 147px);
                 overflow-y: auto;               /* รายละเอียดยาวเกินจอ ให้เลื่อนในกล่อง */
                 overscroll-behavior: contain;
             }
@@ -169,6 +171,62 @@
         @media print {
             body::before { display: none; }
         }
+
+        /* ปุ่มย้อนกลับ ชิดมุมซ้ายของจอ ไม่ตามกรอบกึ่งกลางของเนื้อหา
+           แถบหัวเป็น sticky จึงเป็นตัวตั้งต้นของตำแหน่งนี้อยู่แล้ว ไม่ต้องใส่ relative เพิ่ม */
+        .pb-back {
+            position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+            display: grid; place-items: center; width: 40px; height: 40px;
+        }
+        /* จอแคบ กรอบเนื้อหาชิดขอบอยู่แล้ว ปุ่มลอยจะไปทับหัวเรื่อง
+           ให้แถบหัวเป็นแถวเดียวกัน ปุ่มกับหัวเรื่องจึงอยู่บรรทัดเดียวกันเหมือนเดิม */
+        @media (max-width: 820px) {
+            header.sticky { display: flex; align-items: center; }
+            .pb-back { position: static; transform: none; flex: none; margin-left: 4px; }
+            header.sticky > div.max-w-6xl { flex: 1; min-width: 0; padding-left: 8px; }
+        }
+
+        /* ───── กล่องสรุปยอด แต่งตามอัตลักษณ์ สรพ. ─────
+           หัวกล่องเป็นกรมท่าไล่สี ตัวเลขสีขาว หน่วยเป็นทอง มีเส้นทองคาดใต้
+           วัดแล้ว ขาวบนกรมท่า #031A52 = 16.49:1 · ฟ้าอ่อน #A4D2F6 บนกรมท่า = 10.31:1
+           · ทอง #F4DD79 บนกรมท่า = 13.82:1 ผ่านเกณฑ์อ่านออก 4.5:1 ทุกคู่
+
+           ตัวเลือกด้วย id ชนะคลาสของ Tailwind อยู่แล้ว จึงไม่ต้องใช้ !important */
+        #pbSummary {
+            padding: 0;
+            overflow: hidden;
+            border: none;
+            border-radius: 20px;
+            box-shadow: 0 0 0 1px rgba(207, 149, 43, .5), 0 10px 30px rgba(3, 26, 82, .10);
+        }
+        .pb-sum-head {
+            background: linear-gradient(180deg, #0B2A6E 0%, #031A52 100%);
+            color: #fff;
+            padding: 18px 20px 16px;
+            position: relative;
+        }
+        .pb-sum-head::after {
+            content: ""; position: absolute; left: 20px; right: 20px; bottom: 12px; height: 2px;
+            background: linear-gradient(90deg, #CF952B 0%, #F4DD79 60%, rgba(244, 221, 121, 0) 100%);
+        }
+        .pb-sum-label { font-size: 12px; color: #A4D2F6; font-weight: 500; }
+        #pbSummary #totalAmount { color: #fff; margin-bottom: 14px; font-variant-numeric: tabular-nums; }
+        #pbSummary #totalAmount span { color: #F4DD79; }
+
+        /* เนื้อในกล่องต้องมีระยะขอบของตัวเอง เพราะถอด padding ของกล่องออกไปแล้ว */
+        #pbSummary > #breakdownContainer,
+        #pbSummary > #pbChecklist,
+        #pbSummary > p,
+        #pbSummary > #validationErrors,
+        #pbSummary > #submitBtn {
+            margin-left: 18px; margin-right: 18px;
+        }
+        /* ปุ่มเป็น inline-block ถ้าปล่อย width:auto จะหดเท่าตัวหนังสือ
+           ต้องสั่งให้เป็นบล็อกแล้วหักระยะขอบสองข้างออกเอง */
+        #pbSummary > #submitBtn {
+            display: block; width: calc(100% - 36px); margin-bottom: 18px;
+        }
+        [data-theme="dark"] #pbSummary { box-shadow: 0 0 0 1px rgba(207, 149, 43, .4), 0 10px 30px rgba(0, 0, 0, .45); }
 
         /* ───── หัวการ์ดตามอัตลักษณ์ของ สรพ. ─────
            คู่มือ CI กำหนดกรมท่า #031A52 เป็นสีหัวเรื่อง และมีเส้นทองคาดใต้หัวข้อ
@@ -226,13 +284,15 @@
 
     <!-- Sticky header -->
     <header class="bg-white border-b border-slate-200 sticky top-0 z-20">
+        <!-- ปุ่มย้อนกลับอยู่นอกกรอบกึ่งกลาง เพื่อให้ชิดมุมซ้ายของจอจริง
+             แถบหัวเป็น sticky อยู่แล้ว ปุ่มจึงเลื่อนตามหน้าไปด้วย -->
+        <a href="index.html" title="กลับหน้าหลัก" aria-label="กลับหน้าหลัก"
+           class="pb-back text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition-colors rounded-lg">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+            </svg>
+        </a>
         <div class="max-w-6xl mx-auto px-6 py-4 flex items-center gap-3">
-            <a href="index.html" class="text-slate-400 hover:text-slate-700 transition-colors p-1 -m-1 rounded-lg">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
-                </svg>
-            </a>
-            <div class="h-5 w-px bg-slate-200"></div>
             <div>
                 <h1 id="pageTitle" class="text-base font-bold text-slate-800 leading-none">ทำรายการขอเบิกงบประมาณ</h1>
                 <p class="text-xs text-slate-400 mt-0.5">ระบบคำนวณยอดเงินอัตโนมัติตามโครงสร้างของ สรพ.</p>
@@ -921,11 +981,11 @@
         </div>
 
         <div id="pbSummary" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-10">
-            <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-6 flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
+            <div class="pb-sum-head">
                 <div>
-                    <span class="block text-emerald-800 font-bold text-lg">ยอดเงินที่ขอเบิกครั้งนี้</span>
+                    <span class="block pb-sum-label">ยอดเงินที่ขอเบิกครั้งนี้</span>
                 </div>
-                <div class="text-4xl font-black text-emerald-700 tracking-tight" id="totalAmount" data-value="0">0.00 <span class="text-2xl">฿</span></div>
+                <div class="text-4xl font-black tracking-tight" id="totalAmount" data-value="0">0.00 <span class="text-2xl">฿</span></div>
             </div>
 
             <!-- Breakdown ยอดย่อย -->
@@ -1368,12 +1428,35 @@
         return !!(flatRateCfg && r && r.value === 'flat');
     }
 
-    /** ระยะทางของแต่ละขาที่ใช้คิดเงิน อ่านจากช่องเดียวกับวิธีคิดตามระยะจริง */
+    /** ระยะทางของแต่ละขาที่ใช้คิดเงิน อ่านจากช่องเดียวกับวิธีคิดตามระยะจริง
+
+        12 ต.ค. 2569 — เดิมอ่าน #carType ซึ่งคิดจากติ๊ก "รถส่วนตัว" อย่างเดียว
+        ติ๊กแต่ Taxi จึงได้ "ไม่ระบุ" แล้วเหมาจ่ายไม่สร้างเที่ยวเลย ยอดเป็น 0
+
+        ประกาศ บัญชี ๘ ข้อ ๕ เขียนว่า "ค่าพาหนะเดินทางเหมาจ่าย ... ระยะทางเฉลี่ย
+        ตามการคำนวณของสถาบัน" ไม่ได้ผูกกับชนิดพาหนะ เหมาจ่ายจึงเป็นทางเลือก
+        ของ "เที่ยวเดินทาง" ขานั้นเดินทางด้วยอะไรก็นับเป็นเที่ยวที่เบิกได้
+
+        #carType ตัวเดิมไม่ถูกแตะ เพราะเอกสารกับการคิดค่าน้ำมันยังอ่านมันอยู่
+
+        และต้อง "เพิ่ม ไม่ตัด" — ยังนับ #carType เป็นหลักฐานของเที่ยวด้วย
+        ตอนเปิดใบเก่ามาแก้ ระบบกู้ #carType คืนก่อน แล้ว syncLegCardsFromForm()
+        ค่อยตามไปติ๊กการ์ดให้ (ดูคอมเมนต์เตือนเรื่องลำดับที่ prefill)
+        ถ้าดูแต่ติ๊กการ์ด ช่วงจังหวะนั้นจะได้ศูนย์เที่ยวแล้วยอดหายไปทั้งใบ */
     function currentTrip() {
+        const on = id => !!document.getElementById(id)?.checked;
+        const car = document.getElementById('carType')?.value || '';
+        const outUsed  = on('legOutCar')  || on('legOutTaxi')  || car === 'ขาไป'   || car === 'ไป-กลับ';
+        // เคสปกติ ติ๊กขาไปมีผลทั้งสองขา (การ์ดขากลับถูกซ่อน) กรณีพิเศษแต่ละขาติ๊กเอง
+        const backUsed = (isNormalTrip() && (on('legOutCar') || on('legOutTaxi')))
+                      || on('legBackCar') || on('legBackTaxi')
+                      || car === 'ขากลับ' || car === 'ไป-กลับ';
         return {
             distOut: parseFloat(document.getElementById('distOutbound')?.value) || 0,
             distRet: parseFloat(document.getElementById('distReturn')?.value) || 0,
-            carType: document.getElementById('carType')?.value || 'ไป-กลับ'
+            carType: (outUsed && backUsed) ? 'ไป-กลับ'
+                   : outUsed  ? 'ขาไป'
+                   : backUsed ? 'ขากลับ' : 'ไม่ระบุ'
         };
     }
 
@@ -1381,6 +1464,31 @@
         if (!flatRateCfg) return null;
         const metro = (typeof isMetroTripFE === 'function') ? isMetroTripFE() : { inMetro: null };
         return FlatRate.tripTotal(currentTrip(), flatRateCfg, metro.inMetro);
+    }
+
+    /* เลือกเหมาจ่ายแล้ว ค่าโดยสาร Taxi ต้องกรอกไม่ได้
+       ประกาศ บัญชี ๘ หมายเหตุท้ายบัญชี: "ห้ามเบิกทั้งสองวิธีสำหรับการเดินทางช่วงเดียวกัน"
+       และอัตราเหมาจ่ายระบุว่า "รวมค่าทางด่วน/เที่ยว" อยู่แล้ว
+       ถ้าปล่อยให้กรอก ยอดจะถูกบวกซ้ำโดยที่ผู้ใช้ไม่รู้ตัว
+       เรียกทั้งตอนสลับวิธีคิด และตอนเพิ่มเที่ยว Taxi ใหม่ แถวที่เพิ่งสร้างจะได้ถูกล็อกด้วย */
+    function applyFlatLockToTaxi() {
+        const flat = flatMethodOn();
+        document.querySelectorAll('.taxi-amt-out, .taxi-amt-ret').forEach(inp => {
+            inp.readOnly = flat;
+            inp.classList.toggle('bg-slate-100', flat);
+            inp.classList.toggle('cursor-not-allowed', flat);
+            inp.title = flat ? 'เลือกเหมาจ่ายอยู่ — อัตราเหมาจ่ายรวมค่าโดยสารแล้ว กรอกเพิ่มไม่ได้' : '';
+            if (flat && parseFloat(inp.value) > 0) inp.value = '';
+        });
+        document.querySelectorAll('.taxi-entry').forEach(row => {
+            let hint = row.querySelector('.taxi-flat-hint');
+            if (flat && !hint) {
+                hint = document.createElement('p');
+                hint.className = 'taxi-flat-hint text-[11px] text-amber-700 mt-1';
+                hint.textContent = 'เลือกเหมาจ่ายอยู่ — คิดตามช่วงระยะทาง ไม่ต้องกรอกค่าโดยสาร';
+                row.appendChild(hint);
+            } else if (!flat && hint) hint.remove();
+        });
     }
 
     function onFuelMethodChange() {
@@ -1412,6 +1520,7 @@
         const fuelNote = document.getElementById('fuelRateNote');
         if (fuelNote) fuelNote.classList.toggle('hidden', flat);
 
+        applyFlatLockToTaxi();
         showFlatRateNote();
         if (typeof calculateTravelTotal === 'function') calculateTravelTotal();
     }
@@ -1489,10 +1598,18 @@
     /* วันเดินทางด้านบนเปลี่ยน แถว Taxi ที่ยังไม่เคยถูกแก้เองต้องตามไปด้วย
        แถวที่ผู้ใช้แก้วันเองไว้แล้ว ห้ามเขียนทับ ไม่งั้นของที่ตั้งใจกรอกจะหายเงียบๆ */
     function syncTaxiDatesFromLegs() {
-        const apply = (listId, dir) => {
+        /* 12 ต.ค. 2569 — เดิมยัดวันตาม "รายการที่แถวนั้นอยู่" ไม่ได้ดูทิศทางของแถวเอง
+           เคสไป-กลับตามปกติ แถวขาไปกับขากลับอยู่รายการเดียวกัน (taxiEntriesList)
+           แถวขากลับจึงได้วันไปเสมอ และไม่มีทางตามวันกลับได้เลย
+           พอผู้ใช้เลื่อนช่วงเดินทาง วันในแถวขากลับค้าง แล้วไปโดนด่านตรวจตอนกดบันทึก
+           ซึ่งวันที่นี้ถูกพิมพ์ลงใบรับรองค่าพาหนะที่ส่งการเงิน */
+        const apply = (listId, fallbackDir) => {
             document.querySelectorAll('#' + listId + ' .taxi-entry').forEach(row => {
                 const dt = row.querySelector('.taxi-date');
-                if (dt && dt.dataset.touched !== '1') dt.value = legDateFor(dir);
+                if (!dt || dt.dataset.touched === '1') return;   // ผู้ใช้ตั้งเอง ห้ามเขียนทับ
+                const dir = row.querySelector('.taxi-dir')?.value || fallbackDir;
+                // แถว "ไป-กลับ" แถวเดียวครอบสองขา ใช้วันออกเดินทางเป็นวันของแถว
+                dt.value = legDateFor(dir === 'ขากลับ' ? 'ขากลับ' : 'ขาไป');
             });
         };
         apply('taxiEntriesList', 'ขาไป');
@@ -2705,6 +2822,8 @@
             if (typeof onTaxiDirChange === 'function') onTaxiDirChange(sel);
         }
         showTaxiCap();   // แถวที่เพิ่งเพิ่มต้องเห็นวงเงินด้วย
+        // ถ้ากำลังใช้เหมาจ่ายอยู่ แถวที่เพิ่งเพิ่มต้องถูกล็อกตั้งแต่แรก
+        if (typeof applyFlatLockToTaxi === 'function') applyFlatLockToTaxi();
     }
 
     function onTaxiDirChange(select) {
@@ -2946,7 +3065,15 @@
     /** คิดวงเงินที่ใช้จริงตอนนี้ แล้วอัปเดตหน้าจอ — เรียกทุกครั้งที่หมุดหรือหมวดเปลี่ยน */
     function recomputeTaxiCap() {
         const m = isMetroTripFE();
-        taxiMaxPerTrip = m.inMetro ? taxiCapCategory : Infinity;
+        /* ประกาศ บัญชี ๘ ข้อ ๑ กำหนดเพดานไว้ทั้งสองพื้นที่
+             ในเขต กทม.ปริมณฑล  ไม่เกิน ๗๕๐ บาท  (หมวดงบประมาณตั้งทับได้)
+             นอกเขต              ไม่เกิน ๑,๒๐๐ บาท
+           เดิมนอกเขตปล่อยเป็น Infinity คือไม่มีเพดานเลย ซึ่งหลุดจากประกาศ
+           ค่านอกเขตอ่านจากการตั้งค่าระบบ ผู้ดูแลปรับได้ ไม่ได้ฝังตายในโค้ด */
+        const outside = Number(window.appSettings?.taxiMaxOutsidePerTrip);
+        taxiMaxPerTrip = m.inMetro
+            ? taxiCapCategory
+            : (outside > 0 ? outside : 1200);
         showTaxiCap(m);
     }
 
@@ -2957,8 +3084,11 @@
         const note = document.getElementById('taxiCapNote');
         if (note) {
             note.classList.toggle('hidden', !has);
+            // นอกเขตก็มีเพดานตามบัญชี ๘ ข้อ ๑ แล้ว ข้อความต้องบอกพื้นที่ให้ตรง
+            // ไม่งั้นคนเดินทางนอกเขตจะเห็นว่า "เดินทางใน กทม.ปริมณฑล" ซึ่งไม่จริง
             note.innerHTML = has
-                ? 'เดินทางใน กทม.ปริมณฑล — วงเงินค่า Taxi <b>ไม่เกิน ' + taxiMaxPerTrip.toLocaleString() +
+                ? (m.inMetro ? 'เดินทางใน กทม.ปริมณฑล' : 'เดินทางนอกเขต กทม.ปริมณฑล') +
+                  ' — วงเงินค่า Taxi <b>ไม่เกิน ' + taxiMaxPerTrip.toLocaleString() +
                   ' บาทต่อเที่ยว</b> กรอกเกินจะบันทึกไม่ได้'
                 : '';
         }
@@ -3134,7 +3264,11 @@
         if (typeof showFuelWorking === 'function') showFuelWorking();
         if (typeof showFlatRateNote === 'function') showFlatRateNote();
 
-        const taxiTotal = onReceipt ? getTaxiTotal() : 0;
+        /* เลือกเหมาจ่ายแล้วห้ามบวกค่าโดยสาร Taxi ซ้ำ
+           ประกาศ บัญชี ๘ หมายเหตุ: "ห้ามเบิกทั้งสองวิธีสำหรับการเดินทางช่วงเดียวกัน"
+           ช่องค่าโดยสารถูกล็อกไว้แล้วที่ applyFlatLockToTaxi แต่กันอีกชั้นตรงนี้
+           เผื่อมีค่าค้างจากตอนที่ยังไม่ได้เลือกเหมาจ่าย */
+        const taxiTotal = (onReceipt && !usedFlat) ? getTaxiTotal() : 0;
 
         const air = onReport ? (parseFloat(document.getElementById('airfareCost').value)||0) : 0;
         // อัตราเหมาจ่ายรวมค่าทางด่วนแล้ว นับซ้ำไม่ได้
@@ -4743,8 +4877,10 @@
             box.innerHTML = items.map(it =>
                 '<button type="button" onclick="pbGoTo(\'' + it.go + '\')" ' +
                 'class="w-full text-left flex items-start gap-2.5 px-2 py-1.5 rounded-lg hover:bg-slate-50 transition-colors">' +
+                  // วงกลมทึบแบบดีไซน์ วัดแล้ว ขาวบน emerald-700 = 5.48:1 ผ่านเกณฑ์
+                  // (emerald-600 ได้ 3.77 และเขียวของ CI เอง #0E8A5F ได้ 4.36 ทั้งคู่ตก)
                   '<span class="mt-0.5 shrink-0 w-5 h-5 rounded-full grid place-items-center text-[11px] font-bold ' +
-                    (it.ok ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400') + '">' +
+                    (it.ok ? 'bg-emerald-700 text-white' : 'bg-slate-200 text-slate-400') + '">' +
                     (it.ok ? '&#10003;' : '&#8226;') + '</span>' +
                   '<span class="min-w-0 leading-snug">' +
                     '<span class="block text-[11px] text-slate-500">' + esc(it.title) + '</span>' +
