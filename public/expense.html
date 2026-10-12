@@ -1499,6 +1499,44 @@
         apply('taxiEntriesListBack', 'ขากลับ');
     }
 
+    /* ปุ่ม "ใช้เส้นทางหลัก" ในแถว Taxi
+       12 ต.ค. 2569 — ผู้ใช้ทักว่าช่อง จาก/ถึง ของ Taxi ไม่มีตัวช่วยค้นหาสถานที่
+       ไล่โค้ดแล้วเจอต้นตอที่จริงกว่านั้น: แถว Taxi คัดลอกเส้นทางหลัก "ตอนสร้างแถว"
+       ครั้งเดียว ถ้าติ๊ก Taxi ก่อนแล้วค่อยเลือกจุดหมาย ช่อง "ถึง" จะว่างค้างตลอดไป
+       แล้วข้อความว่างนั้นถูกพิมพ์ลงใบรับรองค่าพาหนะที่ส่งการเงิน
+
+       ช่อง Taxi เป็นข้อความล้วน ไม่มีการคำนวณไหนใช้มัน (ค่าโดยสารกรอกเอง)
+       จึงไม่ต้องยุ่งกับหมุดบนแผนที่เลย — ห้ามเรียก attachPlaceSearch ตัวเดิมมาใช้
+       เพราะตัวนั้นผูกกับการปักหมุดเส้นทางหลัก ถ้าใช้ซ้ำ ค่าน้ำมันจะเพี้ยน */
+    function fillTaxiFromRoute(btn) {
+        const row = btn && btn.closest ? btn.closest('.taxi-entry') : null;
+        if (!row) return;
+        const v = id => (document.getElementById(id)?.value || '').trim();
+
+        const out = { from: v('travelFrom'), to: v('travelTo') };
+        // เคสปกติกลับทางเดิม จึงสลับต้นทาง-ปลายทางของขาไป
+        // กรณีพิเศษมีช่องขากลับของตัวเอง เว้นว่างไว้ความหมายคือกลับทางเดิม
+        const ret = isNormalTrip()
+            ? { from: out.to, to: out.from }
+            : { from: v('travelReturnFrom') || out.to, to: v('travelReturnTo') || out.from };
+
+        const dir = row.querySelector('.taxi-dir')?.value || 'ขาไป';
+        const pick = (dir === 'ขากลับ') ? ret : out;
+
+        const f = row.querySelector('.taxi-from');
+        const t = row.querySelector('.taxi-to');
+        if (f) f.value = pick.from;
+        if (t) t.value = pick.to;
+
+        // กระพริบให้เห็นว่าเติมอะไรลงไป ไม่งั้นกดแล้วไม่รู้ว่าเกิดอะไรขึ้น
+        [f, t].forEach(el => {
+            if (!el) return;
+            el.style.transition = 'background-color .25s';
+            el.style.backgroundColor = '#FEF3C7';
+            setTimeout(() => { el.style.backgroundColor = ''; }, 900);
+        });
+    }
+
     /* เขียนชื่อสถานที่จริงลงใน placeholder ของช่องขากลับ
        "ว่าง = กลับที่จุดเริ่มต้น" ลอยๆ ไม่ช่วยอะไร ถ้าเห็นว่าจุดเริ่มต้นคือบ้านเลขที่อะไร
        ผู้ใช้จะรู้ทันทีว่าเว้นว่างไว้ได้เลย ไม่ต้องไปพิมพ์ที่อยู่บ้านซึ่งแผนที่มักหาไม่เจอ */
@@ -2622,7 +2660,12 @@
                     <input type="text" class="taxi-from w-full border border-slate-200 px-2 py-1.5 rounded text-xs outline-none focus:border-blue-400" value="${fromVal}" placeholder="สถานที่ต้นทาง">
                 </div>
                 <div>
-                    <label class="text-[10px] text-slate-400 font-bold block mb-0.5">ถึง</label>
+                    <div class="flex items-center justify-between mb-0.5 gap-2">
+                        <label class="text-[10px] text-slate-400 font-bold">ถึง</label>
+                        <button type="button" onclick="fillTaxiFromRoute(this)"
+                            class="taxi-use-route text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline whitespace-nowrap"
+                            title="ดึงต้นทาง-ปลายทางจากเส้นทางหลักด้านบนมาเติมให้">ใช้เส้นทางหลัก</button>
+                    </div>
                     <input type="text" class="taxi-to w-full border border-slate-200 px-2 py-1.5 rounded text-xs outline-none focus:border-blue-400" value="${toVal}" placeholder="สถานที่ปลายทาง">
                 </div>
             </div>
