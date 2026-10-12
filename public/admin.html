@@ -1254,7 +1254,11 @@
         order.forEach((id, idx) => {
             const r = rulesMap[id] || { show: false, required: false };
             const isCustom = !ATT_LABELS[id];
-            const currentLabel = r.label !== undefined ? r.label : (ATT_LABELS[id] || id);
+            // getAttachmentRules() ใส่ label: '' มาให้ทุกแถวเสมอ ไม่ใช่ undefined
+            // จึงต้องเช็คด้วยความจริงเท็จ ไม่ใช่ !== undefined ไม่งั้นค่าว่างจะถูกนับว่า
+            // "ผู้ใช้ตั้งชื่อเป็นค่าว่าง" แล้วช่องจะโล่งทั้งตาราง (แบบเดียวกับหน้าเบิก)
+            // ชนิดที่ผู้ใช้สร้างเองไม่มีชื่อเริ่มต้น ปล่อยว่างไว้ให้เห็น placeholder (จำเป็น)
+            const currentLabel = r.label || ATT_LABELS[id] || '';
             const tr = document.createElement('tr');
             tr.className = 'attachment-row hover:bg-slate-50';
             tr.draggable = true;
