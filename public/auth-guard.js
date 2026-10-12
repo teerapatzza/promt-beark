@@ -46,7 +46,14 @@ function _renderUserBar(user) {
 
   bar.innerHTML = `
     <span style="flex:1;display:flex;align-items:center;gap:8px;font-weight:600;">
-      <img src="app-logo.png" alt="" style="height:24px;width:24px;object-fit:contain;border-radius:5px;background:#fff"
+      <span style="flex:none;height:28px;padding:0 6px;border-radius:7px;background:#fff;display:inline-flex;align-items:center"
+            title="สถาบันรับรองคุณภาพสถานพยาบาล (องค์การมหาชน)">
+        <img src="ha-logo.png" alt="สถาบันรับรองคุณภาพสถานพยาบาล (องค์การมหาชน)"
+             style="height:22px;width:auto;object-fit:contain;display:block"
+             onerror="this.parentElement.style.display='none'">
+      </span>
+      <span style="width:1px;height:18px;background:rgba(255,255,255,.3);flex:none"></span>
+      <img src="app-logo.png" alt="" style="height:24px;width:24px;object-fit:contain;border-radius:5px;background:#fff;flex:none"
            onerror="this.style.display='none'">
       พร้อมเบิก
     </span>

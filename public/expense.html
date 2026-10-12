@@ -143,6 +143,33 @@
             #pbSummary > div:first-child { flex-direction: column; align-items: flex-start; }
         }
 
+        /* ───── พื้นหลังอัตลักษณ์ สรพ. ─────
+           วางเป็นชั้นตรึงเต็มจอด้วย ::before แทนการใส่ที่ body โดยตรง
+           เพราะ background-attachment: fixed กระตุกบน iOS ส่วนชั้นตรึงแบบนี้ลื่นทุกเครื่อง
+           ไฟล์ย่อจาก 1.55 MB เหลือ 39 KB แล้ว ทุกคนโหลดทุกครั้งที่เปิดหน้า
+           และตัดแถบโลโก้บนรูปออก เพราะแถบหัวมีตรา สรพ. อยู่แล้ว ไม่ให้ซ้ำซ้อน */
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            pointer-events: none;
+            background-image: url('bg-ha.webp');
+            background-size: cover;
+            background-position: center bottom;
+            background-repeat: no-repeat;
+        }
+        /* จอแคบ รูปถูกครอบตัดจนคลื่นกินพื้นที่เยอะ ลดความเข้มลงไม่ให้แย่งสายตาจากฟอร์ม */
+        @media (max-width: 700px) {
+            body::before { opacity: .45; }
+        }
+        /* โหมดมืด รูปสว่างจ้าตีกับพื้นมืด ปิดทิ้งแล้วกลับไปใช้พื้นเทาถ่านเหมือนเดิม */
+        [data-theme="dark"] body::before { display: none; }
+        /* สั่งพิมพ์ ไม่ต้องเปลืองหมึกกับพื้นหลัง */
+        @media print {
+            body::before { display: none; }
+        }
+
         /* ───── หัวการ์ดตามอัตลักษณ์ของ สรพ. ─────
            คู่มือ CI กำหนดกรมท่า #031A52 เป็นสีหัวเรื่อง และมีเส้นทองคาดใต้หัวข้อ
            วัดแล้ว กรมท่าบนการ์ดขาวได้ 16.49:1 ผ่านเกณฑ์อ่านออก 4.5:1 สบาย */
