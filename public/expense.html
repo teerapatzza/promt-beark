@@ -108,6 +108,80 @@
         }
         .chip:hover { border-color: #93c5fd; color: #2563eb; background: #eff6ff; }
         .chip.is-on { border-color: #2563eb; background: #2563eb; color: #fff; }
+
+        /* ───── แถบสรุปยอดด้านขวา แบบตรึงให้เห็นตลอด ─────
+           12 ต.ค. 2569 ผู้ใช้แจ้งว่า "สรุปมันไปอยู่ล่างสุด ต้องเลื่อนลงไปสุดถึงจะเจอ"
+           ย้ายมาอยู่ขวาและตรึงไว้ด้วย CSS ล้วน — ไม่ย้าย HTML แม้แต่บรรทัดเดียว
+           จึงไม่มี id ไหนหาย และ JavaScript ทุกตัวยังทำงานเหมือนเดิมทุกประการ
+
+           ตรวจก่อนทำแล้วสองข้อ
+             1. ตัวที่ห่ออยู่ไม่มี overflow เลย sticky จึงทำงานได้จริง
+             2. ไม่มีโค้ดไหน appendChild เข้า wrapper กล่องสรุปจึงเป็นลูกตัวสุดท้ายเสมอ
+           จอแคบกว่า 1100px ยังเรียงลงล่างเหมือนเดิม ไม่บีบให้อ่านยาก */
+        @media (min-width: 1100px) {
+            .pb-form-grid {
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) 340px;
+                gap: 24px;
+                align-items: start;
+            }
+            .pb-form-grid > * { grid-column: 1; min-width: 0; }
+            .pb-form-grid > #pbSummary {
+                grid-column: 2;
+                /* wrapper มีลูก 6 ตัว เผื่อไว้ 12 ให้สูงคลุมทุกแถว
+                   ห้ามใส่เลขใหญ่กว่านี้มาก เบราว์เซอร์จะสร้างแถวว่างตามจำนวนที่ระบุ */
+                grid-row: 1 / span 12;
+                align-self: start;
+                position: sticky;
+                top: 84px;                      /* ต่ำกว่าแถบบนที่ sticky อยู่แล้ว */
+                margin-bottom: 0;
+                max-height: calc(100vh - 104px);
+                overflow-y: auto;               /* รายละเอียดยาวเกินจอ ให้เลื่อนในกล่อง */
+                overscroll-behavior: contain;
+            }
+            /* คอลัมน์กว้าง 340px กล่องยอดต้องวางซ้อนกัน ไม่ใช่เรียงข้างกันแบบตอนเต็มหน้า */
+            #pbSummary > div:first-child { flex-direction: column; align-items: flex-start; }
+        }
+
+        /* ───── หัวการ์ดตามอัตลักษณ์ของ สรพ. ─────
+           คู่มือ CI กำหนดกรมท่า #031A52 เป็นสีหัวเรื่อง และมีเส้นทองคาดใต้หัวข้อ
+           วัดแล้ว กรมท่าบนการ์ดขาวได้ 16.49:1 ผ่านเกณฑ์อ่านออก 4.5:1 สบาย */
+        .pb-card-head {
+            display: flex; align-items: center; gap: 12px;
+            margin-bottom: 16px; padding-bottom: 12px; position: relative;
+        }
+        .pb-card-head::after {
+            content: ""; position: absolute; left: 0; bottom: 0; width: 180px; height: 2px;
+            background: linear-gradient(90deg, #CF952B 0%, #F4DD79 60%, rgba(244, 221, 121, 0) 100%);
+        }
+        .pb-step {
+            flex: none; width: 28px; height: 28px; border-radius: 50%;
+            background: #031A52; color: #fff;
+            display: grid; place-items: center; font-size: 13px; font-weight: 700;
+        }
+        .pb-card-title { font-size: 17px; font-weight: 700; color: #031A52; margin: 0; }
+
+        /* ───── ปุ่มยืนยัน สีทองตามอัตลักษณ์ ─────
+           วัดแล้ว ตัวหนังสือกรมท่าบนทองได้ 6.27:1 ที่จุดเข้มสุดของไล่สี ผ่านเกณฑ์ 4.5:1
+           ห้ามใช้ตัวหนังสือสีขาวบนทองเด็ดขาด วัดได้แค่ 1.36–2.63:1 อ่านไม่ออก */
+        .pb-cta {
+            background: linear-gradient(135deg, #CF952B 0%, #F4DD79 50%, #CF952B 100%);
+            color: #031A52;
+            border: 1px solid rgba(207, 149, 43, .75);
+        }
+        .pb-cta:hover:not(:disabled) { filter: brightness(1.06); }
+        .pb-cta:disabled { filter: grayscale(.55); opacity: .75; cursor: not-allowed; }
+
+        /* การ์ดที่หัวเป็นแถบเทาเต็มความกว้าง เส้นทองวางทับขอบล่างของแถบ */
+        .pb-strip-head { position: relative; }
+        .pb-strip-head::after {
+            content: ""; position: absolute; left: 24px; bottom: -1px; width: 180px; height: 2px;
+            background: linear-gradient(90deg, #CF952B 0%, #F4DD79 60%, rgba(244, 221, 121, 0) 100%);
+        }
+
+        /* โหมดมืด กรมท่าจมหายไปกับพื้น ต้องยกให้สว่างขึ้น */
+        [data-theme="dark"] .pb-card-title { color: #9EC5FF; }
+        [data-theme="dark"] .pb-step      { background: #1E52B8; }
     </style>
     <!-- ธีม: ความคมชัดของช่องกรอก และโหมดมืด
          theme.js ต้องไม่ใส่ defer เพราะมันตั้งธีมทันทีที่ถูกอ่าน
@@ -125,7 +199,7 @@
 
     <!-- Sticky header -->
     <header class="bg-white border-b border-slate-200 sticky top-0 z-20">
-        <div class="max-w-3xl mx-auto px-6 py-4 flex items-center gap-3">
+        <div class="max-w-6xl mx-auto px-6 py-4 flex items-center gap-3">
             <a href="index.html" class="text-slate-400 hover:text-slate-700 transition-colors p-1 -m-1 rounded-lg">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
@@ -139,8 +213,8 @@
         </div>
     </header>
 
-    <div class="max-w-3xl mx-auto px-4 md:px-6 py-8">
-        <div>
+    <div class="max-w-6xl mx-auto px-4 md:px-6 py-8">
+        <div class="pb-form-grid">
 
         <div id="editModeBanner" class="hidden mb-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-center gap-3">
             <svg class="w-5 h-5 text-amber-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -152,58 +226,70 @@
             </div>
         </div>
 
-        <div id="profileSelectorBox" class="bg-blue-50 rounded-2xl border border-blue-100 p-5 mb-6">
-            <label class="block text-sm font-bold text-blue-800 mb-2 flex items-center gap-2">
-                <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                โหลดข้อมูลอัตโนมัติจากโปรไฟล์ที่บันทึกไว้
-            </label>
-            <div class="flex flex-wrap gap-2">
-                <div class="relative w-full">
-                    <div class="relative">
-                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                        </span>
-                        <input type="text" id="profileSearch" placeholder="พิมพ์ชื่อเพื่อค้นหาโปรไฟล์..." autocomplete="off"
-                            class="w-full border border-blue-200 pl-9 pr-8 py-3 rounded-xl text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100 bg-white font-medium outline-none transition-all"
-                            oninput="filterProfiles()" onfocus="openProfileDropdown()">
-                        <button type="button" id="profileClearBtn" onclick="clearProfileSelection()" class="hidden absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-600 p-1">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                        </button>
-                    </div>
-                    <div id="profileDropdown" class="hidden absolute z-[9002] w-full bg-white border border-blue-200 shadow-2xl rounded-xl mt-1 max-h-72 overflow-y-auto overscroll-contain"></div>
-                </div>
-                <a href="profile.html" target="_blank" class="shrink-0 bg-white border border-blue-200 text-blue-600 px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-colors flex items-center">
-                    จัดการโปรไฟล์
-                </a>
-            </div>
-        </div>
-
+        <!-- ผู้ขอเบิก — รวมกล่องค้นหาโปรไฟล์กับช่องกรอกไว้ในการ์ดเดียว ประหยัดพื้นที่แนวตั้ง
+             ข้อควรระวัง: #profileSelectorBox ถูกสั่งซ่อนทั้งกล่องตอนแก้ไขใบเก่า (บรรทัดที่เรียก
+             classList.add('hidden')) ช่องชื่อ/บทบาท/สังกัด จึงต้องอยู่ "นอก" กล่องนั้นเสมอ
+             ไม่งั้นพอเปิดใบเก่ามาแก้ ช่องกรอกจะหายไปทั้งแถว -->
         <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-6">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="pb-card-head">
+                <span class="pb-step">1</span>
+                <h2 class="pb-card-title">ผู้ขอเบิก</h2>
+            </div>
+
+            <div id="profileSelectorBox" class="bg-blue-50 rounded-xl border border-blue-100 px-4 py-3 mb-4">
+                <div class="flex items-center gap-3 flex-wrap">
+                    <!-- วงกลมย่อชื่อ + ชื่อโปรไฟล์ที่เลือกอยู่ — อัปเดตโดย pbUpdateProfileChip()
+                         เป็นแค่ป้ายบอกสถานะ ไม่ใช่ช่องกรอก ชื่อที่ลงเอกสารยังมาจาก #requestedBy เท่านั้น -->
+                    <span id="pbProfileAvatar" class="shrink-0 w-10 h-10 rounded-full bg-slate-300 text-white grid place-items-center text-sm font-bold">—</span>
+                    <div class="flex flex-col leading-tight mr-auto min-w-0">
+                        <span class="text-xs text-slate-500">เติมจากโปรไฟล์อัตโนมัติ</span>
+                        <span id="pbProfileName" class="text-sm font-bold text-slate-400 truncate">ยังไม่ได้เลือกโปรไฟล์</span>
+                    </div>
+                    <div class="relative" style="min-width:230px">
+                        <div class="relative">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                            </span>
+                            <input type="text" id="profileSearch" placeholder="พิมพ์ชื่อเพื่อค้นหาโปรไฟล์..." autocomplete="off"
+                                class="w-full border border-blue-200 pl-9 pr-8 py-2.5 rounded-xl text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-100 bg-white font-medium outline-none transition-all"
+                                oninput="filterProfiles()" onfocus="openProfileDropdown()">
+                            <button type="button" id="profileClearBtn" onclick="clearProfileSelection()" class="hidden absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-600 p-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            </button>
+                        </div>
+                        <div id="profileDropdown" class="hidden absolute z-[9002] w-full bg-white border border-blue-200 shadow-2xl rounded-xl mt-1 max-h-72 overflow-y-auto overscroll-contain"></div>
+                    </div>
+                    <a href="profile.html" target="_blank" class="shrink-0 bg-white border border-blue-200 text-blue-600 px-3.5 py-2 rounded-xl text-sm font-bold hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-colors flex items-center">
+                        จัดการโปรไฟล์
+                    </a>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                     <label class="block text-sm font-bold text-slate-700 mb-2">ชื่อผู้ขอเบิก (ภาษาไทย)</label>
-                    <input type="text" id="requestedBy" placeholder="ระบุชื่อ-นามสกุล ของท่าน" class="w-full border border-slate-200 p-3.5 rounded-xl text-lg focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all">
+                    <input type="text" id="requestedBy" placeholder="ระบุชื่อ-นามสกุล ของท่าน" class="w-full border border-slate-200 p-3 rounded-xl text-base focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all">
                 </div>
                 <!-- เลือกจากรายการก็ได้ พิมพ์เองก็ได้ — ค่าที่พิมพ์ใหม่จะถูกเก็บเข้ารายการกลาง -->
                 <div>
                     <label class="block text-sm font-bold text-slate-700 mb-2">บทบาทที่ไปปฏิบัติหน้าที่</label>
                     <input type="text" id="position" autocomplete="off"
                         placeholder="เลือกจากรายการ หรือพิมพ์บทบาทใหม่..."
-                        class="w-full border border-slate-200 p-3.5 rounded-xl text-lg focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all bg-white">
+                        class="w-full border border-slate-200 p-3 rounded-xl text-base focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all bg-white">
                 </div>
-                <div class="md:col-span-2">
+                <div>
                     <label class="block text-sm font-bold text-slate-700 mb-2">สังกัด / กลุ่มงาน</label>
                     <input type="text" id="affiliation" autocomplete="off"
                         placeholder="เลือกจากรายการ หรือพิมพ์สังกัดใหม่..."
-                        class="w-full border border-slate-200 p-3.5 rounded-xl text-lg focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all">
+                        class="w-full border border-slate-200 p-3 rounded-xl text-base focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-all">
                 </div>
             </div>
         </div>
 
         <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-6">
-            <div class="bg-slate-50 px-6 py-4 border-b border-slate-100">
-                <h2 class="text-base font-bold text-slate-700 flex items-center gap-2">
-                    <span class="bg-blue-600 text-white w-6 h-6 rounded-full inline-flex items-center justify-center text-xs font-bold">1</span> ระบุกิจกรรม (ถ้ามี)
+            <div class="bg-slate-50 px-6 py-4 border-b border-slate-100 pb-strip-head">
+                <h2 class="pb-card-title flex items-center gap-3">
+                    <span class="pb-step">2</span> ระบุกิจกรรม (ถ้ามี)
                 </h2>
             </div>
             <div class="p-6">
@@ -263,9 +349,9 @@
         </div>
 
         <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-6">
-            <div class="bg-slate-50 px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-                <h2 class="text-base font-bold text-slate-700 flex items-center gap-2">
-                    <span class="bg-blue-600 text-white w-6 h-6 rounded-full inline-flex items-center justify-center text-xs font-bold">2</span> ระบุรายละเอียดการเบิก
+            <div class="bg-slate-50 px-6 py-4 border-b border-slate-100 flex justify-between items-center pb-strip-head">
+                <h2 class="pb-card-title flex items-center gap-3">
+                    <span class="pb-step">3</span> ระบุรายละเอียดการเบิก
                 </h2>
             </div>
             <div class="p-6">
@@ -807,7 +893,7 @@
             </div>
         </div>
 
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-10">
+        <div id="pbSummary" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-10">
             <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-6 flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
                 <div>
                     <span class="block text-emerald-800 font-bold text-lg">ยอดเงินที่ขอเบิกครั้งนี้</span>
@@ -855,12 +941,18 @@
                 </div>
             </div>
 
+            <!-- เช็กลิสต์ย่อ: บอกว่า "ช่องไหนกรอกแล้ว" ไม่ใช่ "บันทึกได้แล้ว"
+                 กฎตรวจจริงอยู่ใน submitExpense() เป็นลำดับยาวและขึ้นกับหมวดที่เลือก
+                 ถ้าเขียนกฎซ้ำไว้ตรงนี้แล้วสองที่ไม่ตรงกัน ผู้ใช้จะเห็นติ๊กถูกแต่กดบันทึกไม่ผ่าน
+                 ซึ่งแย่กว่าไม่มีเช็กลิสต์เลย จึงรายงานแค่ข้อเท็จจริงที่อ่านได้ตรง ๆ -->
+            <div id="pbChecklist" class="mb-4 flex flex-col gap-0.5"></div>
+
             <p class="text-xs text-slate-500 mb-3 text-center">หากไม่มี API เซิร์ฟเวอร์ ระบบจะบันทึกรายการในเครื่อง (LocalStorage) แล้วแสดงในหน้าประวัติ</p>
 
             <!-- Error Container -->
             <div id="validationErrors" class="hidden mb-4"></div>
 
-            <button onclick="submitExpense()" id="submitBtn" class="w-full bg-blue-600 text-white font-bold text-lg py-4 rounded-xl hover:bg-blue-700 active:scale-[0.99] transition-all">ยืนยันการบันทึกรายการเบิก</button>
+            <button onclick="submitExpense()" id="submitBtn" class="pb-cta w-full font-bold text-lg py-4 rounded-xl active:scale-[0.99] transition-all">ยืนยันการบันทึกรายการเบิก</button>
         </div>
     </div>
     </div>
@@ -4481,6 +4573,137 @@
     loadSettings();
     makeTime24Picker('timeStart');
     makeTime24Picker('timeEnd');
+
+    /* ══════════════════════════════════════════════════════════════════
+       เช็กลิสต์ข้างกล่องสรุปยอด
+       ──────────────────────────────────────────────────────────────────
+       12 ต.ค. 2569 — ย้ายกล่องสรุปมาอยู่ขวาแบบตรึง แล้วเติมเช็กลิสต์ให้เห็นว่า
+       กรอกถึงไหนแล้วโดยไม่ต้องเลื่อนขึ้นไปดู
+
+       กฎที่ยึดไว้สามข้อ
+         1. อ่านอย่างเดียว ไม่เขียนค่าลงช่องไหนทั้งสิ้น โดยเฉพาะช่องวันที่
+         2. ใช้ thaiDateText() ตัวเดิมของหน้า ไม่เขียนตัวแปลงวันที่ขึ้นใหม่
+         3. ไม่ตัดสินว่า "บันทึกได้แล้ว" เพราะกฎจริงอยู่ใน submitExpense()
+            และขึ้นกับหมวดที่เลือก ถ้าเดาแล้วไม่ตรงกัน ผู้ใช้จะโดนหลอก
+
+       ห่อด้วย try/catch ทั้งก้อน ถ้าพังก็แค่ไม่แสดงเช็กลิสต์ ฟอร์มยังใช้ได้ปกติ
+       ผูกด้วย listener ที่ document ไม่ได้ไปแก้ฟังก์ชันเดิมสักตัว
+       ══════════════════════════════════════════════════════════════════ */
+    const PB_BREAKDOWN_ROWS = ['breakdownFuel', 'breakdownHotel', 'breakdownTaxi',
+                               'breakdownAir', 'breakdownToll', 'breakdownParking', 'breakdownOther'];
+
+    function pbGoTo(id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (el.tagName === 'INPUT' && !el.disabled) setTimeout(() => el.focus(), 450);
+    }
+
+    function pbRenderChecklist() {
+        try {
+            const box = document.getElementById('pbChecklist');
+            if (!box) return;
+            const val = id => (document.getElementById(id)?.value || '').trim();
+
+            const name = val('requestedBy');
+            const sub1 = [val('position'), val('affiliation')].filter(Boolean).join(' · ');
+
+            const s = val('dateStart'), e = val('dateEnd');
+            const trip = (s && e) ? (thaiDateText(s) + ' – ' + thaiDateText(e))
+                       : (s ? thaiDateText(s) : '');
+
+            const lines = PB_BREAKDOWN_ROWS.filter(id => {
+                const el = document.getElementById(id);
+                return el && !el.classList.contains('hidden');
+            });
+
+            let files = 0;
+            document.querySelectorAll('.general-file-upload').forEach(i => {
+                files += (i.files && i.files.length) || 0;
+            });
+            const mapOn = !!document.getElementById('useAppMapImage')?.checked;
+
+            const items = [
+                { go: 'requestedBy', title: 'ผู้ขอเบิก',
+                  value: name || 'ยังไม่ได้กรอก', ok: !!name, sub: sub1 },
+                { go: 'dateStart', title: 'ช่วงเวลาเดินทาง',
+                  value: trip || 'ยังไม่ได้ระบุ', ok: !!trip, sub: '' },
+                { go: 'totalAmount', title: 'ค่าใช้จ่าย',
+                  value: lines.length ? (lines.length + ' รายการ') : 'ยังไม่มีรายการ',
+                  ok: lines.length > 0, sub: '' },
+                { go: 'evidenceBox', title: 'เอกสารแนบ',
+                  value: files ? (files + ' ไฟล์') : (mapOn ? 'ใช้แผนที่จากระบบ' : 'ยังไม่ได้แนบ'),
+                  ok: files > 0 || mapOn, sub: (files && mapOn) ? '+ แผนที่จากระบบ' : '' }
+            ];
+
+            const esc = t => String(t == null ? '' : t)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+            box.innerHTML = items.map(it =>
+                '<button type="button" onclick="pbGoTo(\'' + it.go + '\')" ' +
+                'class="w-full text-left flex items-start gap-2.5 px-2 py-1.5 rounded-lg hover:bg-slate-50 transition-colors">' +
+                  '<span class="mt-0.5 shrink-0 w-5 h-5 rounded-full grid place-items-center text-[11px] font-bold ' +
+                    (it.ok ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400') + '">' +
+                    (it.ok ? '&#10003;' : '&#8226;') + '</span>' +
+                  '<span class="min-w-0 leading-snug">' +
+                    '<span class="block text-[11px] text-slate-500">' + esc(it.title) + '</span>' +
+                    '<span class="block text-sm ' + (it.ok ? 'text-slate-800 font-semibold' : 'text-slate-400') + '">' +
+                      esc(it.value) + '</span>' +
+                    (it.sub ? '<span class="block text-[11px] text-slate-500">' + esc(it.sub) + '</span>' : '') +
+                  '</span>' +
+                '</button>'
+            ).join('');
+        } catch (err) {
+            /* เช็กลิสต์เป็นของเสริม ห้ามทำให้ฟอร์มพัง */
+        }
+    }
+
+    document.addEventListener('input',  pbRenderChecklist);
+    document.addEventListener('change', pbRenderChecklist);
+    pbRenderChecklist();
+
+    /* ───── ป้ายโปรไฟล์ที่เลือกอยู่ (วงกลมย่อชื่อ + ชื่อเต็ม) ─────
+       เป็นป้ายบอกสถานะอย่างเดียว ไม่ใช่ช่องกรอก
+       ชื่อที่ลงเอกสารยังมาจาก #requestedBy เหมือนเดิมทุกประการ
+
+       การเลือกโปรไฟล์จากรายการใช้ .value = ... ตรง ๆ ซึ่งไม่ปล่อย event input/change
+       ตัวฟังที่ document จึงไม่รู้ ต้อง "ห่อ" ฟังก์ชันเดิมแทน
+       วิธีห่อแบบนี้ไม่ได้แก้ตัวฟังก์ชันเดิมสักบรรทัด ของเดิมยังทำงานครบก่อนเสมอ */
+    function pbUpdateProfileChip(p) {
+        try {
+            const av = document.getElementById('pbProfileAvatar');
+            const nm = document.getElementById('pbProfileName');
+            if (!av || !nm) return;
+            if (!p) {
+                av.textContent = '—';
+                av.className = 'shrink-0 w-10 h-10 rounded-full bg-slate-300 text-white grid place-items-center text-sm font-bold';
+                nm.textContent = 'ยังไม่ได้เลือกโปรไฟล์';
+                nm.className = 'text-sm font-bold text-slate-400 truncate';
+                return;
+            }
+            const letters = String(p.profileName || p.fullName || '').replace(/[^฀-๿a-zA-Z]/g, '');
+            av.textContent = letters.slice(0, 2).toUpperCase() || '?';
+            av.className = 'shrink-0 w-10 h-10 rounded-full bg-blue-600 text-white grid place-items-center text-sm font-bold';
+            nm.textContent = p.fullName || p.profileName || '';
+            nm.className = 'text-sm font-bold text-blue-900 truncate';
+        } catch (err) {
+            /* ป้ายบอกสถานะพังต้องไม่ทำให้ฟอร์มพัง */
+        }
+    }
+
+    const _pbApplyProfile = applyProfileDataFromObj;
+    applyProfileDataFromObj = function (p) {
+        _pbApplyProfile(p);
+        pbUpdateProfileChip(p);
+        pbRenderChecklist();
+    };
+
+    const _pbClearProfile = clearProfileSelection;
+    clearProfileSelection = function () {
+        _pbClearProfile();
+        pbUpdateProfileChip(null);
+        pbRenderChecklist();
+    };
     </script>
     <script src="auth-guard.js"></script>
     <script>initAuthGuard();</script>
