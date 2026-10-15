@@ -254,18 +254,52 @@
         .menu-icon.violet { background: linear-gradient(145deg, #a78bfa, #6d28d9); box-shadow: 0 8px 18px -9px rgba(109,40,217,.7); }
         .menu-icon.amber  { background: linear-gradient(145deg, #f59e0b, #92650a); box-shadow: 0 8px 18px -9px rgba(146,101,10,.7); }
 
-        /* ── แถบชวนให้คะแนน ──────────────────────────────
+        /* ── แถบแนวนอนใต้ตารางการ์ด ───────────────────────
+           ทั้งแถบผู้ดูแลและแถบชวนให้คะแนนใช้โครงเดียวกัน ต่างกันแค่สี
            วางใต้แถวการ์ด ไม่ได้แทรกเข้าไปในแถว การ์ดเดิมจึงเรียงเหมือนเดิมทุกใบ */
-        .fb-promo {
+        .fb-bar {
             display: flex; align-items: center; gap: 18px 22px; flex-wrap: wrap;
-            margin-top: 20px; padding: 22px 26px; border-radius: 24px;
+            margin-top: 18px; padding: 20px 24px; border-radius: 22px;
             text-decoration: none; color: inherit;
-            background: linear-gradient(110deg, #FFE8B8 0%, #F6C867 100%);
-            box-shadow: 0 14px 32px -16px rgba(146,101,10,.75);
             transition: transform .22s cubic-bezier(.2,.7,.3,1), box-shadow .22s ease;
         }
-        .fb-promo:hover { transform: translateY(-2px); box-shadow: 0 20px 40px -16px rgba(146,101,10,.85); }
-        .fb-promo:focus-visible { outline: 3px solid #031A52; outline-offset: 3px; }
+        .fb-bar:hover { transform: translateY(-2px); }
+        .fb-bar:focus-visible { outline: 3px solid #031A52; outline-offset: 3px; }
+
+        /* แถบของผู้ดูแล — ขาวแบบเดียวกับการ์ด ไม่แย่งสายตาจากแถบทองของผู้ใช้ */
+        .fb-bar-admin {
+            background: rgba(255,255,255,.92);
+            border: 1px solid rgba(203,213,225,.9);
+            box-shadow: 0 10px 26px -18px rgba(15,23,42,.55);
+        }
+        body.has-photo .fb-bar-admin { backdrop-filter: blur(8px); border-color: rgba(255,255,255,.85); }
+        .fb-bar-admin:hover { box-shadow: 0 16px 34px -18px rgba(15,23,42,.6); }
+        .fb-bar-ic {
+            flex: none; width: 52px; height: 52px; border-radius: 15px;
+            display: grid; place-items: center;
+        }
+        .fb-bar-ic svg { width: 25px; height: 25px; color: #fff; }
+        .fb-bar-ic.amber { background: linear-gradient(145deg, #f59e0b, #92650a); box-shadow: 0 8px 18px -9px rgba(146,101,10,.7); }
+        .fb-bar-txt { flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+        .fb-bar-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .fb-bar-top b { font-size: 1.14rem; font-weight: 700; letter-spacing: -.012em; }
+        .fb-bar-tag {
+            background: #ede9fe; color: #6d28d9; font-size: .7rem; font-weight: 700;
+            letter-spacing: .03em; padding: 4px 10px; border-radius: 999px;
+        }
+        .fb-bar-sub { font-size: .92rem; line-height: 1.6; color: #64748b; }
+        .fb-bar-go {
+            flex: none; display: inline-flex; align-items: center; gap: 8px;
+            color: var(--brand); font-size: .96rem; font-weight: 700;
+        }
+
+        /* แถบชวนให้คะแนน — ของผู้ใช้ทุกคน ใช้สีทองให้เด่นกว่า */
+        .fb-promo {
+            background: linear-gradient(110deg, #FFE8B8 0%, #F6C867 100%);
+            box-shadow: 0 14px 32px -16px rgba(146,101,10,.75);
+            padding: 22px 26px; border-radius: 24px;
+        }
+        .fb-promo:hover { box-shadow: 0 20px 40px -16px rgba(146,101,10,.85); }
         .fb-face {
             flex: none; width: 64px; height: 64px; border-radius: 50%; background: #fff;
             display: grid; place-items: center; box-shadow: 0 4px 12px rgba(122,78,0,.20);
@@ -499,28 +533,35 @@
                     <span class="badge admin">เฉพาะผู้ดูแล</span>
                 </a>
 
-                <!-- จัดการแบบประเมิน — ของผู้ดูแลเท่านั้น แยกจากหน้าจัดการระบบ
-                     ไม่เอาไปรวมใน admin.html เพราะหน้านั้นยาวมากอยู่แล้ว -->
-                <a href="feedback-admin.html" class="menu-card" id="feedbackAdminMenu" style="display: none;">
-                    <div class="menu-icon amber">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M4 18h3"/><path d="M4 13h7"/><path d="M4 8h11"/>
-                            <circle cx="17.5" cy="16.5" r="4.5"/><path d="M17.5 14.6v3.8"/><path d="M15.6 16.5h3.8"/>
-                        </svg>
-                    </div>
-                    <h3>แบบประเมินการใช้งาน</h3>
-                    <p>สร้างชุดคำถาม เปิดรับคำตอบ และดูผลสรุปความพึงพอใจ</p>
-                    <span class="card-go">เปิดหน้าแบบประเมิน
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-                    </span>
-                    <span class="badge admin">เฉพาะผู้ดูแล</span>
-                </a>
             </div>
+
+            <!-- จัดการแบบประเมิน — ของผู้ดูแลเท่านั้น แยกจากหน้าจัดการระบบ
+                 วางเป็นแถบแนวนอนใต้ตาราง ไม่ได้อยู่ในตาราง การ์ดเดิมจึงเรียงเหมือนเดิม
+                 ไม่เอาไปรวมใน admin.html เพราะหน้านั้นยาวมากอยู่แล้ว -->
+            <a href="feedback-admin.html" id="feedbackAdminMenu" class="fb-bar fb-bar-admin" style="display: none;">
+                <span class="fb-bar-ic amber" aria-hidden="true">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 18h3"/><path d="M4 13h7"/><path d="M4 8h11"/>
+                        <circle cx="17.5" cy="16.5" r="4.5"/><path d="M17.5 14.6v3.8"/><path d="M15.6 16.5h3.8"/>
+                    </svg>
+                </span>
+                <span class="fb-bar-txt">
+                    <span class="fb-bar-top">
+                        <b>แบบประเมินการใช้งาน</b>
+                        <span class="fb-bar-tag">เฉพาะผู้ดูแล</span>
+                    </span>
+                    <span class="fb-bar-sub">สร้างชุดคำถาม เปิดรับคำตอบ และดูผลสรุปความพึงพอใจ</span>
+                </span>
+                <span class="fb-bar-go">
+                    เปิดหน้าแบบประเมิน
+                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
+                </span>
+            </a>
 
             <!-- ── ชวนให้คะแนน ──────────────────────────────────
                  แถบนี้ขึ้นเฉพาะตอนมีแบบประเมินเปิดรับอยู่จริง
                  ไม่มีรอบเปิด = ไม่ขึ้นเลย หน้าแรกจึงหน้าตาเหมือนเดิมทุกประการ -->
-            <a href="feedback.html" id="feedbackPromo" class="fb-promo" style="display: none;">
+            <a href="feedback.html" id="feedbackPromo" class="fb-bar fb-promo" style="display: none;">
                 <span class="fb-face" aria-hidden="true">
                     <svg width="42" height="42" viewBox="0 0 48 48" fill="none" stroke-linecap="round" stroke-linejoin="round">
                         <circle cx="24" cy="24" r="21" fill="#2FA35B" fill-opacity=".18" stroke="#2FA35B" stroke-width="2"></circle>
@@ -727,8 +768,9 @@
                     // Show admin menu if admin
                     if (user.role === 'admin') {
                         document.getElementById('adminMenu').style.display = 'block';
+                        // แถบนี้เป็น flex ไม่ใช่ block ถ้าตั้งเป็น block ของข้างในจะเรียงลงมาเป็นแนวตั้ง
                         const fb = document.getElementById('feedbackAdminMenu');
-                        if (fb) fb.style.display = 'block';
+                        if (fb) fb.style.display = 'flex';
                     }
 
                     showFeedbackPromo();
