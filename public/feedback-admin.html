@@ -64,6 +64,28 @@ input.f:focus, textarea.f:focus, select.f:focus { border-color: var(--navy2); ba
 .tabs .t:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
 .back { display: inline-flex; align-items: center; gap: 8px; color: #B7D3FF; font-size: 15px; font-weight: 600; text-decoration: none; }
 .back:hover { color: #fff; }
+/* ── สวิตช์เปิด/ปิดรับคำตอบ ──────────────────────────────
+   ใช้ checkbox จริงซ่อนไว้ แล้ววาดรางกับหัวทับ คีย์บอร์ดและ screen reader จึงยังใช้ได้ */
+.sw, .sw-row { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; }
+.sw input, .sw-row input { position: absolute; opacity: 0; width: 0; height: 0; }
+.sw-track {
+    flex: none; width: 50px; height: 28px; border-radius: 999px; background: #CBD5E1;
+    position: relative; transition: background .18s ease;
+}
+.sw-dot {
+    position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%;
+    background: #fff; box-shadow: 0 1px 3px rgba(15,23,42,.35); transition: transform .18s ease;
+}
+.sw input:checked + .sw-track, .sw-row input:checked + .sw-track { background: #2FA35B; }
+.sw input:checked + .sw-track .sw-dot, .sw-row input:checked + .sw-track .sw-dot { transform: translateX(22px); }
+.sw input:focus-visible + .sw-track, .sw-row input:focus-visible + .sw-track { outline: 3px solid var(--navy2); outline-offset: 3px; }
+.sw-lab { font-size: 14px; font-weight: 600; color: var(--muted); }
+.sw-row input:checked ~ .sw-lab { color: #14663A; }
+.sw-box {
+    display: flex; align-items: center; gap: 14px;
+    background: #F6F8FC; border: 1.5px solid var(--line); border-radius: 16px; padding: 14px 18px;
+}
+@media (prefers-reduced-motion: reduce) { .sw-track, .sw-dot { transition: none; } }
 .err { background: #FEF2F2; border: 1.5px solid #FCA5A5; color: #991B1B; border-radius: 16px; padding: 14px 18px; font-size: 15px; line-height: 1.7; }
 .ok  { background: #EAF6EF; border: 1.5px solid #BFE3CC; color: #14573A; border-radius: 16px; padding: 14px 18px; font-size: 15px; line-height: 1.7; }
 @media (max-width: 720px) { .hero { padding: 26px 0 76px; } .card { padding: 18px; border-radius: 18px; } }
@@ -183,10 +205,13 @@ function drawList() {
                 + '<b style="color:var(--navy);">' + f.responses + '</b> คำตอบ'
                 + (f.opensAt || f.closesAt ? ' · ' + esc(f.opensAt || '') + ' – ' + esc(f.closesAt || '') : '') + '</span>'
                 + '</div>'
-                + '<div style="display:flex; gap:8px; flex-wrap:wrap;">'
-                + (f.status === 'open'
-                    ? '<button type="button" class="btn plain sm" onclick="setStatus(' + f.id + ',\'closed\')">ปิดรับ</button>'
-                    : '<button type="button" class="btn navy sm" onclick="setStatus(' + f.id + ',\'open\')">เปิดรับ</button>')
+                + '<div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">'
+                // สวิตช์ในรายการ กดแล้วมีผลทันที ไม่ต้องเข้าไปแก้แล้วบันทึก
+                + '<label class="sw-row" title="เปิด/ปิดรับคำตอบ">'
+                + '<input type="checkbox"' + (f.status === 'open' ? ' checked' : '')
+                + ' onchange="quickToggle(' + f.id + ', this.checked, this)">'
+                + '<span class="sw-track"><span class="sw-dot"></span></span>'
+                + '<span class="sw-lab">' + (f.status === 'open' ? 'เปิดรับ' : 'ปิดรับ') + '</span></label>'
                 + '<button type="button" class="btn plain sm" onclick="editForm(' + f.id + ')">แก้ไข</button>'
                 + '<button type="button" class="btn plain sm" onclick="showStats(' + f.id + ')">ผลสรุป</button>'
                 + '<button type="button" class="btn danger sm" onclick="removeForm(' + f.id + ')">ลบ</button>'
@@ -194,17 +219,29 @@ function drawList() {
         }).join('');
 }
 
-async function setStatus(id, status) {
+/** กดสวิตช์ในหน้ารายการ — บันทึกทันที ส่งค่าเดิมทุกช่องไปด้วยเพื่อไม่ให้วันที่หาย */
+async function quickToggle(id, on, el) {
     const f = FORMS.find(x => x.id === id);
     if (!f) return;
-    if (status === 'open' && FORMS.some(x => x.status === 'open' && x.id !== id)
-        && !confirm('เปิดชุดนี้แล้วชุดที่เปิดอยู่จะถูกปิดให้อัตโนมัติ ดำเนินการต่อไหม')) return;
+    const status = on ? 'open' : 'closed';
+
+    if (on && FORMS.some(x => x.status === 'open' && x.id !== id)) {
+        const other = FORMS.find(x => x.status === 'open' && x.id !== id);
+        if (!confirm('ตอนนี้ "' + other.title + '" เปิดรับอยู่\n\nเปิดชุดนี้แล้วชุดนั้นจะถูกปิดให้อัตโนมัติ ดำเนินการต่อไหม')) {
+            if (el) el.checked = !on;
+            return;
+        }
+    }
     try {
         await api('PUT', '/forms/' + id, { title: f.title, intro: f.intro, status: status,
             opensAt: f.opensAt, closesAt: f.closesAt, questions: f.questions });
         await loadForms(); drawList();
-        say(status === 'open' ? 'เปิดรับคำตอบแล้ว ผู้ใช้จะเห็นการ์ดที่หน้าแรกทันที' : 'ปิดรับคำตอบแล้ว');
-    } catch (e) { say(esc(e.message), 'err'); }
+        say(on ? 'เปิดรับคำตอบแล้ว ผู้ใช้เห็นแถบที่หน้าแรกทันที'
+               : 'ปิดรับชั่วคราวแล้ว คำตอบเดิมยังอยู่ครบ เปิดใหม่เมื่อไหร่ก็ได้');
+    } catch (e) {
+        if (el) el.checked = !on;   // คืนสวิตช์กลับ ไม่ให้หน้าจอโกหกว่าสำเร็จ
+        say(esc(e.message), 'err');
+    }
 }
 
 async function removeForm(id) {
@@ -219,6 +256,28 @@ async function removeForm(id) {
 
 function blank() {
     return { id: null, title: '', intro: '', status: 'draft', opensAt: '', closesAt: '', questions: [] };
+}
+
+/** ข้อความใต้สวิตช์ บอกให้ชัดว่าตอนนี้ผู้ใช้เห็นหรือไม่เห็น */
+function activeNote(status) {
+    if (status === 'open') return 'ผู้ใช้เห็นแถบชวนให้คะแนนที่หน้าแรก และตอบได้ทันที';
+    if (status === 'closed') return 'ปิดรับชั่วคราว ผู้ใช้ไม่เห็นที่หน้าแรก คำตอบเดิมยังอยู่ครบ';
+    return 'ยังเป็นฉบับร่าง ผู้ใช้ยังไม่เห็น เปิดสวิตช์เมื่อพร้อมให้ตอบ';
+}
+
+/* เปิดได้ทีละชุด ฝั่งเซิร์ฟเวอร์ปิดชุดอื่นให้เองอยู่แล้ว
+   ตรงนี้แค่เตือนล่วงหน้าไม่ให้แอดมินเผลอปิดชุดที่กำลังเก็บคำตอบอยู่ */
+function onActiveToggle(on) {
+    if (on && FORMS.some(x => x.status === 'open' && x.id !== EDIT.id)) {
+        const other = FORMS.find(x => x.status === 'open' && x.id !== EDIT.id);
+        if (!confirm('ตอนนี้ "' + other.title + '" เปิดรับอยู่\n\nเปิดชุดนี้แล้วชุดนั้นจะถูกปิดให้อัตโนมัติ ดำเนินการต่อไหม')) {
+            document.getElementById('bActive').checked = false;
+            return;
+        }
+    }
+    EDIT.status = on ? 'open' : (EDIT.id ? 'closed' : 'draft');
+    const note = document.getElementById('bActiveNote');
+    if (note) note.textContent = activeNote(EDIT.status);
 }
 function newForm() { EDIT = blank(); go('build'); }
 function editForm(id) {
@@ -282,16 +341,32 @@ function drawBuild() {
         + '<div style="display:flex; gap:8px; flex-wrap:wrap;">'
         + '<button type="button" class="btn plain sm" onclick="go(\'list\')">ยกเลิก</button>'
         + '<button type="button" class="btn gold" onclick="saveForm()">บันทึก</button></div></div>'
+        /* ทุกช่องเขียนลง EDIT ทันทีที่พิมพ์
+           15 ต.ค. 2569 — เดิมอ่านค่าจากช่องกรอกเฉพาะตอนกดบันทึก
+           พอกดเพิ่มคำถาม drawBuild() วาดช่องใหม่จาก EDIT ที่ยังว่างอยู่
+           สิ่งที่พิมพ์ค้างไว้จึงถูกทับหายทั้งสี่ช่อง เจ้าของงานเจอที่ช่องวันที่ */
         + '<div><label class="f" for="bTitle">ชื่อแบบประเมิน</label>'
-        + '<input class="f" id="bTitle" value="' + attr(EDIT.title) + '" placeholder="เช่น ความพึงพอใจพร้อมเบิก รอบที่ 1/2570"></div>'
+        + '<input class="f" id="bTitle" value="' + attr(EDIT.title) + '" oninput="EDIT.title=this.value"'
+        + ' placeholder="เช่น ความพึงพอใจพร้อมเบิก รอบที่ 1/2570"></div>'
         + '<div><label class="f" for="bIntro">คำชี้แจง (ไม่บังคับ)</label>'
-        + '<textarea class="f" id="bIntro" rows="2" placeholder="ข้อความสั้น ๆ ที่จะขึ้นใต้หัวเรื่อง">' + esc(EDIT.intro) + '</textarea></div>'
+        + '<textarea class="f" id="bIntro" rows="2" oninput="EDIT.intro=this.value"'
+        + ' placeholder="ข้อความสั้น ๆ ที่จะขึ้นใต้หัวเรื่อง">' + esc(EDIT.intro) + '</textarea></div>'
         + '<div style="display:flex; gap:14px; flex-wrap:wrap;">'
         + '<div style="flex:1 1 200px;"><label class="f" for="bOpen">เปิดรับตั้งแต่</label>'
-        + '<input class="f" type="date" id="bOpen" value="' + attr(EDIT.opensAt || '') + '"></div>'
+        + '<input class="f" type="date" id="bOpen" value="' + attr(EDIT.opensAt || '') + '" oninput="EDIT.opensAt=this.value"></div>'
         + '<div style="flex:1 1 200px;"><label class="f" for="bClose">ปิดรับ</label>'
-        + '<input class="f" type="date" id="bClose" value="' + attr(EDIT.closesAt || '') + '"></div></div>'
-        + '<p style="margin:0; font-size:13.5px; color:var(--muted); line-height:1.7;">เว้นว่างได้ทั้งคู่ ถ้าเว้นไว้จะเปิดรับจนกว่าจะกดปิดเอง</p>'
+        + '<input class="f" type="date" id="bClose" value="' + attr(EDIT.closesAt || '') + '" oninput="EDIT.closesAt=this.value"></div></div>'
+        + '<p style="margin:0; font-size:13.5px; color:var(--muted); line-height:1.7;">เว้นว่างได้ทั้งคู่ ถ้าเว้นไว้จะเปิดรับจนกว่าจะปิดสวิตช์เอง</p>'
+
+        /* สวิตช์เปิด/ปิดรับคำตอบ — ปิดไว้ชั่วคราวได้โดยไม่ต้องลบชุดทิ้ง
+           ช่วงวันที่คุมว่า "เปิดได้ถึงเมื่อไหร่" ส่วนสวิตช์คุมว่า "ตอนนี้เอาไหม" */
+        + '<div class="sw-box">'
+        + '<label class="sw"><input type="checkbox" id="bActive"' + (EDIT.status === 'open' ? ' checked' : '')
+        + ' onchange="onActiveToggle(this.checked)"><span class="sw-track"><span class="sw-dot"></span></span></label>'
+        + '<div style="min-width:0; display:flex; flex-direction:column; gap:3px;">'
+        + '<b style="font-family:\'Kanit\',sans-serif; font-size:16px; font-weight:500;">เปิดรับคำตอบ</b>'
+        + '<span id="bActiveNote" style="font-size:13.5px; color:var(--muted); line-height:1.6;">'
+        + activeNote(EDIT.status) + '</span></div></div>'
         + '</div>'
 
         + '<div style="display:flex; gap:18px; flex-wrap:wrap; align-items:flex-start;">'
@@ -365,18 +440,27 @@ function qEditor(q, i) {
 }
 
 async function saveForm() {
-    EDIT.title = document.getElementById('bTitle').value;
-    EDIT.intro = document.getElementById('bIntro').value;
-    EDIT.opensAt = document.getElementById('bOpen').value;
-    EDIT.closesAt = document.getElementById('bClose').value;
+    // อ่านจากช่องกรอกอีกรอบเผื่อเบราว์เซอร์เติมค่าให้เองโดยไม่ยิง input
+    // (ตัวเลือกวันที่บางตัวทำแบบนั้น) ปกติ EDIT ตรงอยู่แล้วจาก oninput
+    const grab = (id, key) => { const e = document.getElementById(id); if (e) EDIT[key] = e.value; };
+    grab('bTitle', 'title'); grab('bIntro', 'intro');
+    grab('bOpen', 'opensAt'); grab('bClose', 'closesAt');
 
     const body = { title: EDIT.title, intro: EDIT.intro, opensAt: EDIT.opensAt,
-                   closesAt: EDIT.closesAt, questions: EDIT.questions };
+                   closesAt: EDIT.closesAt, questions: EDIT.questions, status: EDIT.status };
     try {
-        if (EDIT.id) { body.status = EDIT.status; await api('PUT', '/forms/' + EDIT.id, body); }
-        else await api('POST', '/forms', body);
+        if (EDIT.id) await api('PUT', '/forms/' + EDIT.id, body);
+        else {
+            const made = await api('POST', '/forms', body);
+            // ตอนสร้างใหม่ เซิร์ฟเวอร์ตั้งเป็นฉบับร่างเสมอ
+            // ถ้าแอดมินเปิดสวิตช์ไว้ตั้งแต่แรก ต้องสั่งเปิดตามให้ด้วย
+            if (EDIT.status === 'open' && made.id)
+                await api('PUT', '/forms/' + made.id, Object.assign({}, body, { status: 'open' }));
+        }
         await loadForms(); go('list');
-        say('บันทึกแล้ว · กด <b>เปิดรับ</b> เมื่อพร้อมให้ผู้ใช้ตอบ');
+        say(EDIT.status === 'open'
+            ? 'บันทึกและเปิดรับคำตอบแล้ว ผู้ใช้เห็นที่หน้าแรกทันที'
+            : 'บันทึกแล้ว · เปิดสวิตช์ <b>เปิดรับคำตอบ</b> เมื่อพร้อมให้ผู้ใช้ตอบ');
     } catch (e) { say(esc(e.message), 'err'); }
 }
 
@@ -485,5 +569,11 @@ function qStats(q) {
 })();
 </script>
 <script src="auth-guard.js"></script>
+<script>
+    /* หน้านี้ผู้ดูแลเท่านั้น เหมือน admin.html
+       หลังบ้านกั้นอยู่แล้วทุกเส้นทาง (requireAdmin) ตรงนี้กันไม่ให้คนที่ไม่มีสิทธิ์
+       เปิดหน้าขึ้นมาเห็นหน้าตาเปล่า ๆ แล้วงงว่าทำอะไรไม่ได้ */
+    initAuthGuard({ adminOnly: true });
+</script>
 </body>
 </html>

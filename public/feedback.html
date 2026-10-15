@@ -514,5 +514,9 @@ async function submitFeedback() {
 load();
 </script>
 <script src="auth-guard.js"></script>
+<script>
+    // ต้องล็อกอินก่อนจึงจะตอบได้ และได้แถบด้านบนของระบบเหมือนหน้าอื่น
+    initAuthGuard();
+</script>
 </body>
 </html>

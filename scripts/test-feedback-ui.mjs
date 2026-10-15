@@ -104,8 +104,12 @@ try {
      await ev("return document.querySelectorAll('.star').length;") === 5);
   ok('สเกล 1-10 มีครบ 10 ปุ่ม',
      await ev("return [...document.querySelectorAll('#questions button')].filter(b=>/^(10|[1-9])$/.test(b.textContent.trim())).length;") === 10);
+  // ดูเฉพาะกล่องคำถาม ไม่รวมแถบระบบด้านบนที่ auth-guard วาดให้
+  // แถบนั้นมีอิโมจิกุญแจของปุ่มเปลี่ยนรหัสผ่านอยู่ ซึ่งไม่ใช่ของหน้านี้
   ok('หน้ายิ้มวาดด้วย SVG ไม่ใช่อิโมจิ',
-     await ev("return document.querySelector('.face svg') !== null && !/[\\u{1F300}-\\u{1FAFF}]/u.test(document.body.innerText);"));
+     await ev("const q = document.getElementById('questions');"
+            + "return document.querySelector('.face svg') !== null"
+            + " && !/[\\u{1F300}-\\u{1FAFF}]/u.test(q.innerText);"));
 
   console.log('');
   console.log('═══ 2. แถบความคืบหน้าและปุ่มส่ง ═══');
