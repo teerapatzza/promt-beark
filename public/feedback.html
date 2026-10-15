@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <script src="api-fetch.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ให้คะแนนการใช้งาน — พร้อมเบิก</title>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="theme.css">
+    <script src="theme.js"></script>
+<style>
+/* หน้านี้ไม่ใช้ Tailwind เหมือนหน้าอื่น เพราะเป็นหน้าเดี่ยวที่ไม่ได้ใช้คลาสร่วมกับใคร
+   เขียน CSS ตรง ๆ จบในไฟล์เดียว อ่านง่ายกว่าและโหลดเร็วกว่า */
+:root {
+    --navy:   #031A52;
+    --navy2:  #0B2D7A;
+    --ink:    #14213D;
+    --muted:  #5A667B;
+    --line:   #E1E7F2;
+    --bg:     #F1F4FA;
+    --gold:   #CF952B;
+    --gold-l: #FFD58A;
+}
+* { box-sizing: border-box; }
+body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: 'Sarabun', sans-serif; font-size: 16px;
+}
+.hero {
+    position: relative; overflow: hidden;
+    background: linear-gradient(160deg, var(--navy) 0%, var(--navy2) 100%);
+    padding: 52px 0 96px;
+}
+.hero .ring {
+    position: absolute; border-radius: 50%;
+    border: 1.5px solid rgba(255,255,255,.10); pointer-events: none;
+}
+.hero .dot { position: absolute; border-radius: 50%; background: var(--gold); pointer-events: none; }
+.wrap { width: 100%; max-width: 760px; margin: 0 auto; padding: 0 16px; }
+.eyebrow {
+    align-self: flex-start; background: rgba(207,149,43,.18);
+    border: 1px solid rgba(255,213,138,.38); color: var(--gold-l);
+    font-size: 14px; font-weight: 600; letter-spacing: .04em;
+    padding: 6px 15px; border-radius: 999px;
+}
+.hero h1 {
+    margin: 0; font-family: 'Kanit', sans-serif; font-weight: 600;
+    font-size: 40px; line-height: 1.3; color: #fff; text-wrap: balance;
+}
+.hero p { margin: 0; font-size: 18px; line-height: 1.7; color: #C9D7F2; max-width: 560px; }
+.pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(255,255,255,.10); color: #fff;
+    font-size: 14.5px; font-weight: 500; padding: 8px 16px; border-radius: 999px;
+}
+/* ยกขึ้นเหนือแถบหัวเรื่องด้วยเหตุผลเดียวกับหน้าผู้ดูแล */
+.body { position: relative; z-index: 1; max-width: 760px; margin: -48px auto 0; padding: 0 16px 72px; display: flex; flex-direction: column; gap: 16px; }
+.bar {
+    position: sticky; top: 12px; z-index: 5; background: #fff;
+    border: 1px solid var(--line); border-radius: 18px; padding: 14px 20px 16px;
+    box-shadow: 0 10px 28px rgba(11,35,88,.14);
+    display: flex; flex-direction: column; gap: 10px;
+}
+.bar .track { height: 8px; border-radius: 999px; background: #E6EBF5; overflow: hidden; }
+.bar .fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #2FA35B, #4FBF7A); transition: width .25s ease; }
+.card {
+    background: #fff; border: 1px solid var(--line); border-radius: 24px;
+    box-shadow: 0 1px 2px rgba(11,35,88,.05), 0 10px 28px rgba(11,35,88,.06);
+    padding: 28px; display: flex; flex-direction: column; gap: 22px;
+}
+.qhead { display: flex; align-items: flex-start; gap: 14px; }
+.badge {
+    flex: none; width: 34px; height: 34px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Kanit', sans-serif; font-size: 16px; font-weight: 600;
+    background: #EEF2FA; color: var(--muted); border: 1.5px solid var(--line);
+    transition: background .2s ease, color .2s ease, border-color .2s ease;
+}
+.badge.done { background: #2FA35B; color: #fff; border-color: #2FA35B; }
+.qtitle { margin: 0; font-family: 'Kanit', sans-serif; font-size: 21px; font-weight: 500; line-height: 1.4; color: var(--ink); }
+.qhint { font-size: 15px; color: var(--muted); }
+.req { color: #C2410C; font-weight: 700; }
+.sect {
+    display: flex; align-items: center; gap: 14px;
+    font-family: 'Kanit', sans-serif; font-size: 15px; font-weight: 500;
+    letter-spacing: .04em; color: #8A5A05;
+}
+.sect::before, .sect::after { content: ""; height: 1px; flex-grow: 1; background: #EADDC4; }
+.btn { all: unset; box-sizing: border-box; cursor: pointer; display: block; }
+.btn:focus-visible { outline: 3px solid var(--navy2); outline-offset: 3px; }
+.tile { transition: box-shadow .15s ease, transform .15s ease, border-color .15s ease, background .15s ease; }
+.tile:hover { box-shadow: 0 8px 18px rgba(11,35,88,.10); transform: translateY(-1px); }
+.faces { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.face {
+    display: flex; flex-direction: column; align-items: center; gap: 9px;
+    padding: 16px 6px 14px; border-radius: 20px; text-align: center;
+    background: #fff; border: 2px solid #EDF1F8;
+}
+.face.on { background: #FFF8EC; border-color: var(--gold); }
+.face svg { transition: transform .15s ease; max-width: 100%; height: auto; }
+.face:hover svg { transform: scale(1.08); }
+.face span { font-size: 14px; line-height: 1.4; color: var(--ink); font-weight: 500; }
+.face.on span { font-weight: 700; }
+.star svg { transition: transform .15s ease; }
+.star:hover svg { transform: scale(1.14); }
+.chip {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 15.5px; font-weight: 600; padding: 12px 20px; border-radius: 999px;
+    background: #fff; color: #334155; border: 1.5px solid #E1E7F2;
+}
+.chip.on { background: var(--navy); color: #fff; border-color: var(--navy); }
+.chip .mark {
+    flex: none; width: 20px; height: 20px; border-radius: 50%;
+    border: 2px solid #C7D2E4; display: flex; align-items: center; justify-content: center;
+}
+.chip.on .mark { background: var(--gold); border-color: var(--gold); }
+.yn { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.yn .btn {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    font-size: 16.5px; font-weight: 600; padding: 16px 18px; border-radius: 18px;
+    background: #fff; color: #475569; border: 2px solid #E1E7F2;
+}
+.yn .btn.on.good { background: #ECFDF3; color: #14663A; border-color: #2FA35B; }
+.yn .btn.on.bad  { background: #FEF2F2; color: #B91C1C; border-color: #DC2626; }
+textarea.ta {
+    width: 100%; font-family: 'Sarabun', sans-serif; font-size: 16.5px; line-height: 1.7;
+    color: var(--ink); border: 1.5px solid #C9D3E6; background: #F8FAFD;
+    border-radius: 16px; padding: 16px 18px; resize: vertical; outline: none;
+    transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+}
+textarea.ta:focus { border-color: var(--navy2); background: #fff; box-shadow: 0 0 0 4px rgba(11,35,88,.12); }
+.cta {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    text-align: center; font-family: 'Kanit', sans-serif; font-size: 18px; font-weight: 600;
+    padding: 17px 24px; border-radius: 18px;
+    background: var(--gold); color: #1B1300; box-shadow: 0 8px 18px rgba(207,149,43,.30);
+    transition: transform .15s ease;
+}
+.cta:hover { transform: translateY(-1px); }
+.cta[disabled] { background: #DDE3EE; color: #8A94A6; box-shadow: none; cursor: not-allowed; transform: none; }
+.note { text-align: center; font-size: 14.5px; color: var(--muted); }
+.err {
+    background: #FEF2F2; border: 1.5px solid #FCA5A5; color: #991B1B;
+    border-radius: 16px; padding: 14px 18px; font-size: 15px; line-height: 1.7;
+}
+.back {
+    display: inline-flex; align-items: center; gap: 8px; color: #B7D3FF;
+    font-size: 15px; font-weight: 600; text-decoration: none; margin-bottom: 4px;
+}
+.back:hover { color: #fff; }
+@media (max-width: 560px) {
+    .hero { padding: 36px 0 84px; }
+    .hero h1 { font-size: 30px; }
+    .faces { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+    .face { padding: 12px 3px 10px; border-radius: 16px; }
+    .face span { font-size: 11.5px; }
+    .card { padding: 20px; border-radius: 20px; }
+    .yn { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .tile, .face svg, .star svg, textarea.ta, .cta, .bar .fill { transition: none; }
+    .tile:hover, .cta:hover { transform: none; }
+    .face:hover svg, .star:hover svg { transform: none; }
+}
+</style>
+</head>
+<body>
+
+<div class="hero">
+    <span class="ring" style="right:-90px; top:-120px; width:400px; height:400px;"></span>
+    <span class="ring" style="right:-10px; top:-50px; width:250px; height:250px;"></span>
+    <span class="dot" style="right:150px; top:40px; width:14px; height:14px;"></span>
+    <div class="wrap" style="position:relative; display:flex; flex-direction:column; gap:16px;">
+        <a class="back" href="index.html">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"></path><path d="M11 18l-6-6 6-6"></path></svg>
+            กลับหน้าแรก
+        </a>
+        <span class="eyebrow">แบบประเมินการใช้งาน</span>
+        <h1 id="fTitle">กำลังโหลดแบบประเมิน…</h1>
+        <p id="fIntro"></p>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:4px;">
+            <span class="pill">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
+                ใช้เวลาประมาณ 2 นาที
+            </span>
+            <span class="pill">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                ไม่เก็บชื่อผู้ตอบ ตอบได้เต็มที่
+            </span>
+        </div>
+    </div>
+</div>
+
+<div class="body">
+    <div id="barBox" class="bar" hidden>
+        <div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+            <span style="font-size:15.5px;">ตอบแล้ว <b id="barDone" style="font-family:'Kanit',sans-serif; font-size:17px;">0</b> จาก <span id="barTotal">0</span> ข้อที่ต้องตอบ</span>
+            <span id="barLeft" style="font-size:14.5px; font-weight:600; color:#5A667B;"></span>
+        </div>
+        <div class="track"><div id="barFill" class="fill" style="width:0%"></div></div>
+    </div>
+
+    <div id="msg"></div>
+    <div id="questions" style="display:flex; flex-direction:column; gap:16px;"></div>
+
+    <div id="sendBox" style="display:none; flex-direction:column; gap:12px; padding-top:8px;">
+        <button type="button" id="sendBtn" class="btn cta" onclick="submitFeedback()">
+            <span id="sendLabel">ส่งแบบประเมิน</span>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"></path><path d="M13 6l6 6-6 6"></path></svg>
+        </button>
+        <span id="sendHint" class="note"></span>
+    </div>
+
+    <p class="note" style="margin:8px 0 0; font-size:13.5px; line-height:1.7;">สถาบันรับรองคุณภาพสถานพยาบาล (องค์การมหาชน)</p>
+</div>
+
+<script>
+'use strict';
+
+/* กุญแจสำหรับกลับมาแก้คำตอบของตัวเอง เก็บไว้ในเบราว์เซอร์เท่านั้น
+   เป็นค่าสุ่มจากเซิร์ฟเวอร์ ไม่ได้คิดจากตัวผู้ใช้ จึงไม่บอกว่าใครเป็นใคร
+   ย้ายเครื่องหรือล้างข้อมูลเบราว์เซอร์ = ตอบใหม่เป็นคำตอบใหม่ ไม่ทับของเดิม */
+const TOKEN_KEY = 'pbFeedbackToken';
+const tokenFor = id => localStorage.getItem(TOKEN_KEY + ':' + id) || '';
+const saveToken = (id, t) => { try { localStorage.setItem(TOKEN_KEY + ':' + id, t); } catch (_) {} };
+
+let FORM = null;
+let ANSWERS = {};
+let EDITING = false;
+
+const esc = s => String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+const FACE_LABELS = ['ไม่พอใจมาก', 'ไม่ค่อยพอใจ', 'เฉย ๆ', 'พอใจ', 'พอใจมาก'];
+const FACE_COLORS = ['#C2410C', '#E07B39', '#B8860B', '#4E9F7D', '#15803D'];
+
+/** วาดหน้ายิ้มแต่ละระดับ — เขียน SVG เอง ไม่ใช้อิโมจิ จะได้คมและคุมสีได้ */
+function faceSvg(level, on) {
+    const c = on ? FACE_COLORS[level - 1] : '#B8C0CC';
+    const mouth = [
+        'M15 32c2.4-4 5.6-6 9-6s6.6 2 9 6',
+        'M16 32c2.2-3 5-4.4 8-4.4s5.8 1.4 8 4.4',
+        'M16 30h16',
+        'M16 28c2.2 3.4 5 5 8 5s5.8-1.6 8-5',
+        'M14 27c2.8 4.8 6.2 7.2 10 7.2s7.2-2.4 10-7.2z'
+    ][level - 1];
+    const brow = level === 1 ? '<path d="M14 17l6 3" stroke="' + c + '" stroke-width="2.4"></path>'
+                             + '<path d="M34 17l-6 3" stroke="' + c + '" stroke-width="2.4"></path>' : '';
+    const eyes = level === 5
+        ? '<path d="M17 19.5c1.2-1.6 3.2-1.6 4.4 0" stroke="' + c + '" stroke-width="2.4"></path>'
+        + '<path d="M26.6 19.5c1.2-1.6 3.2-1.6 4.4 0" stroke="' + c + '" stroke-width="2.4"></path>'
+        : '<circle cx="18" cy="' + (level === 1 ? 22 : 20) + '" r="1.9" fill="' + c + '"></circle>'
+        + '<circle cx="30" cy="' + (level === 1 ? 22 : 20) + '" r="1.9" fill="' + c + '"></circle>';
+    return '<svg width="56" height="56" viewBox="0 0 48 48" fill="none" stroke="' + c + '" '
+        + 'stroke-width="2.4" stroke-linecap="round" aria-hidden="true">'
+        + '<circle cx="24" cy="24" r="20"></circle>'
+        + '<path d="' + mouth + '" ' + (level === 5 ? 'fill="' + c + '" fill-opacity=".14"' : '') + '></path>'
+        + brow + eyes + '</svg>';
+}
+
+const starSvg = (on, size) =>
+    '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="' + (on ? '#CF952B' : '#FFFFFF')
+    + '" stroke="' + (on ? '#CF952B' : '#C9CFD8') + '" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true">'
+    + '<path d="M12 3.6l2.6 5.3 5.8.85-4.2 4.1 1 5.8-5.2-2.74-5.2 2.74 1-5.8-4.2-4.1 5.8-.85z"></path></svg>';
+
+const CHECK = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"></path></svg>';
+
+/** ข้อที่ต้องตอบทั้งหมด ใช้คิดแถบความคืบหน้าและเปิด-ปิดปุ่มส่ง */
+function requiredIds() {
+    return (FORM.questions || []).filter(q => q.required).map(q => q.id);
+}
+function answered(id) {
+    const v = ANSWERS[id];
+    return !(v == null || v === '' || (Array.isArray(v) && !v.length));
+}
+
+function render() {
+    const box = document.getElementById('questions');
+    box.innerHTML = (FORM.questions || []).map((q, i) => renderQuestion(q, i)).join('');
+    document.getElementById('sendBox').style.display = 'flex';
+    updateProgress();
+}
+
+function renderQuestion(q, i) {
+    if (q.kind === 'section') {
+        return '<div class="sect">' + esc(q.title) + '</div>';
+    }
+    const done = answered(q.id);
+    const num = (FORM.questions || []).slice(0, i).filter(x => x.kind !== 'section').length + 1;
+    const head =
+        '<div class="qhead">'
+        + '<span class="badge' + (done ? ' done' : '') + '" id="badge-' + esc(q.id) + '">'
+        + (done ? CHECK : num) + '</span>'
+        + '<div style="min-width:0; display:flex; flex-direction:column; gap:4px; padding-top:1px;">'
+        + '<h2 class="qtitle">' + esc(q.title) + (q.required ? ' <span class="req">*</span>' : '') + '</h2>'
+        + (q.hint ? '<span class="qhint">' + esc(q.hint) + '</span>'
+                  : '<span class="qhint">' + (q.required ? 'ต้องตอบข้อนี้' : 'ไม่บังคับ เว้นว่างได้') + '</span>')
+        + '</div></div>';
+    return '<section class="card">' + head + renderInput(q) + '</section>';
+}
+
+function renderInput(q) {
+    const v = ANSWERS[q.id];
+
+    if (q.kind === 'face') {
+        return '<div class="faces">' + [1, 2, 3, 4, 5].map(n =>
+            '<button type="button" class="btn face tile' + (v === n ? ' on' : '') + '"'
+            + ' aria-pressed="' + (v === n ? 'true' : 'false') + '"'
+            + ' onclick="pick(\'' + esc(q.id) + '\',' + n + ')">'
+            + faceSvg(n, v === n) + '<span>' + FACE_LABELS[n - 1] + '</span></button>').join('') + '</div>';
+    }
+
+    if (q.kind === 'star' || q.kind === 'scale') {
+        const max = q.max || 5;
+        if (q.kind === 'star') {
+            return '<div style="display:flex; align-items:center; gap:6px 14px; flex-wrap:wrap;">'
+                + '<div style="display:flex; align-items:center; gap:4px;">'
+                + Array.from({ length: max }, (_, k) => k + 1).map(n =>
+                    '<button type="button" class="btn star" aria-label="ให้ ' + n + ' ดาว"'
+                    + ' aria-pressed="' + (v >= n ? 'true' : 'false') + '"'
+                    + ' style="padding:4px; border-radius:14px; line-height:0;"'
+                    + ' onclick="pick(\'' + esc(q.id) + '\',' + n + ')">'
+                    + starSvg(v >= n, 42) + '</button>').join('')
+                + '</div><span style="font-size:15.5px; font-weight:600; color:var(--navy);">'
+                + (v ? v + ' จาก ' + max : '') + '</span></div>';
+        }
+        return '<div style="display:flex; flex-direction:column; gap:10px;">'
+            + '<div style="display:flex; gap:8px; flex-wrap:wrap;">'
+            + Array.from({ length: max }, (_, k) => k + 1).map(n =>
+                '<button type="button" class="btn tile" aria-pressed="' + (v === n ? 'true' : 'false') + '"'
+                + ' onclick="pick(\'' + esc(q.id) + '\',' + n + ')"'
+                + ' style="width:48px; height:48px; display:flex; align-items:center; justify-content:center;'
+                + ' border-radius:14px; font-family:\'Kanit\',sans-serif; font-size:17px; font-weight:600;'
+                + (v === n ? 'background:var(--navy); color:#fff; border:2px solid var(--navy);'
+                           : 'background:#fff; color:#334155; border:2px solid #E1E7F2;') + '">'
+                + n + '</button>').join('')
+            + '</div>'
+            + ((q.minLabel || q.maxLabel)
+                ? '<div style="display:flex; justify-content:space-between; font-size:14px; color:var(--muted);">'
+                  + '<span>' + esc(q.minLabel || '') + '</span><span>' + esc(q.maxLabel || '') + '</span></div>'
+                : '')
+            + '</div>';
+    }
+
+    if (q.kind === 'choice' || q.kind === 'multi') {
+        const picked = q.kind === 'multi' ? (Array.isArray(v) ? v : []) : [v];
+        return '<div style="display:flex; gap:10px; flex-wrap:wrap;">' + (q.options || []).map(o => {
+            const on = picked.indexOf(o) >= 0;
+            return '<button type="button" class="btn chip tile' + (on ? ' on' : '') + '"'
+                + ' aria-pressed="' + (on ? 'true' : 'false') + '"'
+                + ' onclick="' + (q.kind === 'multi' ? 'toggle' : 'pick')
+                + '(\'' + esc(q.id) + '\',\'' + esc(o).replace(/'/g, '&#39;') + '\')">'
+                + '<span class="mark">' + (on
+                    ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"></path></svg>'
+                    : '') + '</span>'
+                + '<span>' + esc(o) + '</span></button>';
+        }).join('') + '</div>';
+    }
+
+    if (q.kind === 'yesno') {
+        return '<div class="yn">'
+            + '<button type="button" class="btn tile good' + (v === 'yes' ? ' on' : '') + '"'
+            + ' aria-pressed="' + (v === 'yes' ? 'true' : 'false') + '"'
+            + ' onclick="pick(\'' + esc(q.id) + '\',\'yes\')">'
+            + '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"></path></svg>ใช่</button>'
+            + '<button type="button" class="btn tile bad' + (v === 'no' ? ' on' : '') + '"'
+            + ' aria-pressed="' + (v === 'no' ? 'true' : 'false') + '"'
+            + ' onclick="pick(\'' + esc(q.id) + '\',\'no\')">'
+            + '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6L6 18"></path><path d="M6 6l12 12"></path></svg>ไม่ใช่</button>'
+            + '</div>';
+    }
+
+    // text
+    return '<div style="display:flex; flex-direction:column; gap:8px;">'
+        + '<textarea class="ta" rows="5" maxlength="500" id="ta-' + esc(q.id) + '"'
+        + ' oninput="onText(\'' + esc(q.id) + '\', this)"'
+        + ' placeholder="เล่าให้ฟังได้เลยค่ะ ไม่ว่าจะชมหรือติ เราอ่านทุกข้อความ">'
+        + esc(v || '') + '</textarea>'
+        + '<span style="align-self:flex-end; font-size:13.5px; color:var(--muted);">'
+        + '<span id="len-' + esc(q.id) + '">' + String(v || '').length + '</span>/500</span></div>';
+}
+
+function pick(id, value) {
+    // กดซ้ำที่ตัวเดิม = ยกเลิกคำตอบ สำหรับข้อที่ไม่บังคับ
+    const q = (FORM.questions || []).find(x => x.id === id);
+    if (ANSWERS[id] === value && q && !q.required) delete ANSWERS[id];
+    else ANSWERS[id] = value;
+    render();
+}
+
+function toggle(id, value) {
+    const cur = Array.isArray(ANSWERS[id]) ? ANSWERS[id].slice() : [];
+    const at = cur.indexOf(value);
+    if (at >= 0) cur.splice(at, 1); else cur.push(value);
+    if (cur.length) ANSWERS[id] = cur; else delete ANSWERS[id];
+    render();
+}
+
+/* ช่องข้อความไม่วาดใหม่ทั้งหน้า ไม่งั้นเคอร์เซอร์จะเด้งไปท้ายข้อความทุกตัวอักษร
+   อัปเดตเฉพาะตัวนับกับแถบความคืบหน้าพอ */
+function onText(id, el) {
+    const s = el.value;
+    if (s.trim()) ANSWERS[id] = s; else delete ANSWERS[id];
+    const len = document.getElementById('len-' + id);
+    if (len) len.textContent = String(s.length);
+    const badge = document.getElementById('badge-' + id);
+    if (badge) {
+        const on = !!s.trim();
+        badge.classList.toggle('done', on);
+        if (on && badge.innerHTML.indexOf('svg') < 0) badge.innerHTML = CHECK;
+        if (!on && badge.innerHTML.indexOf('svg') >= 0) {
+            const i = (FORM.questions || []).findIndex(x => x.id === id);
+            badge.textContent = String((FORM.questions || []).slice(0, i).filter(x => x.kind !== 'section').length + 1);
+        }
+    }
+    updateProgress();
+}
+
+function updateProgress() {
+    const req = requiredIds();
+    const done = req.filter(answered).length;
+    const box = document.getElementById('barBox');
+    box.hidden = req.length === 0;
+    document.getElementById('barDone').textContent = String(done);
+    document.getElementById('barTotal').textContent = String(req.length);
+    document.getElementById('barFill').style.width = req.length ? Math.round(done / req.length * 100) + '%' : '0%';
+
+    const left = req.length - done;
+    const leftEl = document.getElementById('barLeft');
+    leftEl.textContent = left === 0 ? 'ครบแล้ว ส่งได้เลย' : 'เหลืออีก ' + left + ' ข้อ';
+    leftEl.style.color = left === 0 ? '#15803D' : 'var(--muted)';
+
+    const btn = document.getElementById('sendBtn');
+    btn.disabled = left > 0;
+    document.getElementById('sendLabel').textContent = EDITING ? 'บันทึกคำตอบที่แก้' : 'ส่งแบบประเมิน';
+    document.getElementById('sendHint').textContent = left > 0
+        ? 'ตอบข้อที่มีเครื่องหมาย * ให้ครบก่อนจึงจะส่งได้'
+        : (EDITING ? 'คำตอบเดิมของท่านจะถูกแทนที่ด้วยชุดนี้' : 'ส่งแล้วกลับมาแก้ได้จากเครื่องนี้');
+}
+
+function showMessage(html, kind) {
+    document.getElementById('msg').innerHTML = html
+        ? '<div class="' + (kind === 'err' ? 'err' : 'card') + '">' + html + '</div>' : '';
+}
+
+async function load() {
+    try {
+        const r = await fetch('/feedback/active' + (location.search || ''));
+        if (r.status === 401) { location.href = 'login.html'; return; }
+        const d = await r.json();
+
+        if (!d.form) {
+            document.getElementById('fTitle').textContent = 'ตอนนี้ยังไม่มีแบบประเมินที่เปิดรับ';
+            document.getElementById('fIntro').textContent = 'เมื่อผู้ดูแลเปิดรอบใหม่ ท่านจะเห็นที่หน้าแรก';
+            showMessage('<p style="margin:0; line-height:1.8;">ขอบคุณที่แวะเข้ามาค่ะ '
+                + 'กลับไปที่ <a href="index.html" style="color:var(--navy2); font-weight:600;">หน้าแรก</a> ได้เลย</p>');
+            return;
+        }
+
+        FORM = d.form;
+        document.getElementById('fTitle').textContent = FORM.title;
+        document.getElementById('fIntro').textContent = FORM.intro || 'ความเห็นของท่านช่วยให้เราปรับระบบให้ใช้ง่ายขึ้น';
+
+        // เคยตอบจากเครื่องนี้แล้ว ดึงคำตอบเดิมมาให้แก้ต่อ
+        const tok = tokenFor(FORM.id);
+        if (tok) {
+            const r2 = await fetch('/feedback/active?token=' + encodeURIComponent(tok));
+            const d2 = await r2.json();
+            if (d2.mine) {
+                ANSWERS = d2.mine.answers || {};
+                EDITING = true;
+                showMessage('<div style="display:flex; align-items:center; gap:12px;">'
+                    + '<span style="flex:none; width:38px; height:38px; border-radius:50%; background:#EAF6EF; color:#14663A; display:flex; align-items:center; justify-content:center;">'
+                    + CHECK + '</span>'
+                    + '<span style="line-height:1.7;">ท่านเคยตอบชุดนี้ไว้แล้ว ระบบดึงคำตอบเดิมขึ้นมาให้ '
+                    + 'แก้ตรงไหนก็ได้ แล้วกดบันทึก คำตอบเดิมจะถูกแทนที่</span></div>');
+            }
+        }
+        render();
+    } catch (e) {
+        showMessage('เปิดแบบประเมินไม่สำเร็จ ลองรีเฟรชหน้านี้อีกครั้ง', 'err');
+    }
+}
+
+async function submitFeedback() {
+    const btn = document.getElementById('sendBtn');
+    btn.disabled = true;
+    const label = document.getElementById('sendLabel');
+    const was = label.textContent;
+    label.textContent = 'กำลังส่ง…';
+    try {
+        const r = await fetch('/feedback/respond', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: tokenFor(FORM.id), answers: ANSWERS })
+        });
+        const d = await r.json();
+        if (!r.ok) {
+            showMessage(esc(d.error || 'ส่งไม่สำเร็จ ลองใหม่อีกครั้ง'), 'err');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            label.textContent = was;
+            btn.disabled = false;
+            return;
+        }
+        if (d.token) saveToken(FORM.id, d.token);
+        location.href = 'feedback-done.html?updated=' + (d.updated ? '1' : '0');
+    } catch (e) {
+        showMessage('ส่งไม่สำเร็จ เครือข่ายอาจขัดข้อง ลองใหม่อีกครั้ง', 'err');
+        label.textContent = was;
+        btn.disabled = false;
+    }
+}
+
+load();
+</script>
+<script src="auth-guard.js"></script>
+</body>
+</html>

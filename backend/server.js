@@ -100,6 +100,47 @@ db.exec(`
     last_at  TEXT DEFAULT (datetime('now'))
   );
   CREATE UNIQUE INDEX IF NOT EXISTS idx_places_norm ON places(norm);
+
+  -- ── แบบประเมินการใช้งาน ───────────────────────────────────────
+  -- แยกจากตารางอื่นทั้งหมด ไม่มีคีย์เชื่อมกับ expenses หรือ profiles
+  -- ลบสามตารางนี้ทิ้งทั้งชุด ระบบเบิกยังทำงานได้ครบเหมือนเดิม
+
+  -- ชุดคำถามที่ผู้ดูแลสร้าง questions เก็บเป็น JSON เพราะจำนวนและชนิดข้อ
+  -- เปลี่ยนได้อิสระ ถ้าแตกเป็นตารางย่อยจะต้องย้ายข้อมูลทุกครั้งที่เพิ่มชนิดคำถาม
+  CREATE TABLE IF NOT EXISTS feedback_forms (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    title      TEXT NOT NULL,
+    intro      TEXT DEFAULT '',
+    status     TEXT DEFAULT 'draft',     -- draft | open | closed
+    opens_at   TEXT,
+    closes_at  TEXT,
+    questions  TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+  );
+
+  -- คำตอบ — ตั้งใจไม่มีคอลัมน์ user_id
+  -- edit_token เป็นค่าสุ่ม ไม่ได้คิดจากตัวผู้ใช้ เก็บไว้ฝั่งเบราว์เซอร์
+  -- ให้เจ้าของคำตอบกลับมาแก้ของตัวเองได้ โดยเซิร์ฟเวอร์ยังไม่รู้ว่าเป็นใคร
+  CREATE TABLE IF NOT EXISTS feedback_responses (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    form_id      INTEGER NOT NULL,
+    answers      TEXT NOT NULL DEFAULT '{}',
+    edit_token   TEXT NOT NULL,
+    submitted_at TEXT DEFAULT (datetime('now')),
+    updated_at   TEXT DEFAULT (datetime('now'))
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_fb_token ON feedback_responses(edit_token);
+  CREATE INDEX IF NOT EXISTS idx_fb_form ON feedback_responses(form_id);
+
+  -- บันทึกเพียงว่า "คนนี้ตอบชุดนี้แล้ว" เพื่อกันตอบซ้ำและนับผู้ตอบ
+  -- ไม่มีคอลัมน์ใดเชื่อมกลับไปหาแถวคำตอบ จึงหาไม่ได้ว่าใครตอบว่าอะไร
+  CREATE TABLE IF NOT EXISTS feedback_submitted (
+    form_id      INTEGER NOT NULL,
+    user_id      INTEGER NOT NULL,
+    submitted_at TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (form_id, user_id)
+  );
 `);
 
 // Add columns to existing tables if they don't exist yet (idempotent)
@@ -1316,6 +1357,12 @@ app.get('/backup', requireAdmin, (_req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
+
+// ── แบบประเมินการใช้งาน ───────────────────────────────────
+// อยู่คนละไฟล์และคนละตาราง ไม่ยุ่งกับระบบเบิก ถอดออกได้โดยไม่กระทบอะไร
+// หมายเหตุ: เส้นทางใหม่ต้องเพิ่มชื่อใน docker/nginx.conf ด้วย
+// ไม่งั้น nginx จะตอบ 404 ตั้งแต่ยังไม่ถึง backend
+app.use('/feedback', require('./feedback')({ db, requireAuth, requireAdmin }));
 
 // ── Health ────────────────────────────────────────────────
 
