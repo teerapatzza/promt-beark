@@ -1188,7 +1188,11 @@
                             </div>
                             <!-- ใช้ระยะห่างที่กำหนดเป็นตัวเลข แทนการเว้นบรรทัดด้วย <br>
                                  เพราะ <br> ผูกกับขนาดฟอนต์ คุมความสูงไม่ได้แน่นอนเท่า -->
-                            <div style="text-align: center; margin-top: 4px;">
+                            <!-- ชิดขวาให้ตรงเส้นกรอบตารางด้านบน ไม่ลอยอยู่กลางหน้า
+                                 ตารางเป็น width:100% อยู่ในกล่องเดียวกัน ขอบขวาจึงตรงกันพอดี
+                                 ใช้ text-align แทนการดันด้วย margin-left เป็นเปอร์เซ็นต์
+                                 เพราะชื่อผู้ขอเบิกยาวไม่เท่ากัน ระยะที่ตายตัวจะเลยกรอบเมื่อชื่อยาว -->
+                            <div style="text-align: right; margin-top: 4px;">
                                 ลงชื่อ <span class="solid-line" style="width: 200px;"></span>
                                 <div style="margin-top: 8px;">( <span class="solid-line" style="width: 160px; border: none; font-weight: bold;">${data.requestedBy}</span> )</div>
                                 <div style="margin-top: 4px;">วันที่ <span class="solid-line" style="width: 160px; border: none;">${dateStrFor('TRANSPORT_RECEIPT')}</span></div>
