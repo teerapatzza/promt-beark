@@ -163,6 +163,35 @@ try {
   ck('วันที่ผู้ใช้ตั้งเองไว้ (2026-10-23) ไม่ถูกเขียนทับ',
      ret3 && ret3.date === '2026-10-23' && ret3.touched === '1', ret3);
 
+  // ── เปิดใบเก่ามาแก้ แล้วเปลี่ยนช่วงเดินทาง ──
+  console.log('');
+  console.log('── เปิดใบเก่ามาแก้ (วันที่คืนจากฐานข้อมูล) ──');
+  const EDIT = await ev([
+    "// จำลองการคืนค่าแบบเดียวกับ prefillForm: ตั้งวันเดินทางตรง ๆ ไม่ยิง event",
+    "document.getElementById('dateStart').value='2026-11-03';",
+    "document.getElementById('dateEnd').value='2026-11-05';",
+    "document.querySelectorAll('.taxi-entry').forEach(r=>r.remove());",
+    "addTaxiEntry('ขาไป'); addTaxiEntry('ขากลับ');",
+    "const rs=[...document.querySelectorAll('.taxi-entry')];",
+    "const setRow=(r,d)=>{const c=r.querySelector('.taxi-date'); c.value=d;",
+    "  const dir=r.querySelector('.taxi-dir').value;",
+    "  const auto=legDateFor(dir==='ขากลับ'?'ขากลับ':'ขาไป');",
+    "  delete c.dataset.touched;",
+    "  if (d && d!==auto) c.dataset.touched='1';};",
+    "setRow(rs[0],'2026-11-03');",   // ตรงกับวันของขา = ระบบเติมให้
+    "setRow(rs[1],'2026-11-09');",   // ต่างจากวันของขา = ผู้ใช้ตั้งเอง
+    "await new Promise(x=>setTimeout(x,200));",
+    "const set=(id,v)=>{const e=document.getElementById(id); if(e){e.value=v;",
+    "  e.dispatchEvent(new Event('change',{bubbles:true}));}};",
+    "set('dateStart','2026-11-04'); set('dateEnd','2026-11-06');",
+    "await new Promise(x=>setTimeout(x,700)); " + snap
+  ].join('\n'));
+  EDIT.rows.forEach((r,i)=>console.log('   แถว '+(i+1)+' '+r.dir+' -> '+r.date+' (touched='+r.touched+')'));
+  const eOut = EDIT.rows.find(r=>r.dir==='ขาไป');
+  const eRet = EDIT.rows.find(r=>r.dir==='ขากลับ');
+  ck('แถวที่ระบบเติมให้ ตามช่วงใหม่ไปด้วย (2026-11-04)', eOut && eOut.date==='2026-11-04', eOut);
+  ck('แถวที่ผู้ใช้ตั้งเอง ยังคงวันเดิม (2026-11-09)', eRet && eRet.date==='2026-11-09', eRet);
+
   ck('ไม่มี JavaScript error ตลอดการทดสอบ', pageErrors.length === 0, pageErrors.slice(0, 2));
 } catch (e) {
   fail++;

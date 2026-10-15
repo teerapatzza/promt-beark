@@ -3410,14 +3410,22 @@
         setTimeout(() => { if (typeof showFuelWorking === 'function') showFuelWorking(); }, 0);
         if (category.fuelRate != null && category.fuelRate > 0) {
             fuelRateInput.value = category.fuelRate;
+            /* ปักธงว่าอัตรานี้มาจากหมวด ห้าม loadSettings() เขียนทับ
+               12 ต.ค. 2569 — สองเส้นทางเขียนลงช่องเดียวกันโดยไม่รอกัน
+               ถ้า /settings ตอบช้ากว่าตอนเลือกหมวด ค่าระบบจะทับค่าหมวด
+               วัดแล้ว ระบบ 4 ทับหมวด 5 ทำให้ไป-กลับ 200 กม. ขาดไป 200 บาท */
+            fuelRateInput.dataset.fromCategory = '1';
             fuelRateInput.readOnly = true;
             fuelRateInput.classList.add('bg-slate-100', 'cursor-not-allowed', 'text-slate-700');
             fuelRateInput.title = 'ค่าน้ำมันกำหนดโดย Admin (' + category.fuelRate + ' บาท/กม.)';
         } else {
+            // หมวดนี้ไม่ได้กำหนดอัตราเอง ปล่อยให้ค่าระบบมีผลได้ตามเดิม
+            delete fuelRateInput.dataset.fromCategory;
             fuelRateInput.readOnly = false;
             fuelRateInput.classList.remove('bg-slate-100', 'cursor-not-allowed', 'text-slate-700');
             fuelRateInput.title = '';
-            if (!fuelRateInput.value) fuelRateInput.value = 4;
+            // ไม่มีทั้งค่าหมวดและค่าระบบ ให้ตกมาที่อัตราตามประกาศ บัญชี ๘ ข้อ ๔
+            if (!fuelRateInput.value) fuelRateInput.value = 5;
         }
 
         container.innerHTML = `<div class="bg-blue-50 text-blue-700 p-3 rounded-lg text-sm mb-4 font-mono border border-blue-100">สมการที่ใช้: ${category.formulaString}</div>`;
@@ -4472,8 +4480,17 @@
                     const row = (dir === 'ขากลับ' ? taxiListBack : taxiList).lastElementChild;
                     const dtCell = row.querySelector('.taxi-date');
                     dtCell.value = entry.date || '';
-                    // วันที่ที่เคยบันทึกไว้ถือว่าเจตนาของผู้ใช้ ห้ามให้วันของขามาเขียนทับ
-                    if (entry.date) dtCell.dataset.touched = '1';
+                    /* 12 ต.ค. 2569 — เดิมตีตรา "ผู้ใช้ตั้งเอง" ให้ทุกแถวที่มีวันที่
+                       ทั้งที่วันส่วนใหญ่ระบบเติมให้ตั้งแต่แรก ไม่ใช่คนตั้ง
+                       ผลคือเปิดใบเก่ามาแก้แล้วเปลี่ยนช่วงเดินทาง วันในแถวค้างที่เดิม
+                       แล้วไปโดนด่านตรวจตอนกดบันทึกว่า "วันที่ Taxi ไม่อยู่ในช่วงการเดินทาง"
+
+                       ตีตราเฉพาะวันที่ "ต่างจากวันของขานั้น" ซึ่งแปลว่าตั้งใจตั้งเอง
+                       วันที่ตรงกับของขาอยู่แล้ว ถือว่าระบบเติมให้ ปล่อยให้ตามต่อไปได้
+                       วันเดินทางถูกคืนค่าก่อนหน้านี้แล้ว (บรรทัด 4368-4370) legDateFor จึงอ่านได้ถูก */
+                    const autoDate = (typeof legDateFor === 'function')
+                        ? legDateFor(dir === 'ขากลับ' ? 'ขากลับ' : 'ขาไป') : '';
+                    if (entry.date && entry.date !== autoDate) dtCell.dataset.touched = '1';
                     row.querySelector('.taxi-from').value = entry.from || '';
                     row.querySelector('.taxi-to').value   = entry.to   || '';
                     const dirSel = row.querySelector('.taxi-dir');
@@ -4754,9 +4771,14 @@
             if (res.ok) {
                 const settings = await res.json();
 
-                // Update fuel rate from settings
-                if (settings.fuelRate) {
-                    document.getElementById('fuelRate').value = settings.fuelRate;
+                /* อัตราค่าน้ำมันระดับระบบ ใช้ได้ก็ต่อเมื่อหมวดยังไม่ได้กำหนดเอง
+                   ถ้าหมวดกำหนดแล้ว ห้ามเขียนทับ ไม่งั้นยอดเบิกจะผิดเงียบ ๆ
+                   (ดูคำอธิบายที่จุดปักธง fromCategory) */
+                const fuelEl = document.getElementById('fuelRate');
+                if (settings.fuelRate && fuelEl && fuelEl.dataset.fromCategory !== '1') {
+                    fuelEl.value = settings.fuelRate;
+                    if (typeof showFuelWorking === 'function') showFuelWorking();
+                    if (typeof calculateTravelTotal === 'function') calculateTravelTotal();
                 }
 
                 // ตำแหน่ง/สังกัด: เลือกจากรายการหรือพิมพ์เองก็ได้
