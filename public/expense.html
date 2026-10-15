@@ -3050,9 +3050,14 @@
             && g.lng >= METRO_BOX_FE.lngMin && g.lng <= METRO_BOX_FE.lngMax;
     }
     function isMetroTripFE() {
-        const fp = _provMetro((window.__fromAddrParts || {}).prov || '');
+        /* ต้องตรงกับ backend/validation.js (isMetroTrip) เสมอ
+           15 ต.ค. 2569 — เดิมเช็คจังหวัดต้นทางจาก __fromAddrParts ซึ่งเติมจาก
+           ที่อยู่ในโปรไฟล์เท่านั้น ไม่อัปเดตตามจุดที่พิมพ์หรือหมุดที่ลาก
+           คนที่บ้านอยู่ต่างจังหวัดจึงถูกตีว่านอกเขตทุกครั้ง แม้เดินทางในปริมณฑลล้วน
+           (นนทบุรี -> พระประแดง 28.6 กม. ได้เหมาจ่าย 1,200 แทนที่จะเป็น 350)
+           ปลายทางยังเชื่อได้ เพราะผู้ใช้เลือกเองจากรายการจังหวัด */
         const tp = _provMetro(document.getElementById('targetProv')?.value || '');
-        if (fp === false || tp === false) return { inMetro: false, why: 'จังหวัดอยู่นอก กทม.ปริมณฑล' };
+        if (tp === false) return { inMetro: false, why: 'จังหวัดปลายทางอยู่นอก กทม.ปริมณฑล' };
         const fb = _inBox(geoFrom), tb = _inBox(geoTo);
         if (fb === true && tb === true) return { inMetro: true,  why: 'อยู่ใน กทม.ปริมณฑล' };
         if (fb === null || tb === null) return { inMetro: false, why: 'ยังปักหมุดไม่ครบ' };

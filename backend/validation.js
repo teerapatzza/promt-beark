@@ -46,12 +46,18 @@ function geoInMetroBox(g) {
  */
 function isMetroTrip(travel) {
     const t = travel || {};
-    const fromProv = provIsMetro((t.fromAddr && t.fromAddr.prov) || '');
-    const toProv   = provIsMetro(t.toProv || '');
+    /* จังหวัดปลายทางผู้ใช้เลือกเองจากรายการ จึงเชื่อได้ว่าคือที่ที่ไปจริง
+       เลือกจังหวัดนอกเขตเมื่อไหร่ ก็คือนอกเขต ไม่ต้องดูหมุดต่อ
 
-    // รู้ชื่อจังหวัดแล้วว่าอยู่นอกเขต — จบเลย ไม่ต้องเดาจากพิกัด
-    if (fromProv === false || toProv === false)
-        return { inMetro: false, reason: 'จังหวัดอยู่นอก กทม.ปริมณฑล' };
+       15 ต.ค. 2569 — เดิมเช็คจังหวัด "ต้นทาง" ด้วย แต่ค่านั้นมาจาก
+       fromAddr.prov ซึ่งเติมจากที่อยู่ในโปรไฟล์เท่านั้น ไม่เคยอัปเดต
+       ตามจุดที่พิมพ์หรือหมุดที่ลาก ผู้เดินทางที่บ้านอยู่ต่างจังหวัด
+       จึงถูกตีว่า "นอกเขต" ทุกครั้ง แม้เดินทาง นนทบุรี -> พระประแดง
+       ซึ่งอยู่ในปริมณฑลทั้งคู่ แล้วได้เหมาจ่าย 1,200 แทนที่จะเป็น 350
+       ต้นทางจึงให้หมุดบนแผนที่เป็นตัวตัดสินแทน (ด้านล่าง) */
+    const toProv = provIsMetro(t.toProv || '');
+    if (toProv === false)
+        return { inMetro: false, reason: 'จังหวัดปลายทางอยู่นอก กทม.ปริมณฑล' };
 
     const fromBox = geoInMetroBox(t.fromGeo);
     const toBox   = geoInMetroBox(t.toGeo);
