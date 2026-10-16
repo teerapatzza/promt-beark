@@ -1099,37 +1099,11 @@ app.get('/map-route', requireAuth, async (req, res) => {
 // ── สถิติสำหรับ Dashboard ─────────────────────────────────
 // รวบรวม 5 มุมมอง: หน่วยงาน / เวลา / ประเภทค่าใช้จ่าย / ปลายทาง / รายบุคคล
 
-const num = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
-
-/** แยกยอดเงินของใบเบิกออกเป็นประเภทค่าใช้จ่าย */
-function costBreakdown(md) {
-  const c = (md && md._costs) || {};
-  const t = (md && md._travel) || {};
-  const km = num(t.distOut) + num(t.distRet);
-  const fuel = km * num(c.fuelRate);
-
-  let hotel = 0;
-  const h = c.hotelEntries;
-  if (Array.isArray(h)) {
-    h.forEach(x => (x && Array.isArray(x.entries) ? x.entries : [x]).forEach(e => {
-      if (e) hotel += num(e.rate) * num(e.nights);
-    }));
-  } else if (h && Array.isArray(h.entries)) {
-    h.entries.forEach(e => { if (e) hotel += num(e.rate) * num(e.nights); });
-  }
-
-  let taxi = 0;
-  (Array.isArray(c.taxiEntries) ? c.taxiEntries : []).forEach(e => { taxi += num(e && e.amount); });
-
-  return {
-    fuel, hotel, taxi,
-    air:   num(c.airAmount),
-    toll:    num(c.tollAmount),
-    parking: num(c.parkingAmount),
-    other: num(c.otherAmount),
-    km
-  };
-}
+/* ย้ายไปอยู่ backend/stats-breakdown.js เพื่อให้เขียนเทสต์ได้
+   ตอนอยู่ในไฟล์นี้เรียกมาทดสอบไม่ได้เลยถ้าไม่สตาร์ท express ทั้งตัว
+   บั๊กค่าน้ำมันสองตัวจึงอยู่มานานโดยไม่มีเทสต์ไหนแตะถึง
+   (ไม่ดู carType ทำให้รายงานเกิน · ไม่รู้จักเหมาจ่ายทำให้รายงานขาด) */
+const { costBreakdown, num } = require('./stats-breakdown.js');
 
 app.get('/stats', requireAdmin, (_req, res) => {
   const rows = db.prepare('SELECT id, data, created_at FROM expenses').all();

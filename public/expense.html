@@ -1875,7 +1875,18 @@
                         `ขากลับคนละทาง ${retKm.toLocaleString('th-TH')} กม.`);
                 }
             }
-            document.getElementById('distReturn').value = retKm;
+            /* 16 ต.ค. 2569 — เขียนระยะทางขากลับเฉพาะเมื่อมีคนเบิกรถขากลับจริง
+               ของเดิมเติมทุกครั้ง แม้กรณีพิเศษที่ไม่ได้ติ๊กอะไรในการ์ดขากลับเลย
+               ผู้ใช้เห็นเลขขึ้นมาพร้อมป้าย "ขากลับใช้เส้นทางเดิม" แล้วนึกว่าระบบ
+               คิดขากลับให้แล้ว ทั้งที่ไม่ได้เบิก คนที่ลืมติ๊กจึงไม่มีทางรู้ว่าลืม
+               และตัวเลขที่ค้างไว้ยังไปโผล่เป็นค่าน้ำมันบนหน้าสถิติด้วย
+               ระยะทางช่องนี้มีความหมายกับรถส่วนตัวเท่านั้น Taxi คิดจากค่าโดยสาร */
+            const backCarUsed = !!document.getElementById('legBackCar')?.checked;
+            document.getElementById('distReturn').value = backCarUsed ? retKm : 0;
+            if (!backCarUsed) {
+                retMsg = ' ' + badge('bg-slate-50 border-slate-200 text-slate-500',
+                    'ไม่ได้เบิกรถขากลับ จึงไม่คิดระยะทางขากลับ');
+            }
             if (typeof calculateTravelTotal === 'function') calculateTravelTotal();
             fitRoute();
 
@@ -3824,6 +3835,28 @@
                     return alert('❌ ยังหาตำแหน่งของ "ปลายทางขากลับ" ไม่เจอ\n\n' +
                                  'กดเลือกจากรายการที่ขึ้นมา หรือลากหมุดสีม่วงบนแผนที่ให้ตรง\n' +
                                  'ถ้ากลับที่จุดเริ่มต้น ให้ลบข้อความในช่องนั้นออก');
+            }
+
+            /* กรณีพิเศษแล้วไม่ติ๊กอะไรในการ์ดขากลับเลย มีความหมายได้สองอย่าง
+                 ก. ตั้งใจ — ไม่ได้เดินทางกลับ หรือกลับด้วยพาหนะที่ไม่ได้เบิก
+                 ข. ลืม — ตั้งใจจะเบิกขากลับแต่ยังไม่ได้ติ๊ก
+               ระบบแยกสองอย่างนี้เองไม่ได้ และของเดิมไม่ถามอะไรเลยสักคำ
+               คนที่ลืมจึงบันทึกไปโดยไม่มีทางรู้ว่าตกขากลับไป
+               จึงถามครั้งเดียวตรงนี้ ให้คนตอบเอง ดีกว่าให้ระบบเดาแทน */
+            if (needReceipt && !isNormalTrip()) {
+                const backCar  = !!document.getElementById('legBackCar')?.checked;
+                const backTaxi = !!document.getElementById('legBackTaxi')?.checked;
+                if (!backCar && !backTaxi) {
+                    const okOneWay = confirm(
+                        'ใบนี้เบิกเฉพาะขาไป ไม่ได้เบิกขากลับ\n\n' +
+                        'ถ้าถูกต้องแล้ว กด "ตกลง" เพื่อบันทึก\n' +
+                        'ถ้ายังไม่ได้ติ๊กขากลับ กด "ยกเลิก" แล้วกลับไปติ๊กในการ์ดขากลับ');
+                    if (!okOneWay) {
+                        document.getElementById('legBackCardWrap')?.scrollIntoView({
+                            behavior: 'smooth', block: 'center' });
+                        return;
+                    }
+                }
             }
             const dateStart = document.getElementById('dateStart').value;
             const dateEnd   = document.getElementById('dateEnd').value;
