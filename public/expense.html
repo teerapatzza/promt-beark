@@ -277,6 +277,8 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap">
     <!-- ตัวคำนวณค่าพาหนะเหมาจ่าย ใช้ร่วมกับหน้าแอดมินและฝั่งเซิร์ฟเวอร์ -->
     <script src="flat-rate.js"></script>
+    <!-- ขอบเขต กทม.ปริมณฑล ใช้ร่วมกับฝั่งเซิร์ฟเวอร์ คำนวณในเครื่อง ไม่เรียกเน็ต -->
+    <script src="metro-area.js"></script>
     <link rel="stylesheet" href="theme.css">
     <script src="theme.js"></script>
 </head>
@@ -684,7 +686,7 @@
                             <span class="text-xs text-slate-400">คิดค่าน้ำมันจากระยะทาง</span>
                         </label>
                         <div id="legOutRouteBox" class="hidden mt-2 pt-3 border-t border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div class="md:col-span-2 -mb-1"><span class="text-xs font-bold text-slate-600" id="legOutRouteTitle">เส้นทางของขาไป</span><span class="text-xs text-slate-400"> — ใช้กับแผนที่ ระยะทางค่าน้ำมัน และวงเงินค่า Taxi ในเขต กทม.ปริมณฑล</span></div>
+                        <div class="md:col-span-2 -mb-1"><span class="text-xs font-bold text-slate-600" id="legOutRouteTitle">เส้นทางของขาไป</span><span class="text-xs text-slate-400"> — กรอกเส้นทางที่รถวิ่งจริง ระบบใช้สองหมุดนี้คิดระยะทาง และดูว่าอยู่ในเขต กทม.ปริมณฑลหรือไม่</span></div>
                             <div>
                                 <label class="block text-xs font-bold text-emerald-700 mb-1">จุดเริ่มต้น <span class="text-rose-500">*</span></label>
                                 <div class="relative">
@@ -695,13 +697,16 @@
                                 <p class="text-xs text-slate-400 mt-1" id="fromHint">ดึงจากโปรไฟล์ผู้เดินทางอัตโนมัติ</p>
                             </div>
                             <div>
-                                <label class="block text-xs font-bold text-rose-700 mb-1">จุดหมาย <span class="text-rose-500">*</span></label>
+                                <label class="block text-xs font-bold text-rose-700 mb-1">จุดที่รถไปส่ง <span class="text-rose-500">*</span></label>
                                 <div class="relative">
-                                    <input type="text" id="travelTo" autocomplete="off" placeholder="เช่น โรงพยาบาลนครพิงค์, รพ.สต.บ้านหนองบัว"
+                                    <input type="text" id="travelTo" autocomplete="off" placeholder="เช่น สนามบินดอนเมือง, โรงพยาบาลนครพิงค์"
                                         class="w-full border-2 border-white p-3 rounded-lg text-sm shadow-sm focus:border-rose-400 outline-none">
                                     <div id="toSuggest" class="hidden absolute z-[9100] w-full bg-white border border-slate-200 shadow-xl rounded-xl mt-1 max-h-64 overflow-y-auto overscroll-contain"></div>
                                 </div>
-                                <p class="text-xs text-slate-400 mt-1" id="toHint">พิมพ์ชื่อสถานที่ ระบบจะค้นหาให้</p>
+                                <!-- เดิมเขียนว่า "จุดหมาย" แล้วยกตัวอย่างเป็นโรงพยาบาลปลายทาง
+                                     คนที่นั่งรถไปสนามบินแล้วบินต่อจึงกรอกจังหวัดที่ไปปฏิบัติงาน
+                                     ทั้งที่รถวิ่งแค่ถึงสนามบิน ระยะทางและเขตพื้นที่เลยเพี้ยนทั้งใบ -->
+                                <p class="text-xs text-slate-400 mt-1" id="toHint">ที่ที่ลงจากรถคันนี้ ถ้าไปต่อด้วยเครื่องบินหรือรถทัวร์ ให้ใส่สนามบินหรือสถานีขนส่ง ไม่ใช่จังหวัดที่ไปปฏิบัติงาน</p>
                             </div>
                         </div>
 
@@ -734,12 +739,12 @@
                                 <div>
                                     <label class="block text-xs font-bold text-violet-700 mb-1">จุดเริ่มต้นขากลับ</label>
                                     <div class="relative">
-                                        <input type="text" id="travelReturnFrom" autocomplete="off" placeholder="ว่าง = ออกจากจุดหมายขาไป"
+                                        <input type="text" id="travelReturnFrom" autocomplete="off" placeholder="ว่าง = ออกจากจุดที่รถไปส่งขาไป"
                                             class="w-full border-2 border-white p-3 rounded-lg text-sm shadow-sm focus:border-violet-400 outline-none"
                                             oninput="syncReturnDiff()">
                                         <div id="returnFromSuggest" class="hidden absolute z-[9100] w-full bg-white border border-slate-200 shadow-xl rounded-xl mt-1 max-h-64 overflow-y-auto overscroll-contain"></div>
                                     </div>
-                                    <p class="text-xs text-slate-400 mt-1" id="returnFromHint">เว้นว่างไว้ได้ ถ้าออกเดินทางกลับจากจุดหมายขาไป</p>
+                                    <p class="text-xs text-slate-400 mt-1" id="returnFromHint">เว้นว่างไว้ได้ ถ้าออกเดินทางกลับจากจุดที่รถไปส่งขาไป</p>
                                 </div>
                                 <div>
                                     <label class="block text-xs font-bold text-violet-700 mb-1">ปลายทางขากลับ</label>
@@ -1231,7 +1236,7 @@
     /** วางหมุด (ลากได้เสมอ) แล้วคำนวณใหม่เมื่อลากเสร็จ */
     const PT = {
         from: { color: '#059669', tip: 'จุดเริ่มต้น (ลากได้)' },
-        to:   { color: '#e11d48', tip: 'จุดหมาย (ลากได้)' },
+        to:   { color: '#e11d48', tip: 'จุดที่รถไปส่ง (ลากได้)' },
         ret:  { color: '#7c3aed', tip: 'ปลายทางขากลับ (ลากได้)' },
         retfrom: { color: '#a855f7', tip: 'จุดเริ่มต้นขากลับ (ลากได้)' }
     };
@@ -1663,7 +1668,7 @@
         const toTxt   = cut(document.getElementById('travelTo')?.value);
         const rf = document.getElementById('travelReturnFrom');
         const rt = document.getElementById('travelReturnTo');
-        if (rf) rf.placeholder = toTxt   ? 'ว่าง = ออกจาก ' + toTxt   : 'ว่าง = ออกจากจุดหมายขาไป';
+        if (rf) rf.placeholder = toTxt   ? 'ว่าง = ออกจาก ' + toTxt   : 'ว่าง = ออกจากจุดที่รถไปส่งขาไป';
         if (rt) rt.placeholder = fromTxt ? 'ว่าง = กลับที่ ' + fromTxt : 'ว่าง = กลับที่จุดเริ่มต้น';
         const h = document.getElementById('returnToHint');
         // เขียนทับคำเตือนเก่าได้เมื่อช่องว่างแล้ว ของเดิมเลี่ยงไม่แตะถ้าเป็นสีแดง
@@ -1696,7 +1701,7 @@
             mRet = null; geoRet = null;
         }
         // คำเตือนเก่าของช่องที่ถูกลบข้อความ ต้องหายไปด้วย ไม่ค้างให้เข้าใจผิด
-        if (!rf) pointHint('retfrom', 'เว้นว่างไว้ได้ ถ้าออกเดินทางกลับจากจุดหมายขาไป');
+        if (!rf) pointHint('retfrom', 'เว้นว่างไว้ได้ ถ้าออกเดินทางกลับจากจุดที่รถไปส่งขาไป');
         if (!rt) pointHint('ret', '');
 
         const want = backCar && !!(rf || rt);
@@ -1805,7 +1810,7 @@
             // บอกให้ตรงว่าขาดจุดไหน ข้อความรวมๆ ทำให้ผู้ใช้ที่กรอกจุดหมายไปแล้วงงว่าทำไมยังไม่คำนวณ
             const need = [];
             if (!geoFrom) need.push('จุดเริ่มต้น');
-            if (!geoTo)   need.push('จุดหมาย');
+            if (!geoTo)   need.push('จุดที่รถไปส่ง');
             const typed = document.getElementById('travelTo')?.value.trim();
             routeStatus(
                 badge('bg-amber-50 border-amber-200 text-amber-800',
@@ -2055,8 +2060,8 @@
                 ? '<span class="block text-slate-600">ถ้าจะกลับที่จุดเริ่มต้น (บ้าน) '
                   + '<b>ลบข้อความในช่องนี้ออก</b> ระบบจะใช้พิกัดบ้านที่มีอยู่แล้วให้เอง</span>'
                 : (which === 'retfrom')
-                ? '<span class="block text-slate-600">ถ้าออกเดินทางกลับจากจุดหมายขาไป '
-                  + '<b>ลบข้อความในช่องนี้ออก</b> ระบบจะใช้พิกัดจุดหมายให้เอง</span>'
+                ? '<span class="block text-slate-600">ถ้าออกเดินทางกลับจากจุดที่รถไปส่งขาไป '
+                  + '<b>ลบข้อความในช่องนี้ออก</b> ระบบจะใช้พิกัดจุดนั้นให้เอง</span>'
                 : '';
             pointHint(which, '<span class="text-rose-600">หาตำแหน่งของ "' + escHtml(txt) + '" ไม่เจอ</span>'
                 + backToStart
@@ -3035,34 +3040,22 @@
 
     /** บอกวงเงิน Taxi ของหมวดนี้ตั้งแต่ยังไม่กรอก
         เดิมต้องกรอกเกินก่อนถึงจะขึ้นเตือน ซึ่งสายไปแล้ว ผู้ใช้กรอกเสร็จค่อยมารู้ */
-    /* ── วงเงินแท็กซี่จำกัดเฉพาะ กทม.ปริมณฑล ────────────────────────
-       ⚠️ ตรรกะนี้ซ้ำกับ backend/validation.js (isMetroTrip)
-          backend เป็นตัวตัดสินจริง ตรงนี้มีไว้บอกผู้ใช้ล่วงหน้าเท่านั้น
-          แก้ที่ไหนต้องแก้อีกที่ด้วย — หน้าเว็บยังไม่ได้โหลด validation.js
-       นอกเขตไม่จำกัด เพราะระยะทางต่างจังหวัดต่างกันมาก ให้ผู้อนุมัติดูเอง  */
-    const METRO_PROVINCES_FE = ['กรุงเทพมหานคร','กรุงเทพ','กทม','กทม.','นนทบุรี','ปทุมธานี','สมุทรปราการ','สมุทรสาคร','นครปฐม'];
-    const METRO_BOX_FE = { latMin: 13.45, latMax: 14.20, lngMin: 99.90, lngMax: 100.95 };
-    /* รายชื่อจังหวัดด้านบนคงไว้เป็นข้อความตามประกาศ แต่ไม่ได้ใช้ตัดสินพื้นที่แล้ว
-       ตั้งแต่ 15 ต.ค. 2569 ใช้หมุดบนแผนที่อย่างเดียว ตัวช่วยเทียบชื่อจึงถูกถอดออก */
-    function _inBox(g) {
-        if (!g || typeof g.lat !== 'number' || typeof g.lng !== 'number') return null;
-        return g.lat >= METRO_BOX_FE.latMin && g.lat <= METRO_BOX_FE.latMax
-            && g.lng >= METRO_BOX_FE.lngMin && g.lng <= METRO_BOX_FE.lngMax;
-    }
-    function isMetroTripFE() {
-        /* ต้องตรงกับ backend/validation.js (isMetroTrip) เสมอ
-           พื้นที่ตัดสินจากหมุดบนแผนที่เท่านั้น เพราะประกาศ บัญชี ๘ พูดถึง
-           "การเดินทาง" ของพาหนะที่เบิก ไม่ใช่ที่ตั้งของงานที่ไปทำ
+    /* ── พื้นที่ กทม.ปริมณฑล ────────────────────────
+       ใช้ metro-area.js ไฟล์เดียวกับที่ backend ใช้ จะได้ไม่มีกติกาสองชุด
+       ที่ตัดสินไม่ตรงกัน backend ยังเป็นตัวตัดสินจริงตอนกดบันทึกเหมือนเดิม
+       ตรงนี้มีไว้บอกผู้ใช้ล่วงหน้าว่าจะได้วงเงินเท่าไหร่
 
-           15 ต.ค. 2569 — เดิมเช็คชื่อจังหวัดก่อนดูหมุด ผิดสองทาง
-           ต้นทาง  มาจากที่อยู่ในโปรไฟล์ ไม่อัปเดตตามจุดที่พิมพ์หรือหมุดที่ลาก
-           ปลายทาง มาจากช่อง "ไปปฏิบัติงาน ณ จังหวัด" ซึ่งคือที่ตั้งของงาน
-                   เคสที่หักล้างคือนั่งรถไปสนามบินดอนเมืองแล้วบินไปต่างจังหวัด
-                   รถวิ่งในกรุงเทพล้วน แต่ช่องนั้นเป็นจังหวัดปลายทางของงาน */
-        const fb = _inBox(geoFrom), tb = _inBox(geoTo);
-        if (fb === true && tb === true) return { inMetro: true,  why: 'อยู่ใน กทม.ปริมณฑล' };
-        if (fb === null || tb === null) return { inMetro: false, why: 'ยังปักหมุดไม่ครบ' };
-        return { inMetro: false, why: 'เดินทางออกนอก กทม.ปริมณฑล' };
+       16 ต.ค. 2569 — เดิมใช้กล่องสี่เหลี่ยมอันเดียวครอบหกจังหวัด
+       ซึ่งกินพื้นที่จังหวัดข้างเคียงและตัดสินผิดที่ชายขอบ
+       ตอนนี้ใช้ขอบเขตจริงของจังหวัด คำนวณในเครื่อง ไม่เรียกเน็ต */
+    function isMetroTripFE() {
+        if (typeof MetroArea === 'undefined') {
+            // ไฟล์ขอบเขตโหลดไม่ขึ้น อย่าเดาเอง บอกตรง ๆ แล้วปล่อยให้ backend ตัดสิน
+            return { inMetro: false, why: 'ยังอ่านขอบเขตพื้นที่ไม่ได้' };
+        }
+        const r = MetroArea.tripArea(geoFrom, geoTo);
+        return { inMetro: r.inMetro, why: r.reason,
+                 fromProvince: r.fromProvince, toProvince: r.toProvince };
     }
 
     /** วงเงินที่หมวดหมู่กำหนด (ยังไม่คิดเรื่องพื้นที่) */
@@ -3092,8 +3085,12 @@
             note.classList.toggle('hidden', !has);
             // นอกเขตก็มีเพดานตามบัญชี ๘ ข้อ ๑ แล้ว ข้อความต้องบอกพื้นที่ให้ตรง
             // ไม่งั้นคนเดินทางนอกเขตจะเห็นว่า "เดินทางใน กทม.ปริมณฑล" ซึ่งไม่จริง
+            /* บอกชื่อจังหวัดที่อ่านได้จากหมุดด้วย ถ้าปักผิดจังหวัดจะเห็นตรงนี้ทันที
+               ไม่ต้องรอให้ยอดเงินผิดแล้วค่อยมางม */
+            const where = (m.fromProvince && m.toProvince)
+                ? ' (' + m.fromProvince + ' → ' + m.toProvince + ')' : '';
             note.innerHTML = has
-                ? (m.inMetro ? 'เดินทางใน กทม.ปริมณฑล' : 'เดินทางนอกเขต กทม.ปริมณฑล') +
+                ? (m.inMetro ? 'เดินทางใน กทม.ปริมณฑล' + where : 'เดินทางนอกเขต กทม.ปริมณฑล') +
                   ' — วงเงินค่า Taxi <b>ไม่เกิน ' + taxiMaxPerTrip.toLocaleString() +
                   ' บาทต่อเที่ยว</b> กรอกเกินจะบันทึกไม่ได้'
                 : '';
@@ -3810,7 +3807,7 @@
             const travelFrom = document.getElementById('travelFrom')?.value || '';
             const travelTo   = document.getElementById('travelTo')?.value   || '';
             if (needReceipt && (!travelFrom.trim() || !travelTo.trim()))
-                return alert("❌ กรุณาระบุสถานที่ 'จุดเริ่มต้น' และ 'จุดหมาย' ให้ครบถ้วน");
+                return alert("❌ กรุณาระบุสถานที่ 'จุดเริ่มต้น' และ 'จุดที่รถไปส่ง' ให้ครบถ้วน");
             /* ขากลับต้องรู้ทั้งจุดออกและจุดถึง แต่ "รู้" ไม่ได้แปลว่าต้องพิมพ์
                เว้นว่าง = ใช้จุดของขาไป ซึ่งมีพิกัดอยู่แล้ว เป็นกติกาที่เขียนไว้ในช่องนั่นเอง
                ของเดิมบังคับให้พิมพ์ปลายทางเสมอ และยังอ้างถึงติ๊ก "ขากลับไปที่อื่น"
@@ -3822,7 +3819,7 @@
                 if (txtRetFrom && !geoRetFrom)
                     return alert('❌ ยังหาตำแหน่งของ "จุดเริ่มต้นขากลับ" ไม่เจอ\n\n' +
                                  'กดเลือกจากรายการที่ขึ้นมา หรือลากหมุดสีม่วงบนแผนที่ให้ตรง\n' +
-                                 'ถ้าออกเดินทางกลับจากจุดหมายขาไป ให้ลบข้อความในช่องนั้นออก');
+                                 'ถ้าออกเดินทางกลับจากจุดที่รถไปส่งขาไป ให้ลบข้อความในช่องนั้นออก');
                 if (txtRetTo && !geoRet)
                     return alert('❌ ยังหาตำแหน่งของ "ปลายทางขากลับ" ไม่เจอ\n\n' +
                                  'กดเลือกจากรายการที่ขึ้นมา หรือลากหมุดสีม่วงบนแผนที่ให้ตรง\n' +

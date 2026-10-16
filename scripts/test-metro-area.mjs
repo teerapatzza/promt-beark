@@ -15,6 +15,7 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const V = require('../backend/validation.js');
 const FlatRate = require('../public/flat-rate.js');
+const MetroArea = require('../public/metro-area.js');
 
 const results = [];
 const ok = (name, pass, detail = '') => {
@@ -101,6 +102,76 @@ ok('ไป-กลับ รวม 700 บาท ไม่ใช่ 2,400',
 const out = FlatRate.legAmount(28.60, cfg, false);
 ok('ถ้านอกเขตจริง ยังได้ 1,200 บาทต่อเที่ยวตามประกาศ',
    out.amount === 1200, out.amount + ' บาท · ' + (out.label || out.why));
+
+console.log('');
+console.log('═══ 4. ขอบเขตต้องเป็นรูปจังหวัดจริง ไม่ใช่กล่องสี่เหลี่ยม ═══');
+
+/* 16 ต.ค. 2569 — ของเดิมใช้กล่องสี่เหลี่ยมอันเดียวครอบหกจังหวัด
+   ซึ่งกินพื้นที่จังหวัดข้างเคียงไปด้วย ทดสอบกับพิกัดจริงแล้วตัดสินผิด 4 จาก 10 จุด
+   และผิดไปทางเดียวกันหมด คือตีจุดนอกเขตว่าอยู่ในเขต ผู้เดินทางแถบชายขอบ
+   จึงได้เหมาจ่ายตามช่วงระยะทางแทนที่จะได้ ๑,๒๐๐ ตามข้อ ๕ คือได้น้อยกว่าที่ควร
+
+   จังหวัดที่เขียนไว้ด้านล่างมาจากการถามแผนที่ย้อนพิกัดทีละจุด ไม่ได้เดาเอง
+   สี่จุดที่ทำเครื่องหมาย (ของเดิมผิด) ไว้ คือจุดที่กล่องสี่เหลี่ยมตัดสินพลาด */
+const POINTS = [
+  // ชื่อ, lat, lng, จังหวัดจริง, อยู่ในหกจังหวัดไหม, กล่องเดิมเคยตัดสินผิดไหม
+  ['วังน้อย',            14.1906, 100.7217, 'ปทุมธานี',        true,  false],
+  ['บางปะอิน',           14.1950, 100.5800, 'พระนครศรีอยุธยา', false, true ],
+  ['บ้านโป่ง',           13.8119,  99.9200, 'ราชบุรี',         false, true ],
+  ['เมืองสมุทรสงคราม',   13.4600, 100.0000, 'สมุทรสงคราม',     false, true ],
+  ['บางปะกง',            13.5307, 100.9400, 'ฉะเชิงเทรา',      false, true ],
+  ['ศรีราชา',            13.1700, 100.9300, 'ชลบุรี',          false, false],
+  ['ดอนเมือง',           13.9126, 100.6068, 'กรุงเทพมหานคร',   true,  false],
+  ['พระประแดง',          13.6591, 100.5330, 'สมุทรปราการ',     true,  false],
+  ['เมืองนนทบุรี',       13.8591, 100.5217, 'นนทบุรี',         true,  false],
+  ['เมืองนครปฐม',        13.8196, 100.0620, 'นครปฐม',          true,  false],
+  ['สยามสแควร์',         13.7456, 100.5331, 'กรุงเทพมหานคร',   true,  false],
+  ['สนามบินสุวรรณภูมิ',  13.6900, 100.7501, 'สมุทรปราการ',     true,  false],
+  ['เมืองสมุทรสาคร',     13.5475, 100.2745, 'สมุทรสาคร',       true,  false],
+  ['เมืองปทุมธานี',      14.0208, 100.5250, 'ปทุมธานี',        true,  false],
+  ['เมืองอยุธยา',        14.3532, 100.5689, 'พระนครศรีอยุธยา', false, false],
+  ['หัวหิน',             12.5684,  99.9577, 'ประจวบคีรีขันธ์', false, false],
+];
+
+for (const [name, lat, lng, prov, inside, wasWrong] of POINTS) {
+  const got = MetroArea.provinceAt(lat, lng);
+  // อยู่ในหกจังหวัด = ต้องบอกชื่อจังหวัดถูกด้วย ไม่ใช่แค่ตอบว่าอยู่ในเขต
+  // นอกหกจังหวัด = ต้องตอบ null เพราะไฟล์นี้เก็บแค่หกจังหวัด
+  const pass = inside ? got === prov : got === null;
+  ok(name + ' → ' + prov + (inside ? ' (ในเขต)' : ' (นอกเขต)')
+       + (wasWrong ? '  [กล่องเดิมตัดสินผิดจุดนี้]' : ''),
+     pass, got === null ? 'ไม่อยู่ในหกจังหวัด' : got);
+}
+
+console.log('');
+console.log('═══ 5. สี่จุดที่กล่องเดิมพลาด ต้องได้เงินถูกต้องแล้ว ═══');
+
+/* จุดเหล่านี้อยู่นอกเขตจริง ต้องได้เหมาจ่าย ๑,๒๐๐ ต่อเที่ยวตามข้อ ๕
+   ของเดิมตีเป็นในเขตแล้วให้ตามช่วงระยะทาง ซึ่งน้อยกว่าทุกช่วง */
+const BKK = { lat: 13.7456, lng: 100.5331 };
+for (const [name, lat, lng] of POINTS.filter(p => p[5])) {
+  const t = { fromGeo: BKK, toGeo: { lat, lng } };
+  const area = V.isMetroTrip(t);
+  const money = FlatRate.legAmount(45, cfg, area.inMetro);
+  ok('กรุงเทพ → ' + name + ' นับเป็นนอกเขต และได้ 1,200 ต่อเที่ยว',
+     area.inMetro === false && money.amount === 1200,
+     area.reason + ' · ' + money.amount + ' บาท');
+}
+
+console.log('');
+console.log('═══ 6. เหตุผลที่แสดงต้องบอกชื่อจังหวัดที่อ่านได้จากหมุด ═══');
+
+const named = V.isMetroTrip({ fromGeo: NONTHABURI, toGeo: PHRAPRADAENG });
+ok('ในเขต: บอกทั้งจังหวัดต้นทางและปลายทาง',
+   named.fromProvince === 'นนทบุรี' && named.toProvince === 'สมุทรปราการ'
+   && /นนทบุรี/.test(named.reason) && /สมุทรปราการ/.test(named.reason),
+   named.reason);
+
+const halfOut = V.isMetroTrip({ fromGeo: NONTHABURI, toGeo: LOEI });
+ok('หลุดฝั่งเดียว: บอกว่าเป็นฝั่งปลายทางที่หลุด',
+   halfOut.inMetro === false && /ปลายทาง/.test(halfOut.reason)
+   && halfOut.fromProvince === 'นนทบุรี' && halfOut.toProvince === null,
+   halfOut.reason);
 
 console.log('');
 const pass = results.filter(Boolean).length;

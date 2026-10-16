@@ -1,6 +1,11 @@
 services:
   backend:
-    build: ./backend
+    # build จากรากโปรเจกต์ ไม่ใช่แค่โฟลเดอร์ backend
+    # เพราะ backend ต้องใช้ public/metro-area.js ซึ่งเป็นไฟล์เดียวกับที่หน้าเว็บใช้
+    # ถ้า context เป็น ./backend ไฟล์นั้นจะอยู่นอกขอบเขต build แล้ว COPY ไม่ถึง
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     restart: unless-stopped
     volumes:
       - db_data:/app/data
