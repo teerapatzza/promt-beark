@@ -1466,10 +1466,31 @@
     function currentTrip() {
         const on = id => !!document.getElementById(id)?.checked;
         const car = document.getElementById('carType')?.value || '';
-        const outUsed  = on('legOutCar')  || on('legOutTaxi')  || car === 'ขาไป'   || car === 'ไป-กลับ';
-        // เคสปกติ ติ๊กขาไปมีผลทั้งสองขา (การ์ดขากลับถูกซ่อน) กรณีพิเศษแต่ละขาติ๊กเอง
-        const backUsed = (isNormalTrip() && (on('legOutCar') || on('legOutTaxi')))
-                      || on('legBackCar') || on('legBackTaxi')
+
+        /* 19 ต.ค. 2569 — เจ้าของงานเจอว่า ติ๊ก Taxi แล้วลบแถวขากลับทิ้ง
+           เหลือขาไปแถวเดียว แต่เหมาจ่ายยังคิดให้สองขา ได้ 1,100 แทนที่จะเป็น 550
+
+           ต้นเหตุ: ของเดิมดูแค่ "ติ๊ก Taxi ไว้ไหม" ไม่เคยดูว่ามีแถวกี่แถว
+           ขณะที่วิธีคิดตามระยะจริงรวมเงินจากแถว จึงได้ขาเดียวถูกต้อง
+           สองวิธีเลยนับจำนวนขาไม่ตรงกัน ทั้งที่เป็นใบเดียวกัน
+
+           สำหรับ Taxi "แถว" คือหลักฐานว่าเดินทางขาไหนจริง ติ๊กเป็นแค่สวิตช์เปิดส่วน
+           จึงต้องนับจากแถว ส่วนรถส่วนตัวไม่มีแถว ใช้ติ๊กเหมือนเดิม */
+        const taxiDirs = new Set();
+        document.querySelectorAll('.taxi-entry').forEach(row => {
+            const d = row.querySelector('.taxi-dir')?.value || 'ขาไป';
+            if (d === 'ไป-กลับ') { taxiDirs.add('ขาไป'); taxiDirs.add('ขากลับ'); }
+            else taxiDirs.add(d);
+        });
+        const outTaxiLeg  = on('legOutTaxi') && taxiDirs.has('ขาไป');
+        // เคสปกติไม่มีการ์ดขากลับให้ติ๊ก ทุกแถวอยู่รายการเดียวกัน
+        const backTaxiLeg = (isNormalTrip() ? on('legOutTaxi') : on('legBackTaxi'))
+                            && taxiDirs.has('ขากลับ');
+
+        const outUsed  = on('legOutCar')  || outTaxiLeg  || car === 'ขาไป'   || car === 'ไป-กลับ';
+        // เคสปกติ ติ๊กรถขาไปมีผลทั้งสองขา (การ์ดขากลับถูกซ่อน) กรณีพิเศษแต่ละขาติ๊กเอง
+        const backUsed = (isNormalTrip() && on('legOutCar'))
+                      || on('legBackCar') || backTaxiLeg
                       || car === 'ขากลับ' || car === 'ไป-กลับ';
         return {
             distOut: parseFloat(document.getElementById('distOutbound')?.value) || 0,

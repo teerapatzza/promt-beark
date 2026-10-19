@@ -203,6 +203,10 @@ try {
     "nm.checked=true; nm.dispatchEvent(new Event('change',{bubbles:true}));",
     "await new Promise(r=>setTimeout(r,600));",
     tick('legOutCar', false),
+    /* ปิดแล้วเปิดใหม่ เพื่อให้ระบบสร้างแถวชุดใหม่ครบสองแถวตามเคสปกติ
+       ถ้าไม่ปิดก่อน แถวที่ค้างจากข้อก่อนหน้าจะเหลือขาไปแถวเดียว
+       แล้วข้อนี้จะกลายเป็นวัดเคสขาเดียวซึ่งเป็นของข้อ 7 ไม่ใช่ข้อนี้ */
+    tick('legOutTaxi', false),
     tick('legOutTaxi', true),
     "const f=document.querySelector('input[name=\"fuelMethod\"][value=\"flat\"]');",
     "const hasFlat = !!f;",
@@ -225,6 +229,35 @@ try {
     ok('ได้เงินจริง ไม่ใช่ 0',
        !!(flatTaxi.flat && flatTaxi.flat.total > 0), (flatTaxi.flat || {}).total + ' บาท');
   }
+
+  console.log('');
+  console.log('═══ 7. ลบแถว Taxi ขากลับทิ้ง เหมาจ่ายต้องคิดขาเดียว ═══');
+
+  /* 19 ต.ค. 2569 — เจ้าของงานเจอว่าเหลือแถว Taxi ขาไปแถวเดียว
+     แต่เหมาจ่ายยังคิดสองขา ได้ 1,100 แทนที่จะเป็น 550
+
+     ต้นเหตุ: currentTrip() ดูแค่ "ติ๊ก Taxi ไว้ไหม" ไม่เคยดูว่ามีแถวกี่แถว
+     ขณะที่วิธีคิดตามระยะจริงรวมเงินจากแถว จึงได้ขาเดียวถูกต้อง
+     สองวิธีคิดนับจำนวนขาไม่ตรงกันทั้งที่เป็นใบเดียวกัน
+
+     สำหรับ Taxi "แถว" คือหลักฐานว่าเดินทางขาไหนจริง ติ๊กเป็นแค่สวิตช์เปิดส่วน */
+  const oneWay = await ev([
+    "const rs=[...document.querySelectorAll('#taxiEntriesList .taxi-entry')];",
+    "const back=rs.find(r=>r.querySelector('.taxi-dir').value==='" + 'ขากลับ' + "');",
+    "if(back) back.querySelector('[onclick*=removeTaxiEntry]').click();",
+    "await new Promise(r=>setTimeout(r,900));",
+    "return { rows: [...document.querySelectorAll('#taxiEntriesList .taxi-entry')]",
+    "           .map(r=>r.querySelector('.taxi-dir').value),",
+    "         car: currentTrip().carType,",
+    "         flat: (typeof flatResult==='function') ? flatResult() : null };"
+  ].join('\n'));
+  ok('เหลือแถว Taxi ขาไปแถวเดียว', oneWay.rows.length === 1 && oneWay.rows[0] === 'ขาไป',
+     JSON.stringify(oneWay.rows));
+  ok('currentTrip นับเป็นขาไปอย่างเดียว ไม่ใช่ไป-กลับ',
+     oneWay.car === 'ขาไป', oneWay.car);
+  ok('เหมาจ่ายคิดขาเดียว 550 ไม่ใช่ 1,100',
+     !!(oneWay.flat && oneWay.flat.total === 550 && oneWay.flat.legs.length === 1),
+     (oneWay.flat || {}).total + ' บาท · ' + ((oneWay.flat || {}).legs || []).length + ' ขา');
 
   ok('ไม่มี JavaScript error ตลอดการทดสอบ', pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '));
 
