@@ -94,15 +94,31 @@
 
     /**
      * คิดเงินเหมาจ่ายของทั้งใบ แยกทีละเที่ยวตามที่ระเบียบกำหนด
+     *
+     * 16 ต.ค. 2569 — พื้นที่ตัดสินรายขาได้แล้ว
+     * บัญชี ๘ เขียนหัวคอลัมน์ว่า "อัตรา/บาท /เที่ยว" และบรรทัดนอกเขตของข้อ ๕
+     * เขียนว่า "เหมาจ่าย ๑,๒๐๐ บาท/เที่ยว" วงเงินจึงผูกกับเที่ยว ไม่ใช่ทั้งใบ
+     * ของเดิมรับธงพื้นที่ตัวเดียวแล้วใช้กับทุกขา ขาไปในเขต-ขากลับนอกเขต
+     * จึงถูกคิดเป็นในเขตทั้งคู่ ผู้เดินทางได้น้อยกว่าที่ระเบียบให้
+     *
      * @param {{distOut:number, distRet:number, carType:string}} trip
      * @param {object}  cfg
-     * @param {boolean} inMetro
+     * @param {boolean|{out:boolean, ret:boolean}} inMetro
+     *        ส่งเป็น boolean ได้เหมือนเดิม (ใช้กับทุกขา) หรือส่งแยกรายขา
      * @returns {{total:number, legs:Array, ok:boolean, why:string}}
      */
     function tripTotal(trip, cfg, inMetro) {
         var t = trip || {};
         var legs = [];
         var want = t.carType || 'ไป-กลับ';
+
+        /* รับได้ทั้งสองแบบ ของเดิมส่ง boolean มา และชุดทดสอบก็ยังส่งแบบนั้น
+           ไม่บังคับให้ผู้เรียกทุกที่เปลี่ยนพร้อมกัน จะได้ไม่มีที่ไหนเงียบ ๆ พัง */
+        var perLeg = (inMetro && typeof inMetro === 'object');
+        var areaOf = function (dir) {
+            if (!perLeg) return inMetro;
+            return dir === 'ขากลับ' ? inMetro.ret : inMetro.out;
+        };
 
         if (want === 'ขาไป' || want === 'ไป-กลับ')
             legs.push({ dir: 'ขาไป',   km: num(t.distOut) });
@@ -111,8 +127,10 @@
 
         var total = 0, bad = '';
         legs.forEach(function (l) {
-            var r = legAmount(l.km, cfg, inMetro);
+            var area = areaOf(l.dir);
+            var r = legAmount(l.km, cfg, area);
             l.amount = r.amount; l.label = r.label; l.ok = r.ok; l.why = r.why;
+            l.inMetro = (area === true || area === false) ? area : null;
             if (r.ok) total += r.amount;
             else if (!bad) bad = r.why;
         });

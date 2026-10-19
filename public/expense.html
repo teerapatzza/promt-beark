@@ -993,6 +993,11 @@
                 <div class="text-4xl font-black tracking-tight" id="totalAmount" data-value="0">0.00 <span class="text-2xl">฿</span></div>
             </div>
 
+            <!-- บอกว่ายอดนี้เข้าเกณฑ์ข้อไหนของ บัญชี ๘ และแต่ละขาอยู่เขตไหน
+                 ผู้ใช้เห็นแต่ยอดก้อนเดียวแล้วไม่รู้ว่าระบบคิดมาจากเกณฑ์ไหน
+                 โดยเฉพาะหลังเปลี่ยนมาคิดพื้นที่แยกรายขา ซึ่งสองขาอาจได้เรทต่างกัน -->
+            <div id="caseNote" class="hidden mb-4"></div>
+
             <!-- Breakdown ยอดย่อย -->
             <div id="breakdownContainer" class="hidden mb-4">
                 <div class="bg-slate-50 rounded-xl p-4 border border-slate-200">
@@ -1002,7 +1007,9 @@
                     </h4>
                     <div class="space-y-2 text-sm">
                         <div id="breakdownFuel" class="hidden flex justify-between items-center py-1">
-                            <span class="text-slate-600">⛽ ค่าน้ำมันรถส่วนตัว</span>
+                            <!-- ป้ายเปลี่ยนตามวิธีคิด ถ้าเลือกเหมาจ่ายแล้วยังเขียนว่า "ค่าน้ำมัน"
+                                 จะขัดกับป้ายเกณฑ์ด้านบนที่บอกว่าเป็นเหมาจ่ายตามข้อ ๕ -->
+                            <span class="text-slate-600" id="breakdownFuelLabel">⛽ ค่าน้ำมันรถส่วนตัว</span>
                             <span class="font-bold text-slate-800" id="breakdownFuelAmount">0</span>
                         </div>
                         <div id="breakdownHotel" class="hidden flex justify-between items-center py-1">
@@ -1467,8 +1474,83 @@
 
     function flatResult() {
         if (!flatRateCfg) return null;
-        const metro = (typeof isMetroTripFE === 'function') ? isMetroTripFE() : { inMetro: null };
-        return FlatRate.tripTotal(currentTrip(), flatRateCfg, metro.inMetro);
+        /* ถาม isMetroTripFE() ที่เดียวเหมือนเดิม ไม่เรียก MetroArea ตรงนี้
+           เพราะที่นี่คือจุดเดียวที่ทั้งหน้ารู้เรื่องพื้นที่ ถ้าแตกเป็นสองทาง
+           วันหน้าแก้ที่หนึ่งแล้วลืมอีกที่ เงินจะเพี้ยนแบบที่ไม่มีใครจับได้
+           ส่ง legs เข้าไปถ้ามี เพื่อคิดรายขาตามที่บัญชี ๘ เขียนว่า "ต่อเที่ยว"
+           ถ้าไม่มี (เช่นถูกแทนค่าไว้ตอนทดสอบ) ถอยไปใช้ธงเดียวแบบเดิม */
+        const m = (typeof isMetroTripFE === 'function') ? isMetroTripFE() : { inMetro: null };
+        return FlatRate.tripTotal(currentTrip(), flatRateCfg, m.legs || m.inMetro);
+    }
+
+    /* ══════════ ยอดนี้เข้าเกณฑ์ข้อไหน ══════════
+       แถบขวาเคยบอกแค่ยอดก้อนเดียว ผู้ใช้ไม่รู้ว่าระบบคิดมาจากเกณฑ์ไหน
+       และตั้งแต่คิดพื้นที่แยกรายขา สองขาอาจได้คนละเรท ยิ่งต้องบอกให้เห็น
+       ไม่งั้นคนจะสงสัยว่าทำไมขาไปกับขากลับระยะเท่ากันแต่ได้เงินไม่เท่ากัน
+
+       เขียนอ้างข้อของ บัญชี ๘ ตรง ๆ เพื่อให้ผู้ตรวจเอกสารตามรอยได้
+         ข้อ ๑ ค่าพาหนะรับจ้าง (Taxi) เบิกตามจริง
+         ข้อ ๔ ค่าชดเชยเชื้อเพลิง พาหนะส่วนตัว ๕ บาท/กม.
+         ข้อ ๕ ค่าพาหนะเดินทางเหมาจ่าย ตามช่วงระยะทาง                     */
+    function updateCaseNote(onTravel, onReceipt) {
+        const box = document.getElementById('caseNote');
+        if (!box) return;
+
+        const rows = [];
+        const areaWord = v => v === true ? 'ในเขต กทม.ปริมณฑล'
+                            : v === false ? 'นอกเขต กทม.ปริมณฑล' : 'ยังไม่รู้พื้นที่';
+
+        if (onTravel && onReceipt) {
+            const flat = (typeof flatMethodOn === 'function') && flatMethodOn();
+            if (flat) {
+                const fr = (typeof flatResult === 'function') ? flatResult() : null;
+                if (fr && fr.legs && fr.legs.length) {
+                    rows.push(['ค่าพาหนะ', 'เหมาจ่าย ตามบัญชี ๘ ข้อ ๕']);
+                    fr.legs.forEach(l => {
+                        if (!l.ok) { rows.push([l.dir, l.why || 'คิดไม่ได้']); return; }
+                        rows.push([l.dir, l.km.toLocaleString('th-TH') + ' กม. · '
+                            + areaWord(l.inMetro) + ' · ' + l.label
+                            + ' = ' + l.amount.toLocaleString('th-TH') + ' บาท']);
+                    });
+                } else if (fr && fr.why) {
+                    rows.push(['ค่าพาหนะ', 'เหมาจ่าย — ' + fr.why]);
+                }
+            } else {
+                const rate = parseFloat(document.getElementById('fuelRate')?.value) || 0;
+                const dOut = parseFloat(document.getElementById('distOutbound')?.value) || 0;
+                const dRet = parseFloat(document.getElementById('distReturn')?.value) || 0;
+                const car  = document.getElementById('carType')?.value || 'ไม่ระบุ';
+                if (car !== 'ไม่ระบุ' && rate > 0) {
+                    const km = car === 'ขาไป' ? dOut : car === 'ขากลับ' ? dRet : dOut + dRet;
+                    rows.push(['ค่าพาหนะ', 'ค่าชดเชยเชื้อเพลิง ตามบัญชี ๘ ข้อ ๔']);
+                    rows.push([car, km.toLocaleString('th-TH') + ' กม. × ' + rate
+                        + ' บาท = ' + (km * rate).toLocaleString('th-TH') + ' บาท']);
+                }
+            }
+
+            // วงเงิน Taxi ของขาไป — ป้ายในการ์ดบอกละเอียดกว่า ตรงนี้บอกพอให้เห็นภาพ
+            const taxiN = document.querySelectorAll('.taxi-entry').length;
+            if (taxiN > 0 && !flat) {
+                const m = (typeof isMetroTripFE === 'function') ? isMetroTripFE() : {};
+                const cap = (typeof taxiMaxPerTrip !== 'undefined' && taxiMaxPerTrip !== Infinity)
+                    ? ('ไม่เกิน ' + taxiMaxPerTrip.toLocaleString('th-TH') + ' บาท/เที่ยว') : 'ไม่จำกัด';
+                rows.push(['ค่า Taxi', 'เบิกตามจริง ตามบัญชี ๘ ข้อ ๑ · '
+                    + areaWord(m.inMetro) + ' · ' + cap]);
+            }
+        }
+
+        if (!rows.length) { box.className = 'hidden mb-4'; box.innerHTML = ''; return; }
+
+        box.className = 'mb-4';
+        box.innerHTML =
+            '<div class="bg-indigo-50/60 border border-indigo-100 rounded-xl p-3">'
+            + '<div class="text-[11px] font-bold text-indigo-900 mb-1.5 flex items-center gap-1">'
+            + '<span>🧭</span><span>ยอดนี้คิดจากเกณฑ์ไหน</span></div>'
+            + rows.map(r =>
+                '<div class="flex gap-2 text-[11px] leading-relaxed">'
+                + '<span class="text-indigo-700 font-semibold shrink-0">' + escHtml(r[0]) + '</span>'
+                + '<span class="text-slate-600">' + escHtml(r[1]) + '</span></div>').join('')
+            + '</div>';
     }
 
     /* เลือกเหมาจ่ายแล้ว ค่าโดยสาร Taxi ต้องกรอกไม่ได้
@@ -3064,9 +3146,19 @@
             // ไฟล์ขอบเขตโหลดไม่ขึ้น อย่าเดาเอง บอกตรง ๆ แล้วปล่อยให้ backend ตัดสิน
             return { inMetro: false, why: 'ยังอ่านขอบเขตพื้นที่ไม่ได้' };
         }
-        const r = MetroArea.tripArea(geoFrom, geoTo);
-        return { inMetro: r.inMetro, why: r.reason,
-                 fromProvince: r.fromProvince, toProvince: r.toProvince };
+        /* 16 ต.ค. 2569 — คืนพื้นที่รายขามาด้วย
+           บัญชี ๘ เขียนหัวคอลัมน์ว่า "อัตรา/บาท /เที่ยว" วงเงินผูกกับเที่ยว
+           ค่าระดับบนสุด (inMetro/why) ยังเป็นของขาไปเหมือนเดิม
+           เพราะป้ายวงเงิน Taxi กับข้อความบนหน้าจออ่านจากตรงนั้นอยู่ */
+        const a = MetroArea.legAreas({
+            fromGeo: geoFrom, toGeo: geoTo,
+            returnDifferent: (typeof returnIsDifferent === 'function') ? returnIsDifferent() : false,
+            returnFromGeo: geoRetFrom, returnGeo: geoRet
+        });
+        return { inMetro: a.out.inMetro, why: a.out.reason,
+                 fromProvince: a.out.fromProvince, toProvince: a.out.toProvince,
+                 legs: { out: a.out.inMetro, ret: a.ret.inMetro },
+                 retWhy: a.ret.reason, sameLeg: a.sameLeg };
     }
 
     /** วงเงินที่หมวดหมู่กำหนด (ยังไม่คิดเรื่องพื้นที่) */
@@ -3294,6 +3386,7 @@
         const total = hotel + fuelTotal + taxiTotal + air + toll + parking + other;
         document.getElementById('totalAmount').innerHTML = new Intl.NumberFormat('th-TH', { style: 'decimal', minimumFractionDigits: 2 }).format(total) + ' <span class="text-2xl">฿</span>';
         document.getElementById('totalAmount').dataset.value = total;
+        if (typeof updateCaseNote === 'function') updateCaseNote(onTravel, onReceipt);
 
         // Update breakdown
         const fmt = (n) => new Intl.NumberFormat('th-TH', { minimumFractionDigits: 2 }).format(n) + ' ฿';
@@ -3311,6 +3404,10 @@
             }
         };
 
+        // เรียกป้ายให้ตรงกับวิธีคิดที่เลือกอยู่ ไม่ให้ขัดกับป้ายเกณฑ์ด้านบน
+        const fuelLbl = document.getElementById('breakdownFuelLabel');
+        if (fuelLbl) fuelLbl.textContent = usedFlat
+            ? '🧾 ค่าพาหนะเหมาจ่าย' : '⛽ ค่าน้ำมันรถส่วนตัว';
         updateBreakdownItem('breakdownFuel', 'breakdownFuelAmount', fuelTotal);
         updateBreakdownItem('breakdownHotel', 'breakdownHotelAmount', hotel);
         updateBreakdownItem('breakdownTaxi', 'breakdownTaxiAmount', taxiTotal);
@@ -3406,6 +3503,9 @@
         if (!category) {
             container.innerHTML = ''; eviBox.classList.add('hidden');
             document.getElementById('totalAmount').innerHTML = '0.00 <span class="text-2xl">฿</span>';
+            // ยังไม่ได้เลือกหมวด = ยังไม่มีเกณฑ์ให้บอก ต้องเก็บป้ายเก่าไปด้วย
+            // ไม่งั้นป้ายของหมวดก่อนหน้าจะค้างอยู่ทั้งที่ยอดกลับเป็นศูนย์แล้ว
+            if (typeof updateCaseNote === 'function') updateCaseNote(false, false);
             applyCategoryPdfTemplate(null);
             return;
         }

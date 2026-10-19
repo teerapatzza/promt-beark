@@ -153,16 +153,31 @@ function validateExpense(expense, category, globalTaxiMax) {
         // ติ๊ก "ไม่จำกัด" ในหน้าแอดมินจะเก็บเป็น null/0 ซึ่งแปลว่าไม่ต้องตรวจ
         // วงเงินจำกัดเฉพาะการเดินทางใน กทม.ปริมณฑล นอกเขตให้ผู้อนุมัติดูเอง
         const metro = isMetroTrip(travel);
-        const taxiCap = (function () {
-            if (!metro.inMetro) return Infinity;
+        /* 16 ต.ค. 2569 — วงเงินคิดรายขา ไม่ใช่ทั้งใบ
+           บัญชี ๘ เขียนหัวคอลัมน์ว่า "อัตรา/บาท /เที่ยว" วงเงินจึงผูกกับเที่ยว
+           ของเดิมตัดสินพื้นที่จากหมุดขาไปแล้วใช้ผลนั้นกับทุกรายการ Taxi
+           เคสที่ผิดคือขาไปอยู่ในเขต แต่ขากลับออกต่างจังหวัด
+           รายการ Taxi ของขากลับจะถูกบังคับเพดานในเขต ทั้งที่ควรได้วงเงินนอกเขต */
+        const areas = MetroArea.legAreas(travel);
+        const capOf = function (inMetro) {
+            // นอกเขตไม่บังคับเพดานตรงนี้ เพราะ บัญชี ๘ ข้อ ๒ (รถบริการสนามบิน)
+            // ระบุว่า "เบิกจ่ายตามจริง" ไม่มีเพดาน และช่องกรอกใช้ช่องเดียวกัน
+            // ผู้อนุมัติเป็นคนดูอีกชั้น — พฤติกรรมเดิม ไม่ได้เปลี่ยนในรอบนี้
+            if (!inMetro) return Infinity;
             const fromCat = category && category.taxiMaxPerTrip;
             if (fromCat === null || fromCat === 0 || fromCat === '') return Infinity;   // ไม่จำกัด
             const n = parseFloat(fromCat);
             if (isFinite(n) && n > 0) return n;
             const g = parseFloat(globalTaxiMax);
             return (isFinite(g) && g > 0) ? g : TAXI_MAX_PER_TRIP;
-        })();
-        const capText = taxiCap === Infinity ? 'ไม่จำกัด' : taxiCap.toLocaleString();
+        };
+        const capOut = capOf(areas.out.inMetro);
+        const capRet = capOf(areas.ret.inMetro);
+        /** เที่ยวนี้เป็นขาไปหรือขากลับ ใช้เพดานของขานั้น */
+        const capByDir = dir => (dir === 'ขากลับ' ? capRet : capOut);
+        const asText = cap => (cap === Infinity ? 'ไม่จำกัด' : cap.toLocaleString());
+        const taxiCap = capOut;                       // เผื่อโค้ดเก่าที่ยังอ้างชื่อนี้
+        const capText = asText(capOut);
 
         // Taxi มีช่องอยู่บนใบรับรองค่าพาหนะ (FM-SAM-095-00) เท่านั้น
         // ใบอื่นไม่มีช่องนี้ ถ้ามีค่าค้างมาก็ไม่ใช่สิ่งที่ผู้ใช้ตั้งใจเบิก
@@ -198,33 +213,35 @@ function validateExpense(expense, category, globalTaxiMax) {
             }
 
             // Validate taxi amount limits
+            // แถวเดียวที่กรอกทั้งสองขา ต้องเทียบคนละเพดาน เพราะคนละเที่ยว
             if (entry.direction === 'ไป-กลับ') {
-                if ((entry.amountOut || 0) > taxiCap) {
+                if ((entry.amountOut || 0) > capOut) {
                     errors.push({
                         field: `taxiEntry${index}`,
                         level: 'error',
                         message: `❌ ยอดค่า Taxi เกินวงเงินที่อนุมัติ!\n\n` +
                             `🚕 Taxi วันที่ ${entry.date} (ขาไป)\n` +
                             `💰 ยอดที่กรอก: ${entry.amountOut} บาท\n` +
-                            `📊 วงเงินสูงสุด: ${capText} บาท/เที่ยว\n\n` +
-                            `💡 กรุณาลดยอดเงินให้ไม่เกิน ${capText} บาท`
+                            `📊 วงเงินสูงสุด: ${asText(capOut)} บาท/เที่ยว\n\n` +
+                            `💡 กรุณาลดยอดเงินให้ไม่เกิน ${asText(capOut)} บาท`
                     });
                 }
-                if ((entry.amountRet || 0) > taxiCap) {
+                if ((entry.amountRet || 0) > capRet) {
                     errors.push({
                         field: `taxiEntry${index}`,
                         level: 'error',
                         message: `❌ ยอดค่า Taxi เกินวงเงินที่อนุมัติ! (ขากลับ)\n` +
-                            `💰 ${entry.amountRet} บาท > ${capText} บาท`
+                            `💰 ${entry.amountRet} บาท > ${asText(capRet)} บาท`
                     });
                 }
             } else {
-                if ((entry.amount || 0) > taxiCap) {
+                const cap = capByDir(entry.direction);
+                if ((entry.amount || 0) > cap) {
                     errors.push({
                         field: `taxiEntry${index}`,
                         level: 'error',
                         message: `❌ ยอดค่า Taxi เกินวงเงินที่อนุมัติ!\n` +
-                            `💰 ${entry.amount} บาท > ${capText} บาท`
+                            `💰 ${entry.amount} บาท > ${asText(cap)} บาท`
                     });
                 }
             }
@@ -412,5 +429,7 @@ function validateExpense(expense, category, globalTaxiMax) {
 
 // Export for both Node.js (backend) and browser (frontend)
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { validateExpense, TAXI_MAX_PER_TRIP, isMetroTrip, METRO_PROVINCES };
+    // legAreas ส่งต่อให้เทสต์และที่อื่นเรียกได้ โดยไม่ต้องไปรู้จัก path ของ metro-area.js
+    module.exports = { validateExpense, TAXI_MAX_PER_TRIP, isMetroTrip,
+                       legAreas: MetroArea.legAreas, METRO_PROVINCES };
 }

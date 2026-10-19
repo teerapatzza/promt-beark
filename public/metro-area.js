@@ -100,9 +100,39 @@
                  fromProvince: fp, toProvince: tp };
     }
 
+    /**
+     * พื้นที่ของแต่ละขาเดินทาง แยกขาไปกับขากลับคนละครั้ง
+     *
+     * บัญชี ๘ เขียนหัวคอลัมน์ไว้ว่า "อัตรา/บาท /เที่ยว" และข้อ ๕ บรรทัดนอกเขต
+     * เขียนว่า "เหมาจ่าย ๑,๒๐๐ บาท/เที่ยว" วงเงินจึงผูกกับเที่ยว ไม่ใช่ทั้งใบ
+     * ของเดิมตัดสินจากหมุดขาไปสองหมุดแล้วใช้ผลนั้นกับทุกขา
+     * เคสที่ผิดคือขาไปอยู่ในเขต แต่ขากลับออกต่างจังหวัด ขากลับจะได้เรทในเขต
+     * แทนที่จะได้ ๑,๒๐๐ คือผู้เดินทางได้น้อยกว่าที่ระเบียบให้
+     *
+     * ขากลับที่ไม่ได้กรอกจุดไว้ = กลับเส้นทางเดิม พื้นที่จึงเท่ากับขาไปเสมอ
+     * ไม่ใช่การเดา แต่เป็นกติกาที่เขียนไว้ในช่องกรอกนั่นเอง
+     *
+     * @param {object} travel  ต้องมี fromGeo, toGeo และถ้าขากลับคนละทาง
+     *                         ให้มี returnDifferent, returnFromGeo, returnGeo
+     * @returns {{out:object, ret:object, sameLeg:boolean}}
+     */
+    function legAreas(travel) {
+        var t = travel || {};
+        var out = tripArea(t.fromGeo, t.toGeo);
+
+        // กลับทางเดิม = ขาเดียวกันกลับหัว พื้นที่เหมือนกันทุกประการ
+        if (!t.returnDifferent) return { out: out, ret: out, sameLeg: true };
+
+        // ขากลับคนละทาง เว้นช่องไหนว่างให้ถอยไปใช้หมุดของขาไป
+        // ตรงกับที่หน้ากรอกเขียนไว้ว่า ว่าง = ออกจากจุดที่รถไปส่ง / กลับที่จุดเริ่มต้น
+        var backStart = pt(t.returnFromGeo) || t.toGeo;
+        var backEnd   = pt(t.returnGeo)     || t.fromGeo;
+        return { out: out, ret: tripArea(backStart, backEnd), sameLeg: false };
+    }
+
     /** ชื่อหกจังหวัดตามที่ประกาศระบุ เผื่อที่อื่นอยากอ่าน */
     function provinces() { return PROV.map(function (p) { return p.n; }); }
 
     return { provinceAt: provinceAt, isMetro: isMetro, tripArea: tripArea,
-             provinces: provinces, BOX: ALL };
+             legAreas: legAreas, provinces: provinces, BOX: ALL };
 });
