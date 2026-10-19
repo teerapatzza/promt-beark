@@ -1383,6 +1383,7 @@
 
         syncReturnDiff();
         if (typeof updateReturnPlaceholders === 'function') updateReturnPlaceholders();
+        if (typeof syncTaxiRoutes === 'function') syncTaxiRoutes();
         if (typeof calculateTravelTotal === 'function') calculateTravelTotal();
         if (typeof recalcRoute === 'function') recalcRoute(false);
     }
@@ -1719,25 +1720,54 @@
        ช่อง Taxi เป็นข้อความล้วน ไม่มีการคำนวณไหนใช้มัน (ค่าโดยสารกรอกเอง)
        จึงไม่ต้องยุ่งกับหมุดบนแผนที่เลย — ห้ามเรียก attachPlaceSearch ตัวเดิมมาใช้
        เพราะตัวนั้นผูกกับการปักหมุดเส้นทางหลัก ถ้าใช้ซ้ำ ค่าน้ำมันจะเพี้ยน */
-    function fillTaxiFromRoute(btn) {
-        const row = btn && btn.closest ? btn.closest('.taxi-entry') : null;
-        if (!row) return;
+    /** เส้นทางที่แถว Taxi ทิศทางนี้ควรเป็น อ่านจากเส้นทางหลักด้านบน */
+    function taxiRouteFor(dir) {
         const v = id => (document.getElementById(id)?.value || '').trim();
-
         const out = { from: v('travelFrom'), to: v('travelTo') };
         // เคสปกติกลับทางเดิม จึงสลับต้นทาง-ปลายทางของขาไป
         // กรณีพิเศษมีช่องขากลับของตัวเอง เว้นว่างไว้ความหมายคือกลับทางเดิม
         const ret = isNormalTrip()
             ? { from: out.to, to: out.from }
             : { from: v('travelReturnFrom') || out.to, to: v('travelReturnTo') || out.from };
+        return (dir === 'ขากลับ') ? ret : out;
+    }
+
+    /* ══════════ แถว Taxi ตามเส้นทางหลักให้เอง ══════════
+       19 ต.ค. 2569 — เจ้าของงานทักว่า "ติ๊ก Taxi แล้วทำไมต้องกรอก 3 ครั้ง"
+       หน้าจอมีช่อง จาก/ถึง สามคู่ คู่บนคือเส้นทางหลัก อีกสองคู่คือแถว Taxi
+
+       ของเดิมคัดลอกเส้นทางหลักลงแถว "ตอนสร้างแถว" ครั้งเดียว ผลคือ
+         ก. ติ๊ก Taxi ก่อนแล้วค่อยพิมพ์จุดหมาย -> ช่อง "ถึง" ว่างค้างตลอดไป
+         ข. แถวขากลับได้ทิศทางของขาไป (จาก=บ้าน ถึง=ปลายทาง) ซึ่งกลับหัว
+       แล้วข้อความผิด ๆ นั้นถูกพิมพ์ลงใบรับรองค่าพาหนะที่ส่งการเงิน
+
+       ตอนนี้ตามให้ตลอด จนกว่าผู้ใช้จะพิมพ์ทับเอง (dataset.touched)
+       ช่องที่ผู้ใช้แก้แล้วจะไม่ถูกเขียนทับ เพราะบางเที่ยวนั่งคนละเส้นทางจริง ๆ
+       เช่น นั่งจากสนามบินไปโรงแรม ซึ่งไม่ใช่เส้นทางหลัก                     */
+    function syncTaxiRoutes() {
+        document.querySelectorAll('.taxi-entry').forEach(row => {
+            const dir  = row.querySelector('.taxi-dir')?.value || 'ขาไป';
+            const pick = taxiRouteFor(dir);
+            const f = row.querySelector('.taxi-from');
+            const t = row.querySelector('.taxi-to');
+            if (f && !f.dataset.touched) f.value = pick.from;
+            if (t && !t.dataset.touched) t.value = pick.to;
+        });
+    }
+
+    function fillTaxiFromRoute(btn) {
+        const row = btn && btn.closest ? btn.closest('.taxi-entry') : null;
+        if (!row) return;
 
         const dir = row.querySelector('.taxi-dir')?.value || 'ขาไป';
-        const pick = (dir === 'ขากลับ') ? ret : out;
+        const pick = taxiRouteFor(dir);
 
         const f = row.querySelector('.taxi-from');
         const t = row.querySelector('.taxi-to');
-        if (f) f.value = pick.from;
-        if (t) t.value = pick.to;
+        // กดปุ่มนี้ = ขอให้กลับไปตามเส้นทางหลัก จึงล้างธง "ผู้ใช้แก้เอง" ด้วย
+        // ไม่งั้นกดแล้วเติมให้ครั้งเดียว พอแก้เส้นทางหลักก็ค้างอีก
+        if (f) { f.value = pick.from; delete f.dataset.touched; }
+        if (t) { t.value = pick.to;   delete t.dataset.touched; }
 
         // กระพริบให้เห็นว่าเติมอะไรลงไป ไม่งั้นกดแล้วไม่รู้ว่าเกิดอะไรขึ้น
         [f, t].forEach(el => {
@@ -1797,6 +1827,7 @@
         const changed = cb.checked !== want;
         cb.checked = want;
         if (typeof updateReturnPlaceholders === 'function') updateReturnPlaceholders();
+        if (typeof syncTaxiRoutes === 'function') syncTaxiRoutes();
 
         /* ความหมายของเส้นทางขากลับเพิ่งเปลี่ยน ต้องคิดระยะทางใหม่ทันที
            ก่อนหน้านี้แค่ติ๊ก/ปลดติ๊กเงียบๆ ตัวเลขกับคำเตือนเดิมจึงค้างอยู่บนจอ
@@ -1892,6 +1923,7 @@
     async function recalcRoute(userAsked) {
         // ชื่อจุดเริ่มต้น/จุดหมายอาจเพิ่งเปลี่ยน ช่องขากลับต้องบอกให้ตรงว่าเว้นว่างแล้วได้ที่ไหน
         if (typeof updateReturnPlaceholders === 'function') updateReturnPlaceholders();
+        if (typeof syncTaxiRoutes === 'function') syncTaxiRoutes();
         // หมุดเปลี่ยน = พื้นที่อาจเปลี่ยน = วงเงินแท็กซี่อาจเปลี่ยน ต้องคิดใหม่ทุกครั้ง
         if (typeof recomputeTaxiCap === 'function') recomputeTaxiCap();
         if (document.getElementById('manualDistOverride')?.checked) return;
@@ -1970,11 +2002,25 @@
                คิดขากลับให้แล้ว ทั้งที่ไม่ได้เบิก คนที่ลืมติ๊กจึงไม่มีทางรู้ว่าลืม
                และตัวเลขที่ค้างไว้ยังไปโผล่เป็นค่าน้ำมันบนหน้าสถิติด้วย
                ระยะทางช่องนี้มีความหมายกับรถส่วนตัวเท่านั้น Taxi คิดจากค่าโดยสาร */
-            const backCarUsed = !!document.getElementById('legBackCar')?.checked;
-            document.getElementById('distReturn').value = backCarUsed ? retKm : 0;
-            if (!backCarUsed) {
+            /* 19 ต.ค. 2569 — แก้ของที่ผมทำพังไว้เองใน 2.16.0
+               ตอนนั้นเขียนเงื่อนไขเป็น "ติ๊กรถส่วนตัวขากลับ" โดยให้เหตุผลว่า
+               ระยะทางมีความหมายกับรถส่วนตัวเท่านั้น ซึ่งผิด
+               เหมาจ่าย (บัญชี ๘ ข้อ ๕) คิดจากช่วงระยะทางโดยไม่ผูกชนิดพาหนะ
+               ขา Taxi จึงต้องมีระยะทางด้วย
+
+               อาการที่เกิด: เคสปกติ ติ๊ก Taxi แล้วเลือกเหมาจ่าย
+               ขาไปคิดได้ 550 แต่ขากลับ "ยังไม่มีระยะทาง" ทำให้ทั้งใบ ok=false
+               แล้วถอยไปคิดตามระยะจริงซึ่งเป็นศูนย์ ยอดรวมจึงขึ้น 0.00
+
+               เงื่อนไขที่ถูกคือ "ขากลับถูกเบิกไหม" ไม่ว่าด้วยพาหนะอะไร
+               อ่านจาก currentTrip() ซึ่งเป็นตัวเดียวกับที่ใช้คิดเงิน
+               จะได้ไม่มีกติกาสองชุดที่ตอบไม่ตรงกันอีก */
+            const ctNow = (typeof currentTrip === 'function') ? currentTrip() : { carType: '' };
+            const backClaimed = ctNow.carType === 'ขากลับ' || ctNow.carType === 'ไป-กลับ';
+            document.getElementById('distReturn').value = backClaimed ? retKm : 0;
+            if (!backClaimed) {
                 retMsg = ' ' + badge('bg-slate-50 border-slate-200 text-slate-500',
-                    'ไม่ได้เบิกรถขากลับ จึงไม่คิดระยะทางขากลับ');
+                    'ไม่ได้เบิกขากลับ จึงไม่คิดระยะทางขากลับ');
             }
             if (typeof calculateTravelTotal === 'function') calculateTravelTotal();
             fitRoute();
@@ -2879,7 +2925,7 @@
                 </div>
                 <div>
                     <label class="text-[10px] text-slate-400 font-bold block mb-0.5">จาก</label>
-                    <input type="text" class="taxi-from w-full border border-slate-200 px-2 py-1.5 rounded text-xs outline-none focus:border-blue-400" value="${fromVal}" placeholder="สถานที่ต้นทาง">
+                    <input type="text" class="taxi-from w-full border border-slate-200 px-2 py-1.5 rounded text-xs outline-none focus:border-blue-400" value="${fromVal}" oninput="this.dataset.touched='1'" placeholder="สถานที่ต้นทาง">
                 </div>
                 <div>
                     <div class="flex items-center justify-between mb-0.5 gap-2">
@@ -2888,7 +2934,7 @@
                             class="taxi-use-route text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline whitespace-nowrap"
                             title="ดึงต้นทาง-ปลายทางจากเส้นทางหลักด้านบนมาเติมให้">ใช้เส้นทางหลัก</button>
                     </div>
-                    <input type="text" class="taxi-to w-full border border-slate-200 px-2 py-1.5 rounded text-xs outline-none focus:border-blue-400" value="${toVal}" placeholder="สถานที่ปลายทาง">
+                    <input type="text" class="taxi-to w-full border border-slate-200 px-2 py-1.5 rounded text-xs outline-none focus:border-blue-400" value="${toVal}" oninput="this.dataset.touched='1'" placeholder="สถานที่ปลายทาง">
                 </div>
             </div>
             <div class="flex items-end gap-2">
@@ -2929,6 +2975,9 @@
         showTaxiCap();   // แถวที่เพิ่งเพิ่มต้องเห็นวงเงินด้วย
         // ถ้ากำลังใช้เหมาจ่ายอยู่ แถวที่เพิ่งเพิ่มต้องถูกล็อกตั้งแต่แรก
         if (typeof applyFlatLockToTaxi === 'function') applyFlatLockToTaxi();
+        // แถวที่เพิ่งเกิดต้องได้เส้นทางตามทิศทางของตัวเอง
+        // ค่า value ที่ใส่ตอนสร้างเป็นของขาไปเสมอ แถวขากลับจึงต้องถูกแก้ให้ถูกทาง
+        if (typeof syncTaxiRoutes === 'function') syncTaxiRoutes();
     }
 
     function onTaxiDirChange(select) {
@@ -2957,6 +3006,9 @@
             retInp.value = '';
         }
         entry.querySelector('.taxi-err').classList.add('hidden');
+        // เปลี่ยนทิศทางแล้วเส้นทางต้องตามไปด้วย ขากลับคือเส้นทางกลับหัวของขาไป
+        // ของเดิมไม่ตาม ผู้ใช้สลับเป็นขากลับแล้วได้ จาก=บ้าน ถึง=ปลายทาง ซึ่งกลับหัว
+        if (typeof syncTaxiRoutes === 'function') syncTaxiRoutes();
         calculateTravelTotal();
     }
 
@@ -4727,10 +4779,25 @@
                     const autoDate = (typeof legDateFor === 'function')
                         ? legDateFor(dir === 'ขากลับ' ? 'ขากลับ' : 'ขาไป') : '';
                     if (entry.date && entry.date !== autoDate) dtCell.dataset.touched = '1';
-                    row.querySelector('.taxi-from').value = entry.from || '';
-                    row.querySelector('.taxi-to').value   = entry.to   || '';
+                    const fCell = row.querySelector('.taxi-from');
+                    const tCell = row.querySelector('.taxi-to');
+                    fCell.value = entry.from || '';
+                    tCell.value = entry.to   || '';
                     const dirSel = row.querySelector('.taxi-dir');
                     dirSel.value = entry.direction || 'ขาไป';
+
+                    /* ตีตราเส้นทางที่ "ต่างจากเส้นทางหลัก" ว่าผู้ใช้ตั้งเอง
+                       หลักการเดียวกับช่องวันที่ด้านบน — ตรงกับที่ระบบเติมให้ = ปล่อยให้ตามต่อ
+                       ต่างจากที่ระบบเติม = ตั้งใจตั้งเอง ห้ามเขียนทับ
+                       จำเป็นเพราะ onTaxiDirChange() ด้านล่างเรียก syncTaxiRoutes()
+                       ถ้าไม่ตีตรา เส้นทางที่บันทึกไว้จะถูกทับตั้งแต่เปิดใบขึ้นมา */
+                    const autoRoute = (typeof taxiRouteFor === 'function')
+                        ? taxiRouteFor(dirSel.value) : { from: '', to: '' };
+                    if ((entry.from || '') && (entry.from || '') !== autoRoute.from)
+                        fCell.dataset.touched = '1';
+                    if ((entry.to || '') && (entry.to || '') !== autoRoute.to)
+                        tCell.dataset.touched = '1';
+
                     onTaxiDirChange(dirSel);
                     if (entry.direction === 'ขากลับ') {
                         row.querySelector('.taxi-amt-ret').value = entry.amount || '';

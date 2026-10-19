@@ -90,7 +90,12 @@ try {
     "    {status:200,headers:{'Content-Type':'application/json'}}));",
     "  if(s.indexOf('/budget-categories')>=0) return Promise.resolve(new Response(",
     "    JSON.stringify([{id:'TRAVEL002',name:'test',pdfTemplates:['REPORT','TRANSPORT_RECEIPT'],",
-    "      attachmentRules:{},attachmentOrder:[],taxiMaxPerTrip:750,fuelRate:5}]),",
+    // เปิดเหมาจ่ายไว้ด้วย เพื่อให้ข้อ 6 ทดสอบเคสที่เจ้าของงานเจอได้จริง
+    "      attachmentRules:{},attachmentOrder:[],taxiMaxPerTrip:750,fuelRate:5,",
+    "      flatRate:{enabled:true,maxKm:200,outsideMetro:1200,bands:[",
+    "        {upTo:10.99,amount:150},{upTo:20.99,amount:250},{upTo:30.99,amount:350},",
+    "        {upTo:40.99,amount:450},{upTo:50.99,amount:550},{upTo:60.99,amount:650},",
+    "        {upTo:null,amount:750}]}}]),",
     "    {status:200,headers:{'Content-Type':'application/json'}}));",
     "  if(s.indexOf('/expenses')>=0||s.indexOf('/profiles')>=0)",
     "    return Promise.resolve(new Response('[]',{status:200,headers:{'Content-Type':'application/json'}}));",
@@ -109,8 +114,8 @@ try {
   ok('ระยะทางขาไปยังคำนวณให้ตามปกติ', parseFloat(a.distOut) === 47.6, a.distOut + ' กม.');
   ok('ระยะทางขากลับต้องเป็น 0 เพราะไม่มีใครเบิกขากลับ',
      parseFloat(a.distRet) === 0, a.distRet + ' กม.');
-  ok('ป้ายบอกตรง ๆ ว่าไม่ได้เบิกรถขากลับ',
-     /ไม่ได้เบิกรถขากลับ/.test(a.status), a.status.replace(/\s+/g, ' ').trim().slice(0, 130));
+  ok('ป้ายบอกตรง ๆ ว่าไม่ได้เบิกขากลับ',
+     /ไม่ได้เบิกขากลับ/.test(a.status), a.status.replace(/\s+/g, ' ').trim().slice(0, 130));
   ok('ไม่ขึ้นป้าย "ขากลับใช้เส้นทางเดิม" ให้เข้าใจผิด',
      !/ขากลับใช้เส้นทางเดิม/.test(a.status));
 
@@ -179,6 +184,47 @@ try {
     "return { savedAlerts: (window.__alerts||[]).filter(a=>/บันทึก(สำเร็จ|เรียบร้อย)/.test(a)).length };"
   ].join('\n'));
   ok('กดยกเลิกแล้วไม่มีการบันทึกเกิดขึ้น', e2.savedAlerts === 0, e2.savedAlerts + ' ข้อความสำเร็จ');
+
+  console.log('');
+  console.log('═══ 6. เคสปกติ ติ๊กแต่ Taxi แล้วเลือกเหมาจ่าย ต้องได้เงิน ไม่ใช่ 0 ═══');
+
+  /* 19 ต.ค. 2569 — เจ้าของงานเจอว่ายอดขึ้น 0.00
+     ต้นเหตุคือข้อ 6 ของรอบก่อน (เวอร์ชัน 2.16.0) ที่ผมเขียนเงื่อนไขว่า
+     "เติมระยะทางขากลับเมื่อติ๊กรถส่วนตัวขากลับ" โดยให้เหตุผลว่าระยะทาง
+     มีความหมายกับรถส่วนตัวเท่านั้น ซึ่งผิด
+
+     เหมาจ่าย (บัญชี ๘ ข้อ ๕) คิดจากช่วงระยะทางโดยไม่ผูกชนิดพาหนะ
+     ขา Taxi จึงต้องมีระยะทางด้วย พอขากลับไม่มีระยะ ขานั้นตก ok=false
+     ทั้งใบเลยตก แล้วถอยไปคิดตามระยะจริงซึ่งเป็นศูนย์เพราะไม่ได้ติ๊กรถ
+
+     เงื่อนไขที่ถูกคือ "ขากลับถูกเบิกไหม" ไม่ว่าด้วยพาหนะอะไร */
+  const flatTaxi = await ev([
+    "const nm=document.getElementById('tripModeNormal');",
+    "nm.checked=true; nm.dispatchEvent(new Event('change',{bubbles:true}));",
+    "await new Promise(r=>setTimeout(r,600));",
+    tick('legOutCar', false),
+    tick('legOutTaxi', true),
+    "const f=document.querySelector('input[name=\"fuelMethod\"][value=\"flat\"]');",
+    "const hasFlat = !!f;",
+    "if(f){f.checked=true; f.dispatchEvent(new Event('change',{bubbles:true}));}",
+    "await recalcRoute(true); await new Promise(r=>setTimeout(r,1000));",
+    "return { hasFlat: hasFlat,",
+    "         distRet: document.getElementById('distReturn').value,",
+    "         car: currentTrip().carType,",
+    "         flat: (typeof flatResult==='function') ? flatResult() : null };"
+  ].join('\n'));
+
+  if (!flatTaxi.hasFlat) {
+    ok('ข้ามข้อนี้ — หมวดทดสอบไม่ได้เปิดเหมาจ่าย', true, 'ดู test-case-note.mjs ที่เปิดไว้');
+  } else {
+    ok('ติ๊กแต่ Taxi ในเคสปกติ = เบิกทั้งสองขา ระยะทางขากลับต้องมี',
+       parseFloat(flatTaxi.distRet) === 47.6, flatTaxi.distRet + ' กม.');
+    ok('เหมาจ่ายคิดได้ทั้งสองขา ไม่ตกเป็น ok=false',
+       !!(flatTaxi.flat && flatTaxi.flat.ok), 'ok=' + (flatTaxi.flat || {}).ok
+         + ' why=' + ((flatTaxi.flat || {}).why || '-'));
+    ok('ได้เงินจริง ไม่ใช่ 0',
+       !!(flatTaxi.flat && flatTaxi.flat.total > 0), (flatTaxi.flat || {}).total + ' บาท');
+  }
 
   ok('ไม่มี JavaScript error ตลอดการทดสอบ', pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '));
 
