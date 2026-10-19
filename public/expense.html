@@ -1693,12 +1693,18 @@
                 const carNow = document.getElementById('carType')?.value || 'ไม่ระบุ';
                 const nothingClaimed = !(oc && oc.checked) && !(bc && bc.checked)
                                        && (carNow === 'ไม่ระบุ' || carNow === '');
+                /* 19 ต.ค. 2569 — เจ้าของงานเจอว่าเลือกเหมาจ่ายแล้วไม่มีช่องกรอกเส้นทาง
+                   ตัวที่ตัดสินว่ากล่องไหนโผล่คือ onLegModeChange() ซึ่งไม่ได้ถูกเรียกต่อ
+                   แต่จะเรียกมันตรง ๆ ไม่ได้ เพราะมันคำนวณ carType ใหม่จากติ๊ก
+                   แล้วเขียนทับค่าที่ใบอาจระบุมาแล้ว (หลัก "เพิ่ม ไม่ตัด" ของ currentTrip)
+                   จึงเปิดเฉพาะกล่องเส้นทางเอง ซึ่งเป็นสิ่งเดียวที่เหมาจ่ายต้องใช้ */
                 if (nothingClaimed) {
                     /* ตีตราไว้ว่าระบบติ๊กให้เอง ไม่ใช่คนติ๊ก
                        พอสลับกลับไปคิดตามระยะจริง ต้องเก็บกวาดออก
                        ไม่งั้นใบที่นั่ง Taxi ล้วนจะมีค่าน้ำมันโผล่มาเองโดยไม่มีใครสั่ง */
                     if (oc) { oc.checked = true; oc.dataset.autoFlat = '1'; }
                     if (bc) { bc.checked = true; bc.dataset.autoFlat = '1'; }
+                    document.getElementById('legOutRouteBox')?.classList.remove('hidden');
                 }
             } else {
                 // กรณีพิเศษ: ติ๊ก "เบิกขานี้" เป็นตัวแทนของติ๊กรถเดิม
@@ -1741,6 +1747,7 @@
     function onFuelMethodChange() {
         const flat = flatMethodOn();
         applyFlatLayout();
+
 
         /* อัตราเหมาจ่ายรวมค่าทางด่วนแล้ว ถ้าปล่อยให้กรอกอีกจะเป็นการเบิกซ้ำ
            ล็อกพร้อมบอกเหตุผล ดีกว่าปล่อยให้กรอกแล้วค่อยตีกลับตอนกดบันทึก */

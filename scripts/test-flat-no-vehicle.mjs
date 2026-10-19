@@ -49,7 +49,7 @@ const snap = "({ carLbl: " + vis('legOutCarLabel') + ", taxiLbl: " + vis('legOut
   + ", backCarLbl: " + vis('legBackCarLabel') + ", backTaxiLbl: " + vis('legBackTaxiLabel')
   + ", flatLbl: " + vis('legOutFlatLabel') + ", backFlatLbl: " + vis('legBackFlatLabel')
   + ", taxiBox: " + vis('legOutTaxiBox') + ", legNote: " + vis('flatLegNote')
-  + ", capNote: " + vis('taxiCapNote')
+  + ", capNote: " + vis('taxiCapNote') + ", routeBox: " + vis('legOutRouteBox')
   + ", noteTxt: (document.getElementById('flatLegNote')||{}).textContent||''"
   + ", car: currentTrip().carType"
   + ", total: parseFloat(document.getElementById('totalAmount').dataset.value||0) })";
@@ -127,6 +127,11 @@ try {
   ok('กล่องกรอกค่า Taxi ถูกซ่อน', b.taxiBox === false);
   ok('เคสปกติไม่ถามว่าเบิกขาไหน (มีคำตอบเดียวอยู่แล้ว)', b.flatLbl === false);
   ok('ป้ายวงเงินค่า Taxi ถูกซ่อน เพราะเบิก Taxi ไม่ได้ในโหมดนี้', b.capNote === false);
+  /* 19 ต.ค. 2569 — เจ้าของงานเจอว่าเลือกเหมาจ่ายแล้วไม่มีช่องกรอกเส้นทางเลย
+     applyFlatLayout() ติ๊กขาให้แล้วจริง แต่ตัวที่ตัดสินว่ากล่องไหนโผล่คือ
+     onLegModeChange() ซึ่งไม่ถูกเรียกต่อ ติ๊กจึงถูกตั้งแต่หน้าจอไม่ขยับ
+     เหมาจ่ายคิดจากระยะทางเป็นหลัก ไม่มีช่องกรอกเส้นทาง = ใช้งานไม่ได้เลย */
+  ok('ช่องจุดเริ่มต้น / จุดที่รถไปส่ง ต้องโผล่ขึ้นมา', b.routeBox === true);
   ok('มีป้ายบอกว่าคิดให้ทั้งสองขา',
      b.legNote === true && /ทั้งขาไปและขากลับ/.test(b.noteTxt), b.noteTxt.trim().slice(0, 80));
   ok('คิดเงินได้ทั้งสองขา 550 x 2 = 1,100', b.car === 'ไป-กลับ' && b.total === 1100,
