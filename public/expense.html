@@ -11,6 +11,13 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
+    <!-- อ่านไฟล์ PDF ที่ผู้ใช้แนบ แล้วเรนเดอร์เป็นภาพทีละหน้า
+         จำเป็นเพราะเอกสารที่พิมพ์ออกมาวาดไฟล์แนบเป็น <img> ทุกใบ
+         (public/history.html) ถ้าปล่อย PDF ดิบเข้าไปจะกลายเป็นรูปแตก
+         ผู้แนบจะนึกว่าเรียบร้อยแล้ว แต่ผู้อนุมัติเปิดดูไม่เห็นหลักฐานเลย
+         ใช้รุ่น 3.11.174 เพราะเป็น UMD ตรงกับสคริปต์อื่นในหน้านี้ (4.x เป็น ESM) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
     <!-- Choices.js for searchable dropdown -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
     <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
@@ -3603,7 +3610,8 @@
                 eviDiv.innerHTML += `
                     <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-4">
                         <label class="block text-sm font-bold text-slate-600 mb-2">${label} ${reqTag(r)}</label>
-                        <input type="file" accept="image/*" multiple data-field="${field}" data-label="${label}" class="general-file-upload ${reqClass} text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-slate-200 file:text-slate-700 hover:file:bg-slate-300 transition-all">
+                        <input type="file" accept="image/*,application/pdf,.pdf" multiple data-field="${field}" data-label="${label}" class="general-file-upload ${reqClass} text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-slate-200 file:text-slate-700 hover:file:bg-slate-300 transition-all">
+                        <p class="text-xs text-slate-400 mt-1.5">รับทั้งรูปภาพและไฟล์ PDF — PDF หลายหน้าจะถูกแนบให้ครบทุกหน้า</p>
                     </div>`;
             });
         } else { eviBox.classList.add('hidden'); }
@@ -3787,6 +3795,96 @@
             return original;
         }
     };
+
+    /* ══════════ ไฟล์ PDF ที่ผู้ใช้แนบ ══════════
+       19 ต.ค. 2569 — เจ้าของงานขอให้แนบ PDF ได้ ไม่ใช่แค่รูป
+       เพราะใบเสร็จโรงแรมกับตั๋วเครื่องบินสมัยนี้ส่งมาเป็น PDF
+
+       เอกสารที่พิมพ์ออกมาวาดไฟล์แนบเป็น <img> ทุกใบ (history.html)
+       ถ้าเก็บ PDF ดิบลงไป ตอนพิมพ์จะได้รูปแตก คนแนบนึกว่าเรียบร้อยแล้ว
+       แต่ผู้อนุมัติเปิดดูไม่เห็นหลักฐาน แย่กว่าแนบไม่ได้เสียอีก
+
+       จึงแปลงเป็นภาพตั้งแต่ตอนแนบ แล้วส่งเข้าท่อเดิมทุกประการ
+       ผลคือไม่ต้องแตะ history.html ไม่ต้องแตะ backend ไม่ต้องแตะรูปแบบข้อมูล
+       ใบเก่าทุกใบจึงไม่กระทบ                                              */
+    const PDF_MAX_PAGES  = 10;    // เกินนี้ถามก่อน ไม่ใช่เงียบ ๆ ตัดทิ้ง
+    const PDF_RENDER_W   = 1600;  // ความกว้างที่เรนเดอร์ ให้พอ ๆ กับ IMG_MAX_EDGE
+
+    const isPdfFile = f =>
+        /^application\/pdf$/i.test(f && f.type || '') || /\.pdf$/i.test(f && f.name || '');
+
+    /**
+     * แปลง PDF เป็นภาพ JPEG ทีละหน้า
+     * @returns {Promise<string[]>} base64 ของแต่ละหน้า
+     */
+    async function pdfToImages(file) {
+        if (typeof pdfjsLib === 'undefined')
+            throw new Error('ยังอ่านไฟล์ PDF ไม่ได้ (โหลดตัวอ่านไม่ขึ้น)');
+
+        // worker ต้องชี้เองเสมอ ไม่งั้น pdf.js จะพยายามเดา path แล้วหาไม่เจอ
+        pdfjsLib.GlobalWorkerOptions.workerSrc =
+            'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        const buf = await file.arrayBuffer();
+        const doc = await pdfjsLib.getDocument({ data: buf }).promise;
+        let pages = doc.numPages;
+
+        /* เกินเพดานให้ผู้ใช้ตัดสินเอง ไม่ตัดทิ้งเงียบ ๆ
+           ใบเสร็จที่สแกนมาทั้งเล่มอาจมีเป็นสิบหน้า ถ้าเอาหมดใบเบิกจะใหญ่มาก
+           แต่การตัดให้เองโดยไม่บอกคือทำหลักฐานหายโดยที่เจ้าตัวไม่รู้ */
+        if (pages > PDF_MAX_PAGES) {
+            const keep = confirm(
+                'ไฟล์ "' + (file.name || 'PDF') + '" มี ' + pages + ' หน้า\n\n' +
+                'กด "ตกลง" เพื่อแนบทั้ง ' + pages + ' หน้า (ใบเบิกจะมีขนาดใหญ่)\n' +
+                'กด "ยกเลิก" เพื่อแนบเฉพาะ ' + PDF_MAX_PAGES + ' หน้าแรก');
+            if (!keep) pages = PDF_MAX_PAGES;
+        }
+
+        const out = [];
+        for (let i = 1; i <= pages; i++) {
+            const page = await doc.getPage(i);
+            const base = page.getViewport({ scale: 1 });
+            const viewport = page.getViewport({ scale: PDF_RENDER_W / base.width });
+            const cv = document.createElement('canvas');
+            cv.width = Math.max(1, Math.round(viewport.width));
+            cv.height = Math.max(1, Math.round(viewport.height));
+            const cx = cv.getContext('2d');
+            // PDF หลายไฟล์พื้นโปร่งใส ต้องรองพื้นขาวก่อน ไม่งั้นกลายเป็นพื้นดำ
+            cx.fillStyle = '#fff';
+            cx.fillRect(0, 0, cv.width, cv.height);
+            await page.render({ canvasContext: cx, viewport: viewport }).promise;
+            out.push(cv.toDataURL('image/jpeg', IMG_QUALITY));
+            if (page.cleanup) page.cleanup();
+        }
+        if (doc.destroy) doc.destroy();
+        return out;
+    }
+
+    /**
+     * ไฟล์หนึ่งไฟล์ให้ออกมาเป็นภาพกี่ภาพก็ได้
+     * รูป = 1 ภาพ · PDF = เท่าจำนวนหน้า
+     * @returns {Promise<string[]>}
+     */
+    async function fileToImages(file) {
+        if (!isPdfFile(file)) return [await fileToBase64(file)];
+        try {
+            imgStats.n++;
+            imgStats.before += file.size || 0;
+            const imgs = await pdfToImages(file);
+            imgs.forEach(s => { imgStats.after += s.length * 0.75; });
+            if (!imgs.length) throw new Error('ไฟล์ PDF ไม่มีหน้าให้อ่าน');
+            return imgs;
+        } catch (e) {
+            /* อ่าน PDF ไม่ได้ ต้องบอกตรง ๆ ห้ามเก็บไฟล์ดิบลงไปเงียบ ๆ
+               เพราะมันจะไปโผล่เป็นรูปแตกบนเอกสารโดยไม่มีใครรู้จนถึงมือผู้อนุมัติ */
+            console.warn('อ่าน PDF ไม่สำเร็จ:', file.name, e);
+            imgStats.failed.push((file.name || 'PDF') + ' (อ่านไม่ได้)');
+            alert('❌ อ่านไฟล์ "' + (file.name || 'PDF') + '" ไม่สำเร็จ\n\n' +
+                  (e && e.message ? e.message + '\n\n' : '') +
+                  'ไฟล์นี้จะไม่ถูกแนบ กรุณาบันทึกเป็นรูปภาพแล้วแนบใหม่');
+            return [];
+        }
+    }
 
     // Validation helper functions
     function showValidationErrors(errors) {
@@ -4332,7 +4430,9 @@
 
         for (const input of document.querySelectorAll('.general-file-upload')) {
             if (input.files) {
-                for (let i = 0; i < input.files.length; i++) uploadedImages.push(await fileToBase64(input.files[i]));
+                // ไฟล์เดียวอาจได้หลายภาพ — PDF หนึ่งไฟล์ = หนึ่งภาพต่อหนึ่งหน้า
+                for (let i = 0; i < input.files.length; i++)
+                    uploadedImages.push(...(await fileToImages(input.files[i])));
             }
         }
 
