@@ -404,7 +404,10 @@
                 <!-- วันที่ที่พิมพ์ลงเอกสาร — เดิมใช้วันที่กดบันทึกเสมอ แก้ไม่ได้
                      ทำย้อนหลังหรือลงล่วงหน้าจึงได้วันผิด เติมวันนี้ให้ไว้ ปกติไม่ต้องแตะ -->
                 <div class="mt-5 pt-4 border-t border-slate-100 flex flex-wrap items-center gap-3">
-                    <label for="docDate" class="text-sm font-bold text-slate-600">วันที่บนเอกสาร</label>
+                    <!-- 19 ต.ค. 2569 — เจ้าของงานให้เปลี่ยนป้าย
+                         "วันที่บนเอกสาร" ลอย ๆ ไม่บอกว่าควรใส่วันอะไร
+                         ความหมายจริงคือวันที่ยื่นเบิก ซึ่งตามปกติคือวันที่กิจกรรมจบ -->
+                    <label for="docDate" class="text-sm font-bold text-slate-600">วันที่เบิก / วันที่สิ้นสุดกิจกรรม</label>
                     <input type="date" id="docDate" onchange="onDocDateChange()"
                            class="border-2 border-slate-200 px-3 py-2 rounded-xl text-base focus:border-blue-500 outline-none transition-all">
                     <span id="docDateThai" class="text-sm font-semibold text-blue-700"></span>
@@ -678,6 +681,32 @@
                         </label>
                     </div>
 
+                    <!-- ── วิธีคิดค่าพาหนะรถส่วนตัว (บัญชี ๘) ──
+                         โผล่เฉพาะหมวดที่แอดมินเปิดเหมาจ่ายไว้
+                         ระเบียบห้ามเบิกทั้งสองวิธีในช่วงเดียวกัน จึงเป็นตัวเลือกเดียว ไม่ใช่ติ๊กได้ทั้งคู่ -->
+                    <div id="fuelMethodBox" class="hidden mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+                        <!-- 19 ต.ค. 2569 — ย้ายขึ้นมาถามก่อนพาหนะ ตามที่เจ้าของงานสั่ง
+                             เพราะคำตอบของข้อนี้เป็นตัวกำหนดว่าจะต้องถามพาหนะหรือไม่
+                             เหมาจ่าย (บัญชี ๘ ข้อ ๕) ไม่ผูกชนิดพาหนะ ขอแค่มีหมุดและระยะทาง
+                             ถามว่า "นั่งรถอะไร" ทั้งที่ไม่มีผลต่อเงิน ทำให้คนกรอกงงเปล่า ๆ -->
+                        <div class="text-xs font-bold text-slate-700 mb-1.5">เบิกค่าพาหนะแบบไหน</div>
+                        <label class="flex items-start gap-2 text-xs text-slate-700 cursor-pointer mb-1">
+                            <input type="radio" name="fuelMethod" value="distance" checked
+                                onchange="onFuelMethodChange()" class="mt-0.5 cursor-pointer">
+                            <span><b>คิดตามระยะทางจริง</b>
+                                <span class="text-slate-500">— ระยะทาง × อัตราต่อกิโลเมตร (ค่าทางด่วนเบิกแยก)</span></span>
+                        </label>
+                        <label class="flex items-start gap-2 text-xs text-slate-700 cursor-pointer">
+                            <input type="radio" name="fuelMethod" value="flat"
+                                onchange="onFuelMethodChange()" class="mt-0.5 cursor-pointer">
+                            <span><b>เหมาจ่าย</b>
+                                <span class="text-slate-500">— คิดเป็นก้อนตามช่วงระยะทาง แยกทีละเที่ยว รวมค่าทางด่วนแล้ว</span></span>
+                        </label>
+                        <div id="flatRateNote" class="hidden mt-2 text-[11px] leading-relaxed"></div>
+                    </div>
+
+                    <div id="flatLegNote" class="hidden mb-3 text-[11px] px-2.5 py-1.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800"></div>
+
                     <div id="taxiCapNote" class="hidden mb-3 text-[11px] px-2.5 py-1.5 rounded-md bg-amber-50 border border-amber-200 text-amber-800"></div>
 
                     <!-- ═══════════ ขาไป (เคสปกติใช้การ์ดนี้ใบเดียว) ═══════════ -->
@@ -687,7 +716,17 @@
                             <span class="text-xs text-slate-400" id="legOutDate">ยังไม่ได้ระบุวันออกเดินทาง</span>
                         </div>
 
-                        <label class="flex items-center gap-2 text-sm cursor-pointer py-1.5">
+                        <!-- โหมดเหมาจ่าย: ถามแค่ว่าเบิกขานี้ไหม ไม่ถามว่านั่งอะไร
+                             เพราะ บัญชี ๘ ข้อ ๕ ไม่ผูกชนิดพาหนะ ขอแค่มีหมุดและระยะทาง
+                             เบื้องหลังยังตั้ง legOutCar ให้ เพื่อให้เอกสารติ๊กช่อง
+                             "ค่าน้ำมันเชื้อเพลิง" พร้อมวงกลมขาไป/ขากลับได้เหมือนเดิม -->
+                        <label id="legOutFlatLabel" class="hidden items-center gap-2 text-sm cursor-pointer py-1.5">
+                            <input type="checkbox" id="legOutFlat" class="rounded w-4 h-4" onchange="onFlatLegChange('out')">
+                            <span class="font-semibold text-slate-700">เบิกขานี้</span>
+                            <span class="text-xs text-slate-400">เหมาจ่ายตามช่วงระยะทาง</span>
+                        </label>
+
+                        <label id="legOutCarLabel" class="flex items-center gap-2 text-sm cursor-pointer py-1.5">
                             <input type="checkbox" id="legOutCar" class="rounded w-4 h-4" onchange="onLegModeChange()">
                             <span class="font-semibold text-slate-700">รถส่วนตัว</span>
                             <span class="text-xs text-slate-400">คิดค่าน้ำมันจากระยะทาง</span>
@@ -717,7 +756,7 @@
                             </div>
                         </div>
 
-                        <label class="flex items-center gap-2 text-sm cursor-pointer py-1.5">
+                        <label id="legOutTaxiLabel" class="flex items-center gap-2 text-sm cursor-pointer py-1.5">
                             <input type="checkbox" id="legOutTaxi" class="rounded w-4 h-4" onchange="onLegModeChange()">
                             <span class="font-semibold text-slate-700">Taxi</span>
                             <span class="text-xs text-slate-400">กรอกค่าโดยสารที่จ่ายจริง</span>
@@ -736,7 +775,13 @@
                             <span class="text-xs text-slate-400" id="legBackDate">ยังไม่ได้ระบุวันกลับถึง</span>
                         </div>
 
-                        <label class="flex items-center gap-2 text-sm cursor-pointer py-1.5">
+                        <label id="legBackFlatLabel" class="hidden items-center gap-2 text-sm cursor-pointer py-1.5">
+                            <input type="checkbox" id="legBackFlat" class="rounded w-4 h-4" onchange="onFlatLegChange('back')">
+                            <span class="font-semibold text-slate-700">เบิกขานี้</span>
+                            <span class="text-xs text-slate-400">เหมาจ่ายตามช่วงระยะทาง</span>
+                        </label>
+
+                        <label id="legBackCarLabel" class="flex items-center gap-2 text-sm cursor-pointer py-1.5">
                             <input type="checkbox" id="legBackCar" class="rounded w-4 h-4" onchange="onLegModeChange()">
                             <span class="font-semibold text-slate-700">รถส่วนตัว</span>
                             <span class="text-xs text-slate-400">คิดค่าน้ำมันจากระยะทาง</span>
@@ -766,7 +811,7 @@
                             </div>
                         </div>
 
-                        <label class="flex items-center gap-2 text-sm cursor-pointer py-1.5">
+                        <label id="legBackTaxiLabel" class="flex items-center gap-2 text-sm cursor-pointer py-1.5">
                             <input type="checkbox" id="legBackTaxi" class="rounded w-4 h-4" onchange="onLegModeChange()">
                             <span class="font-semibold text-slate-700">Taxi</span>
                             <span class="text-xs text-slate-400">กรอกค่าโดยสารที่จ่ายจริง</span>
@@ -785,25 +830,6 @@
                         ขากลับใช้เส้นทางเดิม กลับที่จุดเริ่มต้น — ไม่ต้องกรอกอะไรเพิ่ม
                     </p>
 
-                    <!-- ── วิธีคิดค่าพาหนะรถส่วนตัว (บัญชี ๘) ──
-                         โผล่เฉพาะหมวดที่แอดมินเปิดเหมาจ่ายไว้
-                         ระเบียบห้ามเบิกทั้งสองวิธีในช่วงเดียวกัน จึงเป็นตัวเลือกเดียว ไม่ใช่ติ๊กได้ทั้งคู่ -->
-                    <div id="fuelMethodBox" class="hidden mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
-                        <div class="text-xs font-bold text-slate-700 mb-1.5">วิธีคิดค่าพาหนะรถส่วนตัว</div>
-                        <label class="flex items-start gap-2 text-xs text-slate-700 cursor-pointer mb-1">
-                            <input type="radio" name="fuelMethod" value="distance" checked
-                                onchange="onFuelMethodChange()" class="mt-0.5 cursor-pointer">
-                            <span><b>คิดตามระยะทางจริง</b>
-                                <span class="text-slate-500">— ระยะทาง × อัตราต่อกิโลเมตร (ค่าทางด่วนเบิกแยก)</span></span>
-                        </label>
-                        <label class="flex items-start gap-2 text-xs text-slate-700 cursor-pointer">
-                            <input type="radio" name="fuelMethod" value="flat"
-                                onchange="onFuelMethodChange()" class="mt-0.5 cursor-pointer">
-                            <span><b>เหมาจ่าย</b>
-                                <span class="text-slate-500">— คิดเป็นก้อนตามช่วงระยะทาง แยกทีละเที่ยว รวมค่าทางด่วนแล้ว</span></span>
-                        </label>
-                        <div id="flatRateNote" class="hidden mt-2 text-[11px] leading-relaxed"></div>
-                    </div>
 
                     <p class="text-[11px] text-slate-500 mb-3" id="fuelRateNote">
                         ค่าน้ำมัน <b id="fuelRateLabel">—</b> บาท/กม. — อัตรานี้กำหนดโดยผู้ดูแลระบบ แก้ไขไม่ได้
@@ -1320,6 +1346,9 @@
         if (rt) rt.textContent = normal ? 'เส้นทาง' : 'เส้นทางของขาไป';
         const ab = document.getElementById('addTaxiOutBtn');
         if (ab) ab.textContent = normal ? '+ เพิ่มเที่ยว Taxi' : '+ เพิ่มเที่ยว Taxi ขาไป';
+        // สลับปกติ/พิเศษ แล้วหน้าตาของโหมดเหมาจ่ายต้องตามไปด้วย
+        // เคสปกติไม่ถามว่าเบิกขาไหน กรณีพิเศษถาม — คนละหน้าตากัน
+        if (typeof applyFlatLayout === 'function') applyFlatLayout();
     }
 
     function onTripModeChange() {
@@ -1384,6 +1413,9 @@
         syncReturnDiff();
         if (typeof updateReturnPlaceholders === 'function') updateReturnPlaceholders();
         if (typeof syncTaxiRoutes === 'function') syncTaxiRoutes();
+        /* ต้องเรียกหลังจัดกล่องเสร็จ ไม่งั้นบรรทัดบน ๆ จะเปิดกล่อง Taxi คืนมา
+           ทั้งที่เลือกเหมาจ่ายอยู่ และติ๊กพาหนะก็จะโผล่กลับมาให้คนกรอกงงอีก */
+        if (typeof applyFlatLayout === 'function') applyFlatLayout();
         if (typeof calculateTravelTotal === 'function') calculateTravelTotal();
         if (typeof recalcRoute === 'function') recalcRoute(false);
     }
@@ -1482,9 +1514,13 @@
             if (d === 'ไป-กลับ') { taxiDirs.add('ขาไป'); taxiDirs.add('ขากลับ'); }
             else taxiDirs.add(d);
         });
-        const outTaxiLeg  = on('legOutTaxi') && taxiDirs.has('ขาไป');
+        /* เลือกเหมาจ่ายแล้วส่วน Taxi ถูกซ่อนไป แถวที่ค้างอยู่จึงไม่ใช่หลักฐานอะไร
+           ถ้ายังนับ จะได้เที่ยวเกินจากของที่ผู้ใช้มองไม่เห็นด้วยซ้ำ */
+        const flatOn = (typeof flatMethodOn === 'function') && flatMethodOn();
+        const outTaxiLeg  = !flatOn && on('legOutTaxi') && taxiDirs.has('ขาไป');
         // เคสปกติไม่มีการ์ดขากลับให้ติ๊ก ทุกแถวอยู่รายการเดียวกัน
-        const backTaxiLeg = (isNormalTrip() ? on('legOutTaxi') : on('legBackTaxi'))
+        const backTaxiLeg = !flatOn
+                            && (isNormalTrip() ? on('legOutTaxi') : on('legBackTaxi'))
                             && taxiDirs.has('ขากลับ');
 
         const outUsed  = on('legOutCar')  || outTaxiLeg  || car === 'ขาไป'   || car === 'ไป-กลับ';
@@ -1607,8 +1643,104 @@
         });
     }
 
+    /* ══════════ เหมาจ่าย = ไม่ต้องถามว่านั่งอะไร ══════════
+       19 ต.ค. 2569 — เจ้าของงานสั่ง: "เหมาจ่ายเราไม่สนว่าเดินทางอะไร
+       แค่ต้องมีหมุดมีระยะทางและคิดเงินให้ได้ก็พอ การมี 2 ช่องเดี๋ยว user จะงง
+       ว่าต้องเป็น taxi หรือว่าค่าน้ำมัน"
+
+       ตรงกับ บัญชี ๘ ข้อ ๕ ที่เขียนว่า "ระยะทางเฉลี่ยตามการคำนวณของสถาบัน"
+       โดยไม่ระบุชนิดพาหนะ
+
+       เบื้องหลังยังตั้ง legOutCar/legBackCar ให้ เพราะใบรับรองค่าพาหนะ
+       (FM-SAM-095-00) มีแค่ช่อง "ค่า Taxi" กับ "ค่าน้ำมันเชื้อเพลิง"
+       ไม่มีช่องเหมาจ่าย เจ้าของงานเลือกให้พิมพ์ลงช่องค่าน้ำมันเหมือนเดิม
+       วงกลม ขาไป/ขากลับ/ไป-กลับ บอก "เบิกขาไหน" ไม่ได้บอกชนิดพาหนะอยู่แล้ว */
+    function applyFlatLayout() {
+        const flat = flatMethodOn();
+        const normal = isNormalTrip();
+        const show = (id, on) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.classList.toggle('hidden', !on);
+            if (on) el.classList.add('flex');
+        };
+
+        // เหมาจ่าย: ซ่อนติ๊กพาหนะทั้งหมด เหลือติ๊ก "เบิกขานี้" อันเดียวต่อขา
+        show('legOutCarLabel',   !flat);
+        show('legOutTaxiLabel',  !flat);
+        show('legBackCarLabel',  !flat);
+        show('legBackTaxiLabel', !flat);
+        // เคสปกติเบิกสองขาอยู่แล้ว ไม่ต้องถามอะไรเลย กรณีพิเศษค่อยให้ติ๊กทีละขา
+        show('legOutFlatLabel',  flat && !normal);
+        show('legBackFlatLabel', flat && !normal);
+
+        if (flat) {
+            // ซ่อนส่วน Taxi ทิ้ง ไม่ให้เหลือช่องที่กรอกไปก็ไม่มีผล
+            document.getElementById('legOutTaxiBox')?.classList.add('hidden');
+            document.getElementById('legBackTaxiBox')?.classList.add('hidden');
+
+            if (normal) {
+                /* เคสปกติ = ไป-กลับเส้นทางเดิม เบิกสองขาเสมอ
+                   ตั้งให้เองแล้วบอกด้วยป้าย ดีกว่าให้คนไปติ๊กสิ่งที่มีคำตอบเดียว
+
+                   แต่ตั้งได้เฉพาะตอนที่ยังไม่มีใครระบุอะไรไว้เท่านั้น
+                   ถ้าใบนี้ระบุมาแล้วว่าเบิกขาเดียว (เช่นเปิดใบเก่ามาแก้ ซึ่ง
+                   ระบบกู้ #carType คืนก่อนแล้วค่อยตามไปติ๊กการ์ด) การบังคับติ๊ก
+                   จะเปลี่ยนใบขาเดียวให้กลายเป็นไป-กลับ แล้วเงินเปลี่ยนเองเงียบ ๆ
+                   หลักเดียวกับที่ currentTrip() เขียนไว้ว่า "เพิ่ม ไม่ตัด" */
+                const oc = document.getElementById('legOutCar');
+                const bc = document.getElementById('legBackCar');
+                const carNow = document.getElementById('carType')?.value || 'ไม่ระบุ';
+                const nothingClaimed = !(oc && oc.checked) && !(bc && bc.checked)
+                                       && (carNow === 'ไม่ระบุ' || carNow === '');
+                if (nothingClaimed) {
+                    /* ตีตราไว้ว่าระบบติ๊กให้เอง ไม่ใช่คนติ๊ก
+                       พอสลับกลับไปคิดตามระยะจริง ต้องเก็บกวาดออก
+                       ไม่งั้นใบที่นั่ง Taxi ล้วนจะมีค่าน้ำมันโผล่มาเองโดยไม่มีใครสั่ง */
+                    if (oc) { oc.checked = true; oc.dataset.autoFlat = '1'; }
+                    if (bc) { bc.checked = true; bc.dataset.autoFlat = '1'; }
+                }
+            } else {
+                // กรณีพิเศษ: ติ๊ก "เบิกขานี้" เป็นตัวแทนของติ๊กรถเดิม
+                const sync = (flatId, carId) => {
+                    const f = document.getElementById(flatId), c = document.getElementById(carId);
+                    if (f && c) f.checked = c.checked;
+                };
+                sync('legOutFlat',  'legOutCar');
+                sync('legBackFlat', 'legBackCar');
+            }
+        }
+
+        if (!flat) {
+            /* ออกจากโหมดเหมาจ่าย เก็บติ๊กที่ระบบใส่ให้เองคืน
+               ติ๊กที่คนกดเองไม่มีตรานี้ จึงไม่ถูกแตะ */
+            ['legOutCar', 'legBackCar'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el && el.dataset.autoFlat) { el.checked = false; delete el.dataset.autoFlat; }
+            });
+        }
+
+        // ป้ายบอกว่าเหมาจ่ายคิดให้กี่ขา จะได้ไม่ต้องเดาจากหน้าจอที่ว่างลง
+        const note = document.getElementById('flatLegNote');
+        if (note) {
+            const on = flat && normal;
+            note.classList.toggle('hidden', !on);
+            if (on) note.textContent =
+                'เหมาจ่ายคิดให้ทั้งขาไปและขากลับตามเส้นทางเดิม — ไม่ต้องเลือกว่านั่งรถอะไร';
+        }
+    }
+
+    /** ติ๊ก "เบิกขานี้" ในโหมดเหมาจ่าย — ส่งต่อไปที่ติ๊กรถเดิมซึ่งเป็นตัวที่ระบบใช้จริง */
+    function onFlatLegChange(which) {
+        const f = document.getElementById(which === 'back' ? 'legBackFlat' : 'legOutFlat');
+        const c = document.getElementById(which === 'back' ? 'legBackCar'  : 'legOutCar');
+        if (f && c) { c.checked = f.checked; }
+        if (typeof onLegModeChange === 'function') onLegModeChange();
+    }
+
     function onFuelMethodChange() {
         const flat = flatMethodOn();
+        applyFlatLayout();
 
         /* อัตราเหมาจ่ายรวมค่าทางด่วนแล้ว ถ้าปล่อยให้กรอกอีกจะเป็นการเบิกซ้ำ
            ล็อกพร้อมบอกเหตุผล ดีกว่าปล่อยให้กรอกแล้วค่อยตีกลับตอนกดบันทึก */
@@ -3265,7 +3397,10 @@
         const text = has ? 'ไม่เกิน ' + taxiMaxPerTrip.toLocaleString() + ' บาท' : '';
         const note = document.getElementById('taxiCapNote');
         if (note) {
-            note.classList.toggle('hidden', !has);
+            /* โหมดเหมาจ่ายเบิกค่า Taxi ไม่ได้อยู่แล้ว ป้ายวงเงินจึงไม่มีความหมาย
+               ปล่อยไว้จะชวนให้คิดว่ายังกรอกค่าโดยสารได้ ทั้งที่ส่วนนั้นถูกซ่อนไปแล้ว */
+            const flatNow = (typeof flatMethodOn === 'function') && flatMethodOn();
+            note.classList.toggle('hidden', !has || flatNow);
             // นอกเขตก็มีเพดานตามบัญชี ๘ ข้อ ๑ แล้ว ข้อความต้องบอกพื้นที่ให้ตรง
             // ไม่งั้นคนเดินทางนอกเขตจะเห็นว่า "เดินทางใน กทม.ปริมณฑล" ซึ่งไม่จริง
             /* บอกชื่อจังหวัดที่อ่านได้จากหมุดด้วย ถ้าปักผิดจังหวัดจะเห็นตรงนี้ทันที

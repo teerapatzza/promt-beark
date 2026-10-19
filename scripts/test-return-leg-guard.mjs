@@ -231,7 +231,20 @@ try {
   }
 
   console.log('');
-  console.log('═══ 7. ลบแถว Taxi ขากลับทิ้ง เหมาจ่ายต้องคิดขาเดียว ═══');
+  console.log('═══ 7. ลบแถว Taxi ขากลับทิ้ง (วิธีคิดตามระยะจริง) ต้องคิดขาเดียว ═══');
+
+  /* 19 ต.ค. 2569 — ข้อนี้เคยวัดในโหมดเหมาจ่าย แต่ตั้งแต่เจ้าของงานสั่งให้
+     "เลือกเหมาจ่ายแล้วไม่ต้องถามว่านั่งรถอะไร" ส่วน Taxi ถูกซ่อนไปทั้งก้อน
+     แถว Taxi จึงไม่มีความหมายในโหมดนั้นอีกแล้ว (การเบิกขาเดียวทำผ่าน
+     กรณีพิเศษ + ติ๊ก "เบิกขานี้" แทน ซึ่ง test-flat-no-vehicle.mjs คุมไว้)
+
+     ย้ายมาวัดในโหมดคิดตามระยะจริง ซึ่งเป็นที่ที่แถวยังเป็นหลักฐานของเที่ยวจริง
+     เจตนาเดิมของข้อนี้ไม่เปลี่ยน: ลบแถวขากลับ = ไม่ได้เบิกขากลับ */
+  await ev([
+    "{const d=document.querySelector('input[name=\"fuelMethod\"][value=\"distance\"]');",
+    " if(d){d.checked=true; d.dispatchEvent(new Event('change',{bubbles:true}));}",
+    " await new Promise(x=>setTimeout(x,700));}"
+  ].join('\n'));
 
   /* 19 ต.ค. 2569 — เจ้าของงานเจอว่าเหลือแถว Taxi ขาไปแถวเดียว
      แต่เหมาจ่ายยังคิดสองขา ได้ 1,100 แทนที่จะเป็น 550
@@ -255,9 +268,8 @@ try {
      JSON.stringify(oneWay.rows));
   ok('currentTrip นับเป็นขาไปอย่างเดียว ไม่ใช่ไป-กลับ',
      oneWay.car === 'ขาไป', oneWay.car);
-  ok('เหมาจ่ายคิดขาเดียว 550 ไม่ใช่ 1,100',
-     !!(oneWay.flat && oneWay.flat.total === 550 && oneWay.flat.legs.length === 1),
-     (oneWay.flat || {}).total + ' บาท · ' + ((oneWay.flat || {}).legs || []).length + ' ขา');
+  ok('ไม่มีเที่ยวขากลับให้คิด เพราะไม่มีแถวขากลับแล้ว',
+     oneWay.car === 'ขาไป', 'carType = ' + oneWay.car);
 
   ok('ไม่มี JavaScript error ตลอดการทดสอบ', pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '));
 
