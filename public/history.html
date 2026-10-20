@@ -802,6 +802,23 @@
                 }).join('');
                 const airTotal = parseFloat(c.airAmount || 0);
 
+                /* ── ใบรายงานการเดินทาง (FM-SAM-001-04) ช่อง 2.1 กับ 2.2 ──
+                   20 ต.ค. 2569 — เจ้าของงานทักว่าใบที่เลือกเหมาจ่าย ยอดไปขึ้นช่อง
+                   2.2 ค่าน้ำมันรถ ซึ่งไม่ตรง เพราะเหมาจ่ายไม่ใช่ค่าน้ำมัน
+
+                   ตัวเอกสารเขียนนิยามไว้เองแล้วที่ช่อง 2.1 ว่า
+                   "ค่าโดยสารพาหนะต่างๆ (ค่าพาหนะทุกประเภทนอกเหนือจาก 2.2, 2.3)"
+                   เหมาจ่ายตาม บัญชี ๘ ข้อ ๕ ไม่ผูกชนิดพาหนะ จึงเข้าช่อง 2.1
+
+                   คนละใบกับใบรับรองค่าพาหนะ (FM-SAM-095-00) ซึ่งมีแค่ช่อง
+                   "ค่า Taxi" กับ "ค่าน้ำมันเชื้อเพลิง" ไม่มีช่องกลางแบบนี้
+                   เจ้าของงานเลือกให้ใบนั้นพิมพ์ลงช่องค่าน้ำมันเหมือนเดิม
+                   สองใบจึงลงคนละช่องโดยตั้งใจ ไม่ใช่ความไม่สม่ำเสมอ
+
+                   ยอดรวมท้ายใบไม่เปลี่ยน เพราะย้ายช่อง ไม่ได้เปลี่ยนจำนวนเงิน */
+                const rptOther = taxiTotal + (_flat ? fuelTotal : 0);   // 2.1
+                const rptFuel  = _flat ? 0 : fuelTotal;                 // 2.2
+
                 // Calculate hotel total (support both old and new format)
                 let hotelTotal = 0;
                 if (c.hotel && c.hotel.rate) {
@@ -1007,14 +1024,14 @@
                                 <td style="border: none; padding: 0;"></td>
                                 <td style="border: none; padding: 0; padding-left: 5px;">2.1 &nbsp;&nbsp; ค่าโดยสารพาหนะต่างๆ (ค่าพาหนะทุกประเภทนอกเหนือจาก 2.2, 2.3)</td>
                                 <td style="text-align: right; border: none; padding: 0;">เป็นเงิน</td>
-                                <td style="border-bottom: 1px solid #000; text-align: right; padding: 0 5px;">${taxiTotal > 0 ? formatNumber(taxiTotal) : ''}</td>
+                                <td style="border-bottom: 1px solid #000; text-align: right; padding: 0 5px;">${rptOther > 0 ? formatNumber(rptOther) : ''}</td>
                                 <td style="text-align: right; border: none; padding: 0;">บาท</td>
                             </tr>
                             <tr>
                                 <td style="border: none; padding: 0;"></td>
                                 <td style="border: none; padding: 0; padding-left: 5px;">2.2 &nbsp;&nbsp; ค่าน้ำมันรถ</td>
                                 <td style="text-align: right; border: none; padding: 0;">เป็นเงิน</td>
-                                <td style="border-bottom: 1px solid #000; text-align: right; padding: 0 5px;">${fuelTotal > 0 ? formatNumber(fuelTotal) : ''}</td>
+                                <td style="border-bottom: 1px solid #000; text-align: right; padding: 0 5px;">${rptFuel > 0 ? formatNumber(rptFuel) : ''}</td>
                                 <td style="text-align: right; border: none; padding: 0;">บาท</td>
                             </tr>
                             <tr>
