@@ -732,6 +732,64 @@
                     ? ((flatLeg('ขากลับ') || {}).amount || 0)
                     : ((carType === 'ขากลับ' || carType === 'ไป-กลับ') ? distRet * fRate : 0);
 
+                /* ── ใบรับรองค่าพาหนะ: เหมาจ่ายลงบรรทัด "ค่า Taxi" ──
+                   20 ต.ค. 2569 — เจ้าของงานเปิดเอกสารจริงแล้วทักสองเรื่อง
+                     ก. ใบเหมาจ่ายไม่มีข้อมูลว่าจากไหนไปไหน ทั้งที่ควรมี
+                     ข. ให้ติ๊กลงช่อง "ค่า Taxi" ไม่ใช่ "ค่าน้ำมันเชื้อเพลิง"
+
+                   ข. กลับด้านจากที่เคยเลือกไว้ (เดิมให้ลงช่องค่าน้ำมัน)
+                   แต่สอดคล้องกับที่เพิ่งตัดสินกับใบรายงานว่าเหมาจ่ายคือ
+                   "ค่าโดยสารพาหนะ" ไม่ใช่ค่าน้ำมัน บรรทัดที่ใกล้ที่สุดบนใบนี้
+                   คือ "ค่า Taxi" เพราะอีกบรรทัดเจาะจงว่าเป็นค่าเชื้อเพลิง
+
+                   ก. เกิดเพราะบรรทัด จาก/ถึง ผูกกับ carType แต่ยอดเงินไม่ผูก
+                   ใบที่ carType เป็น "ไม่ระบุ" จึงพิมพ์ยอดออกมาโดยไม่มีทั้งติ๊ก
+                   และไม่มีต้นทางปลายทาง ตอนนี้ให้เหมาจ่ายอ่านจากเที่ยวของตัวเอง
+                   ไม่ผ่าน carType อีก ใบเก่าที่เคยพิมพ์ว่างจึงกลับมาครบด้วย
+
+                   ยอดรวมท้ายใบคิดจาก receiptTotal แยกต่างหาก ย้ายบรรทัดไม่กระทบ
+
+                   เจ้าของงานบอกไว้ว่า "เพื่ออนาคตผมแก้ แต่ตอนนี้เอาตามนี้ไปก่อน"
+                   ถ้าวันหน้าให้ย้ายกลับไปช่องค่าน้ำมัน แก้ที่ตัวแปร rcTaxi กับ rcFuel
+                   ด้านล่างที่เดียวพอ ส่วนการอ่าน จาก/ถึง จากเที่ยวของตัวเองต้องคงไว้เสมอ
+                   เพราะนั่นคือบั๊กที่ทำให้เอกสารพิมพ์ยอดโดยไม่มีต้นทางปลายทาง */
+                const flatOut = flatInfo ? flatLeg('ขาไป')   : null;
+                const flatRet = flatInfo ? flatLeg('ขากลับ') : null;
+
+                const rcTaxiOn      = flatInfo ? !!(flatOut || flatRet) : (hasTaxiOut || hasTaxiRet);
+                const rcTaxiHasOut  = flatInfo ? !!flatOut : hasTaxiOut;
+                const rcTaxiHasRet  = flatInfo ? !!flatRet : hasTaxiRet;
+                const rcTaxiOutDate = flatInfo ? dateGo   : (firstTaxiOut ? legDateText(firstTaxiOut.date) : '');
+                const rcTaxiRetDate = flatInfo ? dateBack : (firstTaxiRet ? legDateText(firstTaxiRet.date) : '');
+                const rcTaxiOutFrom = flatInfo ? tr.from : (firstTaxiOut ? firstTaxiOut.from : '');
+                const rcTaxiOutTo   = flatInfo ? tr.to   : (firstTaxiOut ? firstTaxiOut.to   : '');
+                const rcTaxiRetFrom = flatInfo ? retFrom
+                    : (firstTaxiRet ? (firstTaxiRet.direction === 'ไป-กลับ' ? firstTaxiRet.to : firstTaxiRet.from) : '');
+                const rcTaxiRetTo   = flatInfo ? retTo
+                    : (firstTaxiRet ? (firstTaxiRet.direction === 'ไป-กลับ' ? firstTaxiRet.from : firstTaxiRet.to) : '');
+                const rcTaxiOutAmt  = flatInfo ? ((flatOut || {}).amount || 0) : taxiOutDisplayAmt;
+                const rcTaxiRetAmt  = flatInfo ? ((flatRet || {}).amount || 0) : taxiRetDisplayAmt;
+
+                // บรรทัดค่าน้ำมันเชื้อเพลิง — ใบที่เลือกเหมาจ่ายไม่ใช้บรรทัดนี้แล้ว
+                const rcFuelOn      = !flatInfo && carType !== 'ไม่ระบุ';
+                const rcFuelHasOut  = !flatInfo && (carType === 'ขาไป'   || carType === 'ไป-กลับ');
+                const rcFuelHasRet  = !flatInfo && (carType === 'ขากลับ' || carType === 'ไป-กลับ');
+                const rcFuelOutAmt  = flatInfo ? 0 : fuelOut;
+                const rcFuelRetAmt  = flatInfo ? 0 : fuelRet;
+
+                /* คำอธิบายวิธีคิดของใบเหมาจ่าย
+                   เดิมข้อความนี้อยู่บนบรรทัดระยะทางของบล็อกค่าน้ำมัน (rcDist)
+                   พอย้ายยอดมาบล็อก Taxi บรรทัดนั้นว่างลง คนตรวจเอกสารจึงเห็น
+                   แต่ยอดเงิน ไม่รู้ว่าคิดด้วยวิธีไหนและเข้าช่วงระยะทางไหน
+                   ใช้แถวว่างที่มีอยู่แล้วใต้บล็อก Taxi เลย์เอาต์กระดาษไม่เปลี่ยน */
+                const rcFlatNote = flatInfo
+                    ? 'เหมาจ่ายตามช่วงระยะทาง รวมค่าทางด่วนแล้ว &nbsp;—&nbsp; '
+                      + (flatInfo.legs || []).map(function (l) {
+                            return l.dir + ' ' + (Number(l.km) || 0).toLocaleString('th-TH') + ' ก.ม.'
+                                 + (l.label ? ' (' + l.label + ')' : '');
+                        }).join(' &nbsp;·&nbsp; ')
+                    : '';
+
 
                 /* ── ตัวช่วยวาดแถวในใบรับรองค่าพาหนะ ──
                    เอกสารต้นแบบตีเส้นทุกบรรทัดครบทั้งสามคอลัมน์
@@ -1127,40 +1185,37 @@
                                      ค่าน้ำมันแยกยอดรายขาไว้ที่บรรทัดระยะทางของขานั้น -->
                                 ${rcRow('', '<b>กิจกรรม</b> &nbsp;&nbsp;&nbsp; <span class="free-text" style="display:inline">' + actName + '</span>', '')}
 
-                                ${rcRow('', rcSquare(hasTaxiOut || hasTaxiRet) + ' ค่า Taxi &nbsp;&nbsp;&nbsp;&nbsp;'
-                                        + rcCircle(hasTaxiOut && !hasTaxiRet) + ' ขาไป &nbsp;&nbsp;&nbsp;&nbsp;'
-                                        + rcCircle(hasTaxiRet && !hasTaxiOut) + ' ขากลับ &nbsp;&nbsp;&nbsp;&nbsp;'
-                                        + rcCircle(hasTaxiOut && hasTaxiRet)  + ' ไป-กลับ', '')}
+                                ${rcRow('', rcSquare(rcTaxiOn) + ' ค่า Taxi &nbsp;&nbsp;&nbsp;&nbsp;'
+                                        + rcCircle(rcTaxiHasOut && !rcTaxiHasRet) + ' ขาไป &nbsp;&nbsp;&nbsp;&nbsp;'
+                                        + rcCircle(rcTaxiHasRet && !rcTaxiHasOut) + ' ขากลับ &nbsp;&nbsp;&nbsp;&nbsp;'
+                                        + rcCircle(rcTaxiHasOut && rcTaxiHasRet)  + ' ไป-กลับ', '')}
 
-                                ${rcRow(firstTaxiOut ? legDateText(firstTaxiOut.date) : '',
-                                        rcFromTo(firstTaxiOut ? firstTaxiOut.from : '', firstTaxiOut ? firstTaxiOut.to : ''),
-                                        taxiOutDisplayAmt > 0 ? formatNumber(taxiOutDisplayAmt) : '')}
+                                ${rcRow(rcTaxiHasOut ? rcTaxiOutDate : '',
+                                        rcFromTo(rcTaxiHasOut ? rcTaxiOutFrom : '', rcTaxiHasOut ? rcTaxiOutTo : ''),
+                                        rcTaxiOutAmt > 0 ? formatNumber(rcTaxiOutAmt) : '')}
 
-                                ${rcRow(firstTaxiRet ? legDateText(firstTaxiRet.date) : '',
-                                        rcFromTo(firstTaxiRet ? (firstTaxiRet.direction === 'ไป-กลับ' ? firstTaxiRet.to : firstTaxiRet.from) : '',
-                                                 firstTaxiRet ? (firstTaxiRet.direction === 'ไป-กลับ' ? firstTaxiRet.from : firstTaxiRet.to) : ''),
-                                        taxiRetDisplayAmt > 0 ? formatNumber(taxiRetDisplayAmt) : '')}
+                                ${rcRow(rcTaxiHasRet ? rcTaxiRetDate : '',
+                                        rcFromTo(rcTaxiHasRet ? rcTaxiRetFrom : '', rcTaxiHasRet ? rcTaxiRetTo : ''),
+                                        rcTaxiRetAmt > 0 ? formatNumber(rcTaxiRetAmt) : '')}
 
-                                ${rcRow('', rcFromTo('', ''), '')}
+                                ${rcRow('', flatInfo ? rcFlatNote : rcFromTo('', ''), '')}
 
-                                ${rcRow('', rcSquare(carType !== 'ไม่ระบุ') + ' ค่าน้ำมันเชื้อเพลิง &nbsp;&nbsp;&nbsp;&nbsp;'
-                                        + rcCircle(carType === 'ขาไป')   + ' ขาไป &nbsp;&nbsp;&nbsp;&nbsp;'
-                                        + rcCircle(carType === 'ขากลับ') + ' ขากลับ &nbsp;&nbsp;&nbsp;&nbsp;'
-                                        + rcCircle(carType === 'ไป-กลับ') + ' ไป-กลับ', '')}
+                                ${rcRow('', rcSquare(rcFuelOn) + ' ค่าน้ำมันเชื้อเพลิง &nbsp;&nbsp;&nbsp;&nbsp;'
+                                        + rcCircle(rcFuelOn && carType === 'ขาไป')   + ' ขาไป &nbsp;&nbsp;&nbsp;&nbsp;'
+                                        + rcCircle(rcFuelOn && carType === 'ขากลับ') + ' ขากลับ &nbsp;&nbsp;&nbsp;&nbsp;'
+                                        + rcCircle(rcFuelOn && carType === 'ไป-กลับ') + ' ไป-กลับ', '')}
 
-                                ${rcRow((carType === 'ขาไป' || carType === 'ไป-กลับ') ? dateGo : '',
-                                        rcFromTo((carType === 'ขาไป' || carType === 'ไป-กลับ') ? tr.from : '',
-                                                 (carType === 'ขาไป' || carType === 'ไป-กลับ') ? tr.to   : ''), '')}
+                                ${rcRow(rcFuelHasOut ? dateGo : '',
+                                        rcFromTo(rcFuelHasOut ? tr.from : '', rcFuelHasOut ? tr.to : ''), '')}
 
-                                ${rcRow('', rcDist((carType === 'ขาไป' || carType === 'ไป-กลับ') ? distOut : 0),
-                                        fuelOut > 0 ? formatNumber(fuelOut) : '')}
+                                ${rcRow('', rcDist(rcFuelHasOut ? distOut : 0),
+                                        rcFuelOutAmt > 0 ? formatNumber(rcFuelOutAmt) : '')}
 
-                                ${rcRow((carType === 'ขากลับ' || carType === 'ไป-กลับ') ? dateBack : '',
-                                        rcFromTo((carType === 'ขากลับ' || carType === 'ไป-กลับ') ? retFrom : '',
-                                                 (carType === 'ขากลับ' || carType === 'ไป-กลับ') ? retTo   : ''), '')}
+                                ${rcRow(rcFuelHasRet ? dateBack : '',
+                                        rcFromTo(rcFuelHasRet ? retFrom : '', rcFuelHasRet ? retTo : ''), '')}
 
-                                ${rcRow('', rcDist((carType === 'ขากลับ' || carType === 'ไป-กลับ') ? distRet : 0),
-                                        fuelRet > 0 ? formatNumber(fuelRet) : '')}
+                                ${rcRow('', rcDist(rcFuelHasRet ? distRet : 0),
+                                        rcFuelRetAmt > 0 ? formatNumber(rcFuelRetAmt) : '')}
 
                                 ${rcRow('', rcSquare(tollTotal > 0)    + ' ค่าทางด่วน',  tollTotal > 0 ? formatNumber(tollTotal) : '')}
                                 ${rcRow('', rcSquare(parkingTotal > 0) + ' ค่าที่จอดรถ', parkingTotal > 0 ? formatNumber(parkingTotal) : '')}

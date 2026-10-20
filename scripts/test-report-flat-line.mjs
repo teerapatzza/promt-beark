@@ -157,6 +157,54 @@ try {
   ok('2.1 = 300 + 1,100 = 1,400', both['2.1'] === 1400, String(both['2.1']));
   ok('2.2 ยังว่าง', !both['2.2'], String(both['2.2'] ?? 'ว่าง'));
 
+  console.log('');
+  console.log('═══ 5. ใบรับรองค่าพาหนะ: เหมาจ่ายติ๊กช่อง "ค่า Taxi" และบอกจาก-ถึง ═══');
+
+  /* 20 ต.ค. 2569 — เจ้าของงานเปิดเอกสารจริงแล้วทักสองเรื่อง
+       ก. ใบเหมาจ่ายไม่มีข้อมูลว่าจากไหนไปไหน
+       ข. ให้ติ๊กลงช่อง "ค่า Taxi" ไม่ใช่ "ค่าน้ำมันเชื้อเพลิง"
+     ก. เกิดเพราะบรรทัด จาก/ถึง ผูกกับ carType แต่ยอดเงินไม่ผูก
+     ใบที่ carType เป็น "ไม่ระบุ" จึงพิมพ์ยอดโดยไม่มีทั้งติ๊กและต้นทางปลายทาง */
+  const READ_RC = [
+    "window.renderRouteMapImage = async () => null;",
+    "async function readRc(rec) {",
+    "  const b = await buildDocumentHtml(rec, function(){});",
+    "  const d = document.createElement('div'); d.innerHTML = b.html;",
+    "  const rows = [...d.querySelectorAll('tr')].map(tr =>",
+    "    [...tr.querySelectorAll('td')].map(x => (x.textContent||'').replace(/\s+/g,' ').trim()));",
+    "  const find = word => rows.findIndex(r => r.some(c => c.indexOf(word) >= 0));",
+    "  const iTaxi = find('ค่า Taxi'), iFuel = find('ค่าน้ำมันเชื้อเพลิง');",
+    "  const tick = i => i < 0 ? null : rows[i].join(' ').indexOf('☑') >= 0;",
+    "  const txt  = i => i < 0 ? '' : rows[i].join(' | ');",
+    "  return { taxiTick: tick(iTaxi), fuelTick: tick(iFuel),",
+    "           taxiHead: txt(iTaxi), fuelHead: txt(iFuel),",
+    "           taxiBlock: rows.slice(iTaxi+1, iFuel).map(r => r.join(' | ')).join('  //  '),",
+    "           fuelBlock: rows.slice(iFuel+1, iFuel+6).map(r => r.join(' | ')).join('  //  ') };",
+    "}"
+  ].join('\n');
+
+  const rcFlat = await ev(READ_RC + '\nreturn await readRc(' + JSON.stringify(flatRec) + ');');
+  ok('ติ๊กช่อง "ค่า Taxi"', rcFlat.taxiTick === true, rcFlat.taxiHead.slice(0, 70));
+  ok('ไม่ติ๊กช่อง "ค่าน้ำมันเชื้อเพลิง"', rcFlat.fuelTick === false, rcFlat.fuelHead.slice(0, 70));
+  /* วัดจากทั้งบล็อกใต้หัวข้อ ไม่นับทีละแถว เพราะ rcFromTo สร้างตารางซ้อน
+     ดัชนีแถวจึงไม่ตรงกับบรรทัดที่เห็นบนกระดาษ (ตัววัดตัวแรกผิดแบบนี้) */
+  const blk = rcFlat.taxiBlock;
+  ok('บล็อกค่า Taxi มีต้นทางและปลายทาง',
+     /บ้าน/.test(blk) && /ดอนเมือง/.test(blk), blk.slice(0, 100));
+  ok('มียอดรายขาสองก้อน ก้อนละ 550',
+     (blk.match(/550\.00/g) || []).length === 2,
+     (blk.match(/550\.00/g) || []).length + ' ก้อน');
+  ok('มีวันที่ทั้งขาไปและขากลับ',
+     /20\/10\/2569/.test(blk) && /22\/10\/2569/.test(blk), blk.slice(0, 120));
+  ok('บล็อกค่าน้ำมันไม่มียอดซ้ำ',
+     !/550\.00/.test(rcFlat.fuelBlock), rcFlat.fuelBlock.slice(0, 80));
+
+  console.log('');
+  console.log('═══ 6. ใบคิดตามระยะจริง ยังติ๊กช่องค่าน้ำมันเหมือนเดิม ═══');
+  const rcDist = await ev(READ_RC + '\nreturn await readRc(' + JSON.stringify(distRec) + ');');
+  ok('ติ๊กช่อง "ค่าน้ำมันเชื้อเพลิง"', rcDist.fuelTick === true, rcDist.fuelHead.slice(0, 70));
+  ok('ไม่ติ๊กช่อง "ค่า Taxi" เพราะไม่ได้นั่ง Taxi', rcDist.taxiTick === false, rcDist.taxiHead.slice(0, 70));
+
   ok('ไม่มี JavaScript error ตลอดการทดสอบ', pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '));
 
   console.log('');
