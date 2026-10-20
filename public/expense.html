@@ -1736,6 +1736,108 @@
         }
     }
 
+    /* ══════════ ค้นหาสถานที่ในแถว Taxi ══════════
+       19 ต.ค. 2569 — เจ้าของงานสั่ง "ช่อง จาก/ถึง ของ Taxi ต้องค้นหาได้
+       เพราะว่าต้องหมุดได้ ส่วนถ้าเบิกตามจริงก็ให้ใส่เงินตามมิเตอร์จริง"
+
+       ตัวค้นหาของเส้นทางหลัก (attachPlaceSearch) ยืมมาใช้ไม่ได้
+       เพราะมันผูกกับการปักหมุด geoFrom/geoTo ซึ่งเป็นฐานคิดค่าน้ำมันและเหมาจ่าย
+       ถ้าใช้ซ้ำ หมุดของเที่ยว Taxi จะไปทับเส้นทางหลัก แล้วเงินเพี้ยนทั้งใบ
+       (คอมเมนต์เดิมที่ fillTaxiFromRoute เตือนเรื่องนี้ไว้แล้ว)
+
+       ตัวนี้จึงเก็บพิกัดไว้ที่ช่องตัวเอง (dataset) ใช้แค่
+         ก. ให้ชื่อสถานที่ถูกต้องตอนพิมพ์ลงเอกสาร
+         ข. บอกระยะทางของเที่ยวนั้นให้ผู้ใช้เห็น
+       เงินยังเป็นค่าโดยสารที่ผู้ใช้กรอกตามมิเตอร์เสมอ ไม่ถูกแตะเลย        */
+    let _taxiSugSeq = 0;
+
+    function taxiSugBox(input) {
+        return input.parentElement?.querySelector('.taxi-sug') || null;
+    }
+
+    /** ระยะทางของเที่ยว Taxi นี้ บอกให้ผู้ใช้เห็นเฉย ๆ ไม่เกี่ยวกับเงิน */
+    async function updateTaxiLegNote(row) {
+        const note = row.querySelector('.taxi-leg-note');
+        if (!note) return;
+        const f = row.querySelector('.taxi-from'), t = row.querySelector('.taxi-to');
+        const pin = el => (el && el.dataset.lat && el.dataset.lng)
+            ? { lat: parseFloat(el.dataset.lat), lng: parseFloat(el.dataset.lng) } : null;
+        const a = pin(f), b = pin(t);
+        if (!a || !b) { note.textContent = ''; return; }
+        note.textContent = 'กำลังคิดระยะทางของเที่ยวนี้...';
+        try {
+            const leg = await routeLeg(a, b);
+            note.textContent = 'ระยะทางของเที่ยวนี้ประมาณ ' + leg.km.toLocaleString('th-TH')
+                + ' กม. — ค่าโดยสารยังกรอกตามมิเตอร์จริง';
+        } catch (e) { note.textContent = ''; }
+    }
+
+    function attachTaxiPlaceSearch(input) {
+        if (!input || input.dataset.searchOn) return;
+        input.dataset.searchOn = '1';
+        const box = taxiSugBox(input);
+        if (!box) return;
+        let timer = null;
+
+        const close = () => box.classList.add('hidden');
+        document.addEventListener('click', e => {
+            if (!input.contains(e.target) && !box.contains(e.target)) close();
+        });
+
+        input.addEventListener('input', function () {
+            // พิมพ์เองแล้ว = ไม่ให้เส้นทางหลักมาเขียนทับอีก (กติกาเดิมของ syncTaxiRoutes)
+            this.dataset.touched = '1';
+            // พิมพ์ใหม่ = พิกัดเดิมใช้ไม่ได้แล้ว ต้องเลือกจากรายการอีกครั้ง
+            delete this.dataset.lat; delete this.dataset.lng;
+            const row = this.closest('.taxi-entry');
+            if (row) { const n = row.querySelector('.taxi-leg-note'); if (n) n.textContent = ''; }
+
+            clearTimeout(timer);
+            const q = this.value.trim();
+            if (q.length < 2) return close();
+            const my = ++_taxiSugSeq;
+            box.classList.remove('hidden');
+            box.innerHTML = '<div class="p-2 text-xs text-slate-500">กำลังค้นหา...</div>';
+
+            timer = setTimeout(async () => {
+                const r = await placeSearch(q);
+                if (my !== _taxiSugSeq) return;
+                const list = (r.data || []).slice(0, 6);
+                if (!list.length) {
+                    box.innerHTML = '<div class="p-2 text-xs text-slate-500">ไม่พบ "'
+                        + escHtml(q) + '" — พิมพ์ชื่อหลักสั้น ๆ ดูอีกครั้ง</div>';
+                    return;
+                }
+                box.innerHTML = list.map((p, i) =>
+                    '<button type="button" data-i="' + i + '" class="w-full text-left px-2.5 py-1.5 '
+                    + 'hover:bg-blue-50 text-xs border-b border-slate-100 last:border-0">'
+                    + '<div class="font-semibold text-slate-700">' + escHtml(p.name || '') + '</div>'
+                    + (p.address ? '<div class="text-[10px] text-slate-400">'
+                        + escHtml(p.address) + '</div>' : '')
+                    + '</button>').join('');
+                box.querySelectorAll('button[data-i]').forEach(btn => {
+                    btn.addEventListener('click', async () => {
+                        const p = list[parseInt(btn.dataset.i, 10)];
+                        input.value = p.name || input.value;
+                        input.dataset.touched = '1';
+                        if (p.lat != null && p.lon != null) {
+                            input.dataset.lat = p.lat; input.dataset.lng = p.lon;
+                        }
+                        close();
+                        const row = input.closest('.taxi-entry');
+                        if (row) await updateTaxiLegNote(row);
+                    });
+                });
+            }, 250);
+        });
+    }
+
+    /** ติดตัวค้นหาให้ทุกแถวที่ยังไม่มี เรียกได้ซ้ำ ไม่ติดซ้อน */
+    function attachAllTaxiSearches() {
+        document.querySelectorAll('.taxi-entry .taxi-from, .taxi-entry .taxi-to')
+            .forEach(attachTaxiPlaceSearch);
+    }
+
     /** ติ๊ก "เบิกขานี้" ในโหมดเหมาจ่าย — ส่งต่อไปที่ติ๊กรถเดิมซึ่งเป็นตัวที่ระบบใช้จริง */
     function onFlatLegChange(which) {
         const f = document.getElementById(which === 'back' ? 'legBackFlat' : 'legOutFlat');
@@ -1926,8 +2028,16 @@
         const t = row.querySelector('.taxi-to');
         // กดปุ่มนี้ = ขอให้กลับไปตามเส้นทางหลัก จึงล้างธง "ผู้ใช้แก้เอง" ด้วย
         // ไม่งั้นกดแล้วเติมให้ครั้งเดียว พอแก้เส้นทางหลักก็ค้างอีก
-        if (f) { f.value = pick.from; delete f.dataset.touched; }
-        if (t) { t.value = pick.to;   delete t.dataset.touched; }
+        /* ดึงชื่อจากเส้นทางหลักมาเติม พิกัดที่แถวเคยเลือกไว้จึงไม่ใช่ของชื่อใหม่แล้ว
+           ถ้าปล่อยไว้ ป้ายระยะทางจะอ้างพิกัดเก่าที่ไม่ตรงกับชื่อที่เห็น */
+        [f, t].forEach(el => {
+            if (!el) return;
+            delete el.dataset.touched; delete el.dataset.lat; delete el.dataset.lng;
+        });
+        if (f) f.value = pick.from;
+        if (t) t.value = pick.to;
+        const legNote = row.querySelector('.taxi-leg-note');
+        if (legNote) legNote.textContent = '';
 
         // กระพริบให้เห็นว่าเติมอะไรลงไป ไม่งั้นกดแล้วไม่รู้ว่าเกิดอะไรขึ้น
         [f, t].forEach(el => {
@@ -3085,7 +3195,10 @@
                 </div>
                 <div>
                     <label class="text-[10px] text-slate-400 font-bold block mb-0.5">จาก</label>
-                    <input type="text" class="taxi-from w-full border border-slate-200 px-2 py-1.5 rounded text-xs outline-none focus:border-blue-400" value="${fromVal}" oninput="this.dataset.touched='1'" placeholder="สถานที่ต้นทาง">
+                    <div class="relative">
+                        <input type="text" class="taxi-from w-full border border-slate-200 px-2 py-1.5 rounded text-xs outline-none focus:border-blue-400" value="${fromVal}" autocomplete="off" placeholder="พิมพ์ชื่อสถานที่ แล้วเลือกจากรายการ">
+                        <div class="taxi-sug hidden absolute z-[9200] w-full bg-white border border-slate-200 shadow-xl rounded-lg mt-1 max-h-56 overflow-y-auto overscroll-contain"></div>
+                    </div>
                 </div>
                 <div>
                     <div class="flex items-center justify-between mb-0.5 gap-2">
@@ -3094,7 +3207,11 @@
                             class="taxi-use-route text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline whitespace-nowrap"
                             title="ดึงต้นทาง-ปลายทางจากเส้นทางหลักด้านบนมาเติมให้">ใช้เส้นทางหลัก</button>
                     </div>
-                    <input type="text" class="taxi-to w-full border border-slate-200 px-2 py-1.5 rounded text-xs outline-none focus:border-blue-400" value="${toVal}" oninput="this.dataset.touched='1'" placeholder="สถานที่ปลายทาง">
+                    <div class="relative">
+                        <input type="text" class="taxi-to w-full border border-slate-200 px-2 py-1.5 rounded text-xs outline-none focus:border-blue-400" value="${toVal}" autocomplete="off" placeholder="พิมพ์ชื่อสถานที่ แล้วเลือกจากรายการ">
+                        <div class="taxi-sug hidden absolute z-[9200] w-full bg-white border border-slate-200 shadow-xl rounded-lg mt-1 max-h-56 overflow-y-auto overscroll-contain"></div>
+                    </div>
+                    <p class="taxi-leg-note text-[10px] text-slate-400 mt-1"></p>
                 </div>
             </div>
             <div class="flex items-end gap-2">
@@ -3135,6 +3252,8 @@
         showTaxiCap();   // แถวที่เพิ่งเพิ่มต้องเห็นวงเงินด้วย
         // ถ้ากำลังใช้เหมาจ่ายอยู่ แถวที่เพิ่งเพิ่มต้องถูกล็อกตั้งแต่แรก
         if (typeof applyFlatLockToTaxi === 'function') applyFlatLockToTaxi();
+        // แถวที่เพิ่งเกิดยังไม่มีตัวค้นหา ต้องติดให้ ไม่งั้นช่องจะเป็นข้อความเปล่า
+        if (typeof attachAllTaxiSearches === 'function') attachAllTaxiSearches();
         // แถวที่เพิ่งเกิดต้องได้เส้นทางตามทิศทางของตัวเอง
         // ค่า value ที่ใส่ตอนสร้างเป็นของขาไปเสมอ แถวขากลับจึงต้องถูกแก้ให้ถูกทาง
         if (typeof syncTaxiRoutes === 'function') syncTaxiRoutes();
@@ -4156,14 +4275,24 @@
                 });
             }
 
-            // Check file type (images only)
-            if (!file.type.startsWith('image/')) {
+            /* 20 ต.ค. 2569 — ด่านนี้เคยบังคับว่าต้องเป็นรูปภาพเท่านั้น
+               ตอนเปิดให้แนบ PDF (19 ต.ค.) ผมแก้ accept กับตัวแปลงไฟล์แล้ว
+               แต่ลืมด่านนี้ไป ผลคือช่องยอมให้เลือก PDF ข้อความใต้ช่องก็เขียนว่า
+               "รับทั้งรูปภาพและไฟล์ PDF" แต่พอกดบันทึกกลับถูกตีกลับว่าไม่ใช่รูปภาพ
+               หน้าจอขัดกันเองจนผู้ใช้ไม่รู้จะทำยังไงต่อ
+
+               PDF ถูกแปลงเป็นภาพตั้งแต่ตอนแนบอยู่แล้ว (pdfToImages)
+               ของที่ลงฐานจึงเป็นภาพเสมอ ด่านนี้จึงต้องยอมรับ PDF ด้วย */
+            const isImage = (file.type || '').startsWith('image/');
+            const isPdf = /^application\/pdf$/i.test(file.type || '')
+                          || /\.pdf$/i.test(file.name || '');
+            if (!isImage && !isPdf) {
                 errors.push({
                     field: 'file',
                     level: 'error',
-                    message: `❌ ไฟล์ "${file.name}" ไม่ใช่รูปภาพ!\n` +
+                    message: `❌ ไฟล์ "${file.name}" ใช้แนบไม่ได้!\n` +
                         `📄 ชนิด: ${file.type || 'ไม่ทราบ'}\n\n` +
-                        `<svg class="inline w-3.5 h-3.5 -mt-0.5 flex-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2Z"/></svg> กรุณาเลือกไฟล์รูปภาพเท่านั้น (JPG, PNG, etc.)`
+                        `<svg class="inline w-3.5 h-3.5 -mt-0.5 flex-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2Z"/></svg> แนบได้เฉพาะรูปภาพ (JPG, PNG) หรือไฟล์ PDF`
                 });
             }
         }
@@ -4961,6 +5090,9 @@
                     if ((entry.to || '') && (entry.to || '') !== autoRoute.to)
                         tCell.dataset.touched = '1';
 
+                    if (typeof attachTaxiPlaceSearch === 'function') {
+                        attachTaxiPlaceSearch(fCell); attachTaxiPlaceSearch(tCell);
+                    }
                     onTaxiDirChange(dirSel);
                     if (entry.direction === 'ขากลับ') {
                         row.querySelector('.taxi-amt-ret').value = entry.amount || '';

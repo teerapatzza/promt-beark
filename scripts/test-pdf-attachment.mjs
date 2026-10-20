@@ -198,6 +198,31 @@ try {
      (bad.alerts || []).some(a => /ไม่สำเร็จ/.test(a) && /ไม่ถูกแนบ/.test(a)),
      (bad.alerts || []).join(' | ').slice(0, 130) || '(ไม่เตือน)');
 
+  console.log('');
+  console.log('═══ 7. ด่านตรวจก่อนบันทึก ต้องยอมรับ PDF ด้วย ═══');
+
+  /* 20 ต.ค. 2569 — เจ้าของงานแนบ PDF จริงแล้วถูกตีกลับว่า "ไม่ใช่รูปภาพ!"
+     ตอนเปิดให้แนบ PDF ผมแก้ accept กับตัวแปลงไฟล์แล้ว แต่ลืม validateFileSize()
+     ซึ่งยังบังคับ file.type.startsWith('image/') อยู่
+
+     ผลคือหน้าจอขัดกันเอง: ช่องยอมให้เลือก PDF ข้อความใต้ช่องเขียนว่ารับ PDF
+     แต่พอกดบันทึกกลับบอกว่าแนบไม่ได้ ผู้ใช้ไม่มีทางรู้ว่าต้องทำยังไงต่อ */
+  const gate = await ev([
+    MAKE_PDF,
+    "const pdf = pdfFile('ใบเสร็จ.pdf', 2);",
+    "const png = pngFile('receipt.png');",
+    "const txt = new File([new Uint8Array([1,2,3])], 'note.txt', { type: 'text/plain' });",
+    "const msg = list => (list||[]).map(e => e.message).join(' | ');",
+    "return { pdfErr: msg(validateFileSize([pdf], 5)),",
+    "         pngErr: msg(validateFileSize([png], 5)),",
+    "         txtErr: msg(validateFileSize([txt], 5)) };"
+  ].join('\n'));
+  ok('PDF ผ่านด่าน ไม่ถูกตีกลับว่าไม่ใช่รูปภาพ',
+     gate.pdfErr === '', gate.pdfErr || 'ผ่าน');
+  ok('รูปภาพยังผ่านเหมือนเดิม', gate.pngErr === '', gate.pngErr || 'ผ่าน');
+  ok('ไฟล์ชนิดอื่นยังถูกกันไว้',
+     /แนบได้เฉพาะ/.test(gate.txtErr), gate.txtErr.slice(0, 90) || '(ไม่ถูกกัน)');
+
   ok('ไม่มี JavaScript error ตลอดการทดสอบ', pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '));
 
   console.log('');
