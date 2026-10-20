@@ -399,7 +399,7 @@
                 <div id="activityPreview" class="hidden mt-2"></div>
                 <!-- กล่องวัด ซ่อนไว้นอกจอ ตั้งความกว้างและฟอนต์เท่าเซลล์บนเอกสารเป๊ะ -->
                 <div id="activityRuler" aria-hidden="true"></div>
-                <p class="text-xs text-slate-500 mt-2"><svg class="inline w-3.5 h-3.5 -mt-0.5 flex-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2Z"/></svg> หากไม่ระบุ ระบบจะเว้นว่างไว้ในเอกสาร PDF <span class="text-blue-600">🔄 ข้อมูลจะ sync กับกิจกรรมด้านล่างอัตโนมัติ</span></p>
+                <p class="text-xs text-slate-500 mt-2"><svg class="inline w-3.5 h-3.5 -mt-0.5 flex-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2Z"/></svg> หากไม่ระบุ ระบบจะเว้นว่างไว้ในเอกสาร PDF <span class="text-blue-600">↓ ใช้เป็นค่าตั้งต้นของแถวกิจกรรมด้านล่างให้ — แก้แถวล่างได้ ช่องนี้ไม่เปลี่ยนตาม</span></p>
 
                 <!-- วันที่ที่พิมพ์ลงเอกสาร — เดิมใช้วันที่กดบันทึกเสมอ แก้ไม่ได้
                      ทำย้อนหลังหรือลงล่วงหน้าจึงได้วันผิด เติมวันนี้ให้ไว้ ปกติไม่ต้องแตะ -->
@@ -3414,34 +3414,32 @@
         updateActivityPreview();
     }
 
+    /* ══════════ ชื่อกิจกรรม: ไหลลงทางเดียว ══════════
+       20 ต.ค. 2569 — เจ้าของงานทักว่า "ถ้าแก้ข้างล่าง ข้างบนไม่ควรถูกแก้ด้วย"
+       และบอกเจตนาการออกแบบไว้ชัดว่า "มันต้องดึงไปข้างล่างให้เป็น default"
+
+       ของเดิมเชื่อมสองทาง ช่องล่างเขียนทับช่องบนทุกครั้งที่พิมพ์ และตอนลบแถว
+       ผลคือลบแถวล่างแล้วชื่อกิจกรรมบนหายไปด้วย ทั้งที่คนละช่อง คนละความหมาย
+         บน  = ชื่อกิจกรรมของใบ (ขึ้นใบรับรองแทนใบเสร็จฯ)
+         ล่าง = แถวกิจกรรมท้ายตารางในเอกสาร ซึ่งมีได้หลายแถว
+
+       "ค่าตั้งต้น" แปลว่าใช้ได้จนกว่าจะถูกแก้ทับ พอผู้ใช้พิมพ์ในแถวล่างแล้ว
+       แถวนั้นจะถูกตีตราว่าตั้งเอง ช่องบนจะไม่ไหลลงมาทับอีก
+       หลักเดียวกับที่ใช้กับเส้นทางแถว Taxi และช่องวันที่ */
     function syncActivityFromMainToExtra() {
         const mainActivity = document.getElementById('activityName')?.value || '';
-        const extraActivities = document.querySelectorAll('.extra-act-text');
+        if (!mainActivity.trim()) return;
 
-        if (mainActivity.trim()) {
-            // If extra activities exist, update first one
-            if (extraActivities.length > 0) {
-                extraActivities[0].value = mainActivity;
-            } else {
-                // If no extra activities, create one
-                addExtraActivity();
-                setTimeout(() => {
-                    const newInput = document.querySelector('.extra-act-text');
-                    if (newInput) newInput.value = mainActivity;
-                }, 100);
-            }
+        const first = document.querySelector('.extra-act-text');
+        if (first) {
+            // แถวที่ผู้ใช้พิมพ์เองแล้ว ห้ามเขียนทับ
+            if (!first.dataset.touched) first.value = mainActivity;
+            return;
         }
-    }
-
-    function syncActivityFromExtraToMain() {
-        const activities = [];
-        document.querySelectorAll('.extra-act-text').forEach(input => {
-            if (input.value.trim()) {
-                activities.push(input.value.trim());
-            }
-        });
-        document.getElementById('activityName').value = activities.join(' / ');
-        updateActivityCounter();
+        // ยังไม่มีแถวเลย สร้างให้หนึ่งแถวแล้วเติมค่าตั้งต้นลงไป
+        addExtraActivity();
+        const made = document.querySelector('.extra-act-text');
+        if (made && !made.dataset.touched) made.value = mainActivity;
     }
 
     function addExtraActivity() {
@@ -3451,7 +3449,7 @@
         const div = document.createElement('div');
         div.className = 'extra-activity flex gap-2 items-center';
         div.innerHTML = `
-            <input type="text" maxlength="200" class="extra-act-text flex-1 border border-slate-200 px-2.5 py-1.5 rounded-lg text-sm outline-none focus:border-blue-400" placeholder="ระบุกิจกรรม..." oninput="syncActivityFromExtraToMain()">
+            <input type="text" maxlength="200" class="extra-act-text flex-1 border border-slate-200 px-2.5 py-1.5 rounded-lg text-sm outline-none focus:border-blue-400" placeholder="ระบุกิจกรรม..." oninput="this.dataset.touched='1'">
             <button type="button" onclick="removeExtraActivity(this)" class="text-slate-300 hover:text-rose-500 transition-colors p-1 flex-shrink-0">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
@@ -3466,7 +3464,8 @@
         if (!list.querySelector('.extra-activity')) {
             list.innerHTML = '<p class="text-xs text-slate-400 italic">ยังไม่มีรายการ — กดปุ่ม "เพิ่มแถว" ด้านบน</p>';
         }
-        syncActivityFromExtraToMain();
+        /* ไม่แตะชื่อกิจกรรมด้านบน — คนละช่อง คนละความหมาย
+           ของเดิมลบแถวล่างแล้วชื่อกิจกรรมบนหายไปด้วย ซึ่งไม่ใช่สิ่งที่ใครสั่ง */
     }
 
     /** บอกวงเงิน Taxi ของหมวดนี้ตั้งแต่ยังไม่กรอก
