@@ -1385,6 +1385,12 @@
                 + escHtml(label || ti.value) + '</b> แล้ว</span>');
             const row = ti.closest('.taxi-entry');
             if (row) refreshTaxiLegNote(row);
+            /* ปักหมุดเสร็จต้องเห็นเส้นทันที ไม่ต้องรอให้เส้นทางหลักขยับ
+               เคสที่เบิกเฉพาะ Taxi เส้นทางหลักอาจไม่มีวันขยับเลย */
+            if (typeof drawTaxiLegLines === 'function')
+                drawTaxiLegLines().then(function () {
+                    if (typeof fitRoute === 'function') fitRoute();
+                });
             return;
         }
         initRouteMap();
@@ -2262,7 +2268,10 @@
     function fitRoute(userAsked) {
         if (!routeMap) return;
         routeMap.invalidateSize();
-        const pts = [mFrom, mTo, mRetFrom, mRet].filter(Boolean).map(m => m.getLatLng());
+        // หมุดของเที่ยว Taxi ต้องอยู่ในกรอบที่ซูมให้ด้วย ไม่งั้นปักแล้วมองไม่เห็น
+        const taxiMks = (typeof taxiLegMarkers !== 'undefined') ? taxiLegMarkers : [];
+        const pts = [mFrom, mTo, mRetFrom, mRet].concat(taxiMks)
+            .filter(Boolean).map(m => m.getLatLng());
         // เส้นของเที่ยว Taxi ต้องอยู่ในกรอบที่ซูมให้ด้วย ไม่งั้นวาดแล้วมองไม่เห็น
         const taxiLines = (typeof taxiLegLines !== 'undefined') ? taxiLegLines : [];
         if (routeLine || retLine || taxiLines.length) {
@@ -2321,11 +2330,50 @@
        คิดเงินจากมิเตอร์ ไม่เกี่ยวกับระยะทางบนแผนที่เลย
        ถ้าใช้สีเดียวกันจะชวนให้เข้าใจผิดว่าเส้นพวกนี้มีผลกับเงิน */
     let taxiLegLines = [];
+    let taxiLegMarkers = [];
     function clearTaxiLegLines() {
         taxiLegLines.forEach(function (ln) {
             try { routeMap.removeLayer(ln); } catch (e) {}
         });
         taxiLegLines = [];
+        taxiLegMarkers.forEach(function (mk) {
+            try { routeMap.removeLayer(mk); } catch (e) {}
+        });
+        taxiLegMarkers = [];
+    }
+
+    /* ── หมุดของเที่ยว Taxi ──
+       21 ต.ค. 2569 — เจ้าของงานปักหมุดครบทั้งสี่จุดของ Taxi สองเที่ยว
+       แต่บนแผนที่เห็นหมุดเดียว แล้วถามว่า "หมุดหายไปไหน"
+
+       ของเดิมแผนที่มีหมุดแค่ของเส้นทางหลัก (จุดเริ่มต้น/จุดที่รถไปส่ง/ขากลับ)
+       ส่วนหมุดของเที่ยว Taxi เก็บอยู่ที่ช่องกรอกของตัวเอง ไม่เคยถูกวางลงแผนที่
+
+       ลากได้เหมือนหมุดเส้นทางหลัก เพราะแผนที่ไม่มีทุกซอยทุกบ้านเลขที่
+       วิธีที่ระบบนี้ใช้มาตลอดคือหาที่ใกล้ ๆ แล้วให้ผู้ใช้ลากหมุดเอง
+       ลากเสร็จพิกัดเขียนกลับลงช่องนั้น แล้ววัดระยะทางของเที่ยวใหม่ให้ */
+    const TAXI_PIN = {
+        from: { color: '#f97316', what: 'จุดเริ่มต้น' },
+        to:   { color: '#c2410c', what: 'จุดที่ลงจากรถ' }
+    };
+
+    function addTaxiMarker(input, which, legNo) {
+        const lat = parseFloat(input.dataset.lat), lng = parseFloat(input.dataset.lng);
+        if (!isFinite(lat) || !isFinite(lng)) return;
+        const cfg = TAXI_PIN[which];
+        const mk = L.marker([lat, lng], { draggable: true, icon: pin(cfg.color) }).addTo(routeMap);
+        mk.bindTooltip('Taxi เที่ยวที่ ' + legNo + ' — ' + cfg.what
+            + (input.value ? ': ' + input.value : '') + ' (ลากได้)', { sticky: true });
+        mk.on('dragend', function () {
+            const p = mk.getLatLng();
+            input.dataset.lat = p.lat;
+            input.dataset.lng = p.lng;
+            input.dataset.touched = '1';      // ลากเอง = ยืนยันเอง ห้ามเส้นทางหลักเขียนทับ
+            const row = input.closest('.taxi-entry');
+            if (row) { delete row.dataset.pinSig; refreshTaxiLegNote(row); }
+            drawTaxiLegLines();
+        });
+        taxiLegMarkers.push(mk);
     }
 
     async function drawTaxiLegLines() {
@@ -2334,14 +2382,22 @@
         const rows = [...document.querySelectorAll('.taxi-entry')];
         if (!rows.length) return;
 
-        const pin = el => (el && el.dataset.lat && el.dataset.lng)
+        // ชื่อ pin ถูกใช้เป็นตัวสร้างไอคอนหมุดอยู่แล้ว ตั้งชื่อใหม่กันบังกัน
+        const pinOf = el => (el && el.dataset.lat && el.dataset.lng)
             ? { lat: parseFloat(el.dataset.lat), lng: parseFloat(el.dataset.lng) } : null;
 
         for (let i = 0; i < rows.length; i++) {
             const row = rows[i];
-            const a = pin(row.querySelector('.taxi-from'));
-            const b = pin(row.querySelector('.taxi-to'));
-            if (!a || !b) continue;                       // ยังไม่ได้ปักหมุดครบ ข้ามไป
+            const fromEl = row.querySelector('.taxi-from');
+            const toEl   = row.querySelector('.taxi-to');
+            /* วางหมุดก่อน แล้วค่อยลากเส้น
+               หมุดต้องขึ้นแม้ปักได้ข้างเดียว ไม่งั้นผู้ใช้ที่ปักไปแล้วหนึ่งจุด
+               จะไม่เห็นอะไรเลยบนแผนที่ แล้วนึกว่าระบบไม่รับ */
+            addTaxiMarker(fromEl, 'from', i + 1);
+            addTaxiMarker(toEl,   'to',   i + 1);
+            const a = pinOf(fromEl);
+            const b = pinOf(toEl);
+            if (!a || !b) continue;                       // ยังไม่ได้ปักหมุดครบ ลากเส้นไม่ได้
             // หมุดชี้ที่เดียวกันทั้งคู่ ลากเส้นไปก็ไม่เห็นอะไร
             if (Math.abs(a.lat - b.lat) < 1e-6 && Math.abs(a.lng - b.lng) < 1e-6) continue;
             try {
@@ -2365,8 +2421,15 @@
         if (typeof syncTaxiRoutes === 'function') syncTaxiRoutes();
         // หมุดเปลี่ยน = พื้นที่อาจเปลี่ยน = วงเงินแท็กซี่อาจเปลี่ยน ต้องคิดใหม่ทุกครั้ง
         if (typeof recomputeTaxiCap === 'function') recomputeTaxiCap();
-        if (document.getElementById('manualDistOverride')?.checked) return;
+        /* เส้นของเที่ยว Taxi ไม่ได้ขึ้นกับเส้นทางหลัก ต้องวาดก่อนด่านตรวจหมุดข้างล่าง
+           21 ต.ค. 2569 — ผมวางบรรทัดนี้ไว้ใต้ด่านนั้นตอนแรก ซึ่งผิด
+           เคสที่เบิกเฉพาะ Taxi ขากลับ เส้นทางหลักไม่มีหมุดปลายทาง
+           ฟังก์ชันจึง return ตั้งแต่ด่านนั้น เส้น Taxi เลยไม่เคยถูกวาดเลยสักเส้น
+           (เจ้าของงานเจอเอง: "ทำไมแผนที่ไม่ลากหมุด ผมเลือก taxi แล้ว") */
+        await drawTaxiLegLines();
+        if (document.getElementById('manualDistOverride')?.checked) { fitRoute(); return; }
         if (!geoFrom || !geoTo) {
+            fitRoute();   // ให้แผนที่ซูมไปที่เส้น Taxi ที่เพิ่งวาด ไม่งั้นวาดแล้วมองไม่เห็น
             // บอกให้ตรงว่าขาดจุดไหน ข้อความรวมๆ ทำให้ผู้ใช้ที่กรอกจุดหมายไปแล้วงงว่าทำไมยังไม่คำนวณ
             const need = [];
             if (!geoFrom) need.push('จุดเริ่มต้น');
@@ -2462,7 +2525,6 @@
                     'ไม่ได้เบิกขากลับ จึงไม่คิดระยะทางขากลับ');
             }
             if (typeof calculateTravelTotal === 'function') calculateTravelTotal();
-            await drawTaxiLegLines();
             fitRoute();
 
             const worst = [geoFrom.precision, geoTo.precision]
@@ -3499,6 +3561,8 @@
         });
         row.remove();
         if (typeof updateTaxiRowsNote === 'function') updateTaxiRowsNote();
+        // ลบแถวแล้วเส้นบนแผนที่ของแถวนั้นต้องหายตามไปด้วย
+        if (typeof drawTaxiLegLines === 'function') drawTaxiLegLines();
         calculateTravelTotal();
     }
 
