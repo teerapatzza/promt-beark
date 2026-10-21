@@ -2367,13 +2367,38 @@
     const taxiColorOf = i => TAXI_COLORS[i % TAXI_COLORS.length];
     const TAXI_PIN_WHAT = { from: 'จุดเริ่มต้น', to: 'จุดที่ลงจากรถ' };
 
+    /* หมุดคนละตัวที่อยู่ตำแหน่งเดียวกันเป๊ะ ต้องไม่วางซ้อนกัน
+       21 ต.ค. 2569 — เจ้าของงานทักว่า "ทำไมหมุดมันไปกองกันที่เดียว"
+       เพราะเที่ยว Taxi ที่ยังไม่ได้แก้เส้นทางเอง จะดึงหมุดจากเส้นทางหลักมาใช้
+       หมุดของเที่ยวจึงไปทับหมุด A/B ของเส้นทางหลักพอดี กลายเป็นกองเดียวกัน
+
+       แทนที่จะวางซ้อน ให้รวมเป็นหมุดเดียวแล้วบอกในป้ายว่าตรงนี้มีอะไรบ้าง
+       ~20 เมตร คือระยะที่ถือว่า "ที่เดียวกัน" บนแผนที่ระดับเมือง */
+    const SAME_SPOT_DEG = 0.0002;        // ~20 เมตร
+    function markerAtSameSpot(lat, lng) {
+        const near = (m) => {
+            const p = m.getLatLng();
+            return Math.abs(p.lat - lat) < SAME_SPOT_DEG && Math.abs(p.lng - lng) < SAME_SPOT_DEG;
+        };
+        return [mFrom, mTo, mRetFrom, mRet].filter(Boolean).find(near)
+            || taxiLegMarkers.find(near) || null;
+    }
+
     function addTaxiMarker(input, which, legNo) {
         const lat = parseFloat(input.dataset.lat), lng = parseFloat(input.dataset.lng);
         if (!isFinite(lat) || !isFinite(lng)) return;
+        const label = 'Taxi เที่ยวที่ ' + legNo + ' — ' + TAXI_PIN_WHAT[which]
+            + (input.value ? ': ' + input.value : '');
+        const dup = markerAtSameSpot(lat, lng);
+        if (dup) {
+            // มีหมุดตรงนี้แล้ว เติมบรรทัดเข้าไปในป้ายเดิมแทนการวางหมุดซ้อน
+            const prev = dup.getTooltip() ? dup.getTooltip().getContent() : '';
+            dup.bindTooltip(prev ? prev + '<br>' + label : label, { sticky: true });
+            return;
+        }
         const col = taxiColorOf(legNo - 1);
         const mk = L.marker([lat, lng], { draggable: true, icon: pin(col[which]) }).addTo(routeMap);
-        mk.bindTooltip('Taxi เที่ยวที่ ' + legNo + ' — ' + TAXI_PIN_WHAT[which]
-            + (input.value ? ': ' + input.value : '') + ' (ลากได้)', { sticky: true });
+        mk.bindTooltip(label + ' (ลากได้)', { sticky: true });
         mk.on('dragend', function () {
             const p = mk.getLatLng();
             input.dataset.lat = p.lat;
@@ -2408,6 +2433,13 @@
             const a = pinOf(fromEl);
             const b = pinOf(toEl);
             if (!a || !b) continue;                       // ยังไม่ได้ปักหมุดครบ ลากเส้นไม่ได้
+            /* เที่ยวที่ใช้เส้นทางหลักทั้งต้นทางและปลายทาง = เส้นเดียวกับที่วาดไปแล้ว
+               ลากซ้ำก็ทับกันสนิท มองไม่เห็นอะไรเพิ่ม มีแต่ทำให้แผนที่รก */
+            const sameAsMain = (p, g) => g && Math.abs(p.lat - g.lat) < 0.0002
+                                           && Math.abs(p.lng - g.lng) < 0.0002;
+            const matchOut = sameAsMain(a, geoFrom) && sameAsMain(b, geoTo);
+            const matchBack = sameAsMain(a, geoTo) && sameAsMain(b, geoFrom);
+            if (matchOut || matchBack) continue;
             // หมุดชี้ที่เดียวกันทั้งคู่ ลากเส้นไปก็ไม่เห็นอะไร
             if (Math.abs(a.lat - b.lat) < 1e-6 && Math.abs(a.lng - b.lng) < 1e-6) continue;
             try {

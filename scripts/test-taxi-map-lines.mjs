@@ -275,6 +275,43 @@ try {
   }
 
   console.log('');
+  console.log('═══ 7. เที่ยวที่ใช้เส้นทางหลัก ต้องไม่วางหมุดซ้อนกองเดียว ═══');
+  /* 21 ต.ค. 2569 — เจ้าของงานทักว่า "ทำไมหมุดมันไปกองกันที่เดียว"
+     เที่ยว Taxi ที่ยังไม่ได้แก้เส้นทางเอง จะดึงหมุดจากเส้นทางหลักมาใช้
+     หมุดของเที่ยวจึงทับหมุด A/B พอดีเป๊ะ */
+  const stacked = await ev([
+    "document.querySelectorAll('.taxi-entry').forEach(r=>r.querySelector('[onclick*=removeTaxiEntry]')?.click());",
+    "await new Promise(r=>setTimeout(r,400));",
+    "geoFrom = { lat: 13.60, lng: 100.53, precision:'exact', label:'บ้าน' };",
+    "geoTo   = { lat: 13.91, lng: 100.60, precision:'exact', label:'ดอนเมือง' };",
+    "setPoint('from', 13.60, 100.53, 'บ้าน', 'exact', 'test');",
+    "setPoint('to',   13.91, 100.60, 'ดอนเมือง', 'exact', 'test');",
+    "await new Promise(r=>setTimeout(r,500));",
+    "addTaxiEntry('ขาไป'); addTaxiEntry('ขากลับ');",
+    "await new Promise(r=>setTimeout(r,500));",
+    // ทั้งสองเที่ยวใช้หมุดเดียวกับเส้นทางหลัก (สถานการณ์ที่ทำให้หมุดกอง)
+    "[...document.querySelectorAll('.taxi-entry')].forEach(r=>{",
+    "  const f=r.querySelector('.taxi-from'), t=r.querySelector('.taxi-to');",
+    "  f.value='บ้าน'; f.dataset.lat=13.60; f.dataset.lng=100.53;",
+    "  t.value='ดอนเมือง'; t.dataset.lat=13.91; t.dataset.lng=100.60; });",
+    "await drawTaxiLegLines();",
+    "await new Promise(r=>setTimeout(r,600));",
+    "const all = [mFrom, mTo].filter(Boolean).concat(taxiLegMarkers||[]);",
+    "const key = m => { const p=m.getLatLng(); return p.lat.toFixed(4)+','+p.lng.toFixed(4); };",
+    "return { markers: (taxiLegMarkers||[]).length,",
+    "         lines: (taxiLegLines||[]).length,",
+    "         spots: new Set(all.map(key)).size,",
+    "         total: all.length };"
+  ].join(NL));
+  ok('ไม่วางหมุดของเที่ยวซ้อนบนหมุดเส้นทางหลัก',
+     stacked.markers === 0, stacked.markers + ' หมุดของเที่ยว');
+  ok('จำนวนหมุดบนแผนที่เท่ากับจำนวนตำแหน่งจริง ไม่มีกองซ้อน',
+     stacked.total === stacked.spots,
+     stacked.total + ' หมุด · ' + stacked.spots + ' ตำแหน่ง');
+  ok('ไม่ลากเส้นซ้ำทับเส้นทางหลัก',
+     stacked.lines === 0, stacked.lines + ' เส้น');
+
+  console.log('');
   ok('ไม่มี JavaScript error ตลอดการทดสอบ', pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '));
 
   console.log('');
