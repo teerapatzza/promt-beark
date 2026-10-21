@@ -1649,14 +1649,19 @@
                ใบเก่าที่ไม่มีค่านี้ถือว่าใช้แผนที่ระบบเหมือนเดิม จะได้ไม่เปลี่ยนหน้าตา
                ภาพที่ผู้ใช้แนบเองอยู่ในไฟล์แนบอยู่แล้ว จึงพิมพ์ออกมาตามปกติ */
             const _useAppMap = !_tr || _tr.useAppMap !== false;
-            if (_useAppMap && _tr && _tr.fromGeo && _tr.toGeo) {
+            /* 21 ต.ค. 2569 — ใบที่เบิกเฉพาะ Taxi ไม่มีหมุดเส้นทางหลัก
+               ของเดิมจึงไม่มีหน้าแผนที่เลย ทั้งที่ทุกเที่ยวปักหมุดไว้ครบ
+               ตอนนี้มีเที่ยวที่ปักหมุดแล้วก็พอ วาดให้เหมือนที่เห็นตอนกรอก */
+            const _taxiLegs = taxiLegsWithPins(data.inputMetadata || {});
+            const _hasMainPins = !!(_tr && _tr.fromGeo && _tr.toGeo);
+            if (_useAppMap && (_hasMainPins || _taxiLegs.length)) {
                 // ใบเบิกเก่าไม่มี useAppMap แต่มีพิกัดครบ ก็วาดแผนที่ให้ด้วย
                 say('⏳ กำลังวาดแผนที่...');
-                const km = _tr.distOut || (_tr.route && _tr.route.km) || '-';
+                const km = (_tr && (_tr.distOut || (_tr.route && _tr.route.km))) || '-';
                 try {
-                    const img = await renderRouteMapImage(_tr);
+                    const img = await renderRouteMapImage(_tr, _taxiLegs);
                     if (img) {
-                        mapPageHtml = buildMapPageHtml(img, _tr, km);
+                        mapPageHtml = buildMapPageHtml(img, _tr, km, _taxiLegs);
                     } else {
                         // วาดไม่ได้ต้องบอก ไม่ใช่เงียบแล้วเอกสารขาดหน้าไปเฉยๆ
                         alert('หมายเหตุ: วาดแผนที่ลงเอกสารไม่สำเร็จ\n\n' +
@@ -1909,8 +1914,31 @@
            ข้อดี: ประหยัดพื้นที่ ~50 เท่า และถ้าแก้หมุดภายหลัง เอกสารจะถูกต้องเสมอ */
 
         /** วาดแผนที่จากพิกัดที่บันทึกไว้ คืนค่าเป็น dataURL (คืน null ถ้าวาดไม่ได้) */
-        async function renderRouteMapImage(tr) {
-            if (!tr || !tr.fromGeo || !tr.toGeo) return null;
+        /* สีของเที่ยว Taxi บนแผนที่ — ต้องตรงกับหน้ากรอก (TAXI_COLORS ใน expense.html)
+           ไม่งั้นผู้ใช้เห็นเส้นสีหนึ่งตอนกรอก แล้วได้อีกสีตอนพิมพ์ จะงงว่าเส้นไหนของเที่ยวไหน */
+        const DOC_TAXI_COLORS = [
+            { line: '#ea580c', from: '#f97316', to: '#9a3412' },
+            { line: '#0d9488', from: '#14b8a6', to: '#115e59' },
+            { line: '#c026d3', from: '#d946ef', to: '#86198f' },
+            { line: '#ca8a04', from: '#eab308', to: '#854d0e' },
+            { line: '#0369a1', from: '#0ea5e9', to: '#075985' },
+            { line: '#be123c', from: '#f43f5e', to: '#881337' }
+        ];
+
+        /** เที่ยว Taxi ที่ปักหมุดครบ พร้อมวาดลงแผนที่ */
+        function taxiLegsWithPins(meta) {
+            const list = ((meta && meta._costs && meta._costs.taxiEntries) || []);
+            return list.filter(e => e && e.fromGeo && e.toGeo
+                && isFinite(e.fromGeo.lat) && isFinite(e.toGeo.lat));
+        }
+
+        async function renderRouteMapImage(tr, taxiLegs) {
+            const legs = Array.isArray(taxiLegs) ? taxiLegs : [];
+            /* 21 ต.ค. 2569 — เจ้าของงานกรอก Taxi 5 เที่ยว เห็นครบ 5 เส้นบนหน้ากรอก
+               แต่แผนที่ในเอกสารมีเส้นเดียว เพราะตัวนี้รู้จักแต่เส้นทางหลัก
+               และใบที่เบิกเฉพาะ Taxi ยังไม่มีหมุดหลักเลย จึงไม่มีหน้าแผนที่ด้วยซ้ำ */
+            const hasMain = !!(tr && tr.fromGeo && tr.toGeo);
+            if (!hasMain && !legs.length) return null;
             if (typeof L === 'undefined' || typeof html2canvas !== 'function') return null;
 
             const host = document.createElement('div');
@@ -1937,13 +1965,20 @@
                     attribution: '&copy; OpenStreetMap contributors'
                 }).addTo(map);
 
-                const from = L.latLng(tr.fromGeo.lat, tr.fromGeo.lng);
-                const to   = L.latLng(tr.toGeo.lat,   tr.toGeo.lng);
-                const hasPath = Array.isArray(tr.routePath) && tr.routePath.length > 1;
-                const pts = hasPath
+                const from = hasMain ? L.latLng(tr.fromGeo.lat, tr.fromGeo.lng) : null;
+                const to   = hasMain ? L.latLng(tr.toGeo.lat,   tr.toGeo.lng)   : null;
+                const hasPath = hasMain && Array.isArray(tr.routePath) && tr.routePath.length > 1;
+                const pts = !hasMain ? []
+                    : hasPath
                     ? tr.routePath.filter(p => Array.isArray(p) && p.length >= 2)
                                   .map(p => L.latLng(p[0], p[1]))
                     : [from, to];
+
+                // จุดของทุกเที่ยว Taxi ที่ปักหมุดไว้
+                const legPts = legs.map(e => ({
+                    a: L.latLng(e.fromGeo.lat, e.fromGeo.lng),
+                    b: L.latLng(e.toGeo.lat,   e.toGeo.lng)
+                }));
 
                 // ขากลับไปคนละที่: ต้องเห็นทั้งสองขาบนแผนที่ ไม่งั้นเอกสารเล่าไม่ครบ
                 const rg = tr.returnDifferent && tr.returnGeo ? tr.returnGeo : null;
@@ -1960,8 +1995,11 @@
                         : [retStart, ret])
                     : [];
 
-                map.fitBounds(L.latLngBounds(pts.concat(retPts, [from, to],
-                                  ret ? [ret] : [], rgf ? [retStart] : [])),
+                const allPts = pts.concat(retPts,
+                    hasMain ? [from, to] : [],
+                    ret ? [ret] : [], (rgf && retStart) ? [retStart] : [],
+                    legPts.reduce((acc, l) => acc.concat([l.a, l.b]), []));
+                map.fitBounds(L.latLngBounds(allPts),
                               { padding: [46, 46], maxZoom: 15, animate: false });
 
                 // รอ tile โหลดครบจริงๆ ไม่ใช่เดาเวลา
@@ -2014,7 +2052,7 @@
                         });
                     ctx.setLineDash([]);
                 };
-                drawLine(pts, '#2563eb', hasPath);
+                if (hasMain) drawLine(pts, '#2563eb', hasPath);
 
                 const drawPin = (ll, color, letter) => {
                     const [x, y] = P(ll);
@@ -2033,11 +2071,28 @@
                     ctx.fillText(letter, x, y + SCALE * 0.5);
                 };
                 if (retPts.length > 1) drawLine(retPts, '#7c3aed', !!(tr.returnPath && tr.returnPath.length > 1));
-                drawPin(from, '#059669', 'A');
-                drawPin(to,   '#e11d48', 'B');
+
+                /* เส้นของเที่ยว Taxi — เส้นประเสมอ เพราะเราไม่ได้เก็บเส้นทางถนนจริงของเที่ยว
+                   ลากตรงระหว่างสองหมุด เส้นประบอกผู้อ่านเองว่าไม่ใช่เส้นทางที่รถวิ่งจริง
+                   หมายเลขบนหมุดตรงกับลำดับเที่ยวในใบรับรอง จะได้ไล่ดูทีละเที่ยวได้ */
+                legPts.forEach(function (l, i) {
+                    const col = DOC_TAXI_COLORS[i % DOC_TAXI_COLORS.length];
+                    drawLine([l.a, l.b], col.line, false);
+                });
+
+                if (hasMain) {
+                    drawPin(from, '#059669', 'A');
+                    drawPin(to,   '#e11d48', 'B');
+                }
                 // จุดเริ่มต้นขากลับได้หมุดของตัวเองเฉพาะเมื่อไม่ใช่จุดหมายขาไป
                 if (rgf) drawPin(retStart, '#a855f7', 'C');
                 if (ret) drawPin(ret, '#7c3aed', rgf ? 'D' : 'C');
+
+                legPts.forEach(function (l, i) {
+                    const col = DOC_TAXI_COLORS[i % DOC_TAXI_COLORS.length];
+                    drawPin(l.a, col.from, String(i + 1));
+                    drawPin(l.b, col.to,   String(i + 1));
+                });
 
                 return out.toDataURL('image/jpeg', 0.9);
             } catch (e) {
@@ -2078,8 +2133,9 @@
         }
 
         /** สร้างหน้าแผนที่สำหรับแทรกในเอกสาร */
-        function buildMapPageHtml(imgData, tr, km) {
+        function buildMapPageHtml(imgData, tr, km, taxiLegs) {
             if (!imgData) return '';
+            const legs = Array.isArray(taxiLegs) ? taxiLegs : [];
             const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g,
                 c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
             const lvl = { exact: 'ตำแหน่งยืนยันโดยผู้ใช้', search: 'ค้นหาจากชื่อสถานที่',
@@ -2118,6 +2174,21 @@
                         <td style="border:1px solid #cbd5e1;padding:7px 10px;">${esc((tr.toGeo && tr.toGeo.label) || tr.to || '-')}
                             <span style="color:#64748b;">— ${esc(p(tr.toGeo))}</span></td>
                     </tr>
+                    ${legs.map(function (e, i) {
+                        /* 21 ต.ค. 2569 — หมุดของเที่ยว Taxi มีเลขกำกับบนแผนที่
+                           ต้องมีบรรทัดบอกว่าเลขไหนคือเที่ยวไหน ไม่งั้นดูแผนที่แล้วเดาไม่ออก
+                           สีตรงกับหมุดบนแผนที่และกับที่เห็นตอนกรอก */
+                        const col = DOC_TAXI_COLORS[i % DOC_TAXI_COLORS.length];
+                        const a = (e.from || (e.fromGeo && e.fromGeo.label) || '-');
+                        const b = (e.to   || (e.toGeo   && e.toGeo.label)   || '-');
+                        return `
+                    <tr>
+                        <td style="border:1px solid #cbd5e1;padding:7px 10px;background:#f8fafc;">
+                            <b style="color:${col.line};">${i + 1}</b> เที่ยว Taxi</td>
+                        <td style="border:1px solid #cbd5e1;padding:7px 10px;">${esc(a)} → ${esc(b)}
+                            <span style="color:#64748b;">— ${esc(e.direction || '')}</span></td>
+                    </tr>`;
+                    }).join('')}
                     ${(tr.returnDifferent && (tr.returnTo || (tr.returnGeo && tr.returnGeo.label))) ? `
                     <tr>
                         <td style="border:1px solid #cbd5e1;padding:7px 10px;background:#f8fafc;">

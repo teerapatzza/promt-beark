@@ -269,6 +269,86 @@ try {
      offDoc.html.indexOf('MAPSTUB') < 0, 'ไม่มีหน้าแผนที่');
 
   console.log('');
+  console.log('═══ 9. แผนที่ในเอกสารต้องวาดทุกเที่ยว ไม่ใช่เส้นเดียว ═══');
+  /* 21 ต.ค. 2569 — เจ้าของงานกรอก Taxi 5 เที่ยว เห็นครบ 5 เส้นบนหน้ากรอก
+     แต่พอกดพิมพ์ แผนที่ในเอกสารมีเส้นเดียว
+     ต้นเหตุ: renderRouteMapImage รู้จักแต่เส้นทางหลัก ไม่เคยรับเที่ยว Taxi เข้าไปเลย */
+  const legFive = n => Array.from({ length: n }, (_, i) => ({
+    date: '2026-10-22', direction: i === 0 ? 'ขาไป' : 'ขากลับ', amount: 50 + i,
+    from: 'ต้นทาง ' + (i + 1), to: 'ปลายทาง ' + (i + 1),
+    fromGeo: { lat: 13.60 + i * 0.05, lng: 100.50 + i * 0.03 },
+    toGeo:   { lat: 13.70 + i * 0.05, lng: 100.60 + i * 0.03 }
+  }));
+  const mapOf = async (entries, withMainPins) => {
+    const rec = mkRec(entries, 260);
+    rec.inputMetadata._pdfTemplates = ['TRANSPORT_RECEIPT'];
+    if (withMainPins) {
+      rec.inputMetadata._travel.fromGeo = { lat: 13.60, lng: 100.53, precision: 'exact' };
+      rec.inputMetadata._travel.toGeo   = { lat: 13.91, lng: 100.60, precision: 'exact' };
+    }
+    return ev([
+      "const rec = " + JSON.stringify(rec) + ";",
+      "const legs = taxiLegsWithPins(rec.inputMetadata);",
+      // ดักตัววาดเส้นและหมุด นับว่าถูกเรียกกี่ครั้งและสีอะไร แทนการอ่านพิกเซลจากภาพ
+      "window.__lines = []; window.__pins = [];",
+      "const realRender = renderRouteMapImage;",
+      "return { legs: legs.length,",
+      "         hasRenderer: typeof realRender === 'function',",
+      "         page: buildMapPageHtml('data:image/png;base64,X', rec.inputMetadata._travel, 10, legs) };"
+    ].join(NL));
+  };
+
+  const five = await mapOf(legFive(5), true);
+  ok('อ่านเที่ยวที่ปักหมุดครบทั้ง 5 เที่ยว', five.legs === 5, five.legs + ' เที่ยว');
+  ok('ตารางใต้แผนที่ลงครบทั้ง 5 เที่ยว',
+     (five.page.match(/เที่ยว Taxi/g) || []).length === 5,
+     (five.page.match(/เที่ยว Taxi/g) || []).length + ' แถว');
+  ok('แต่ละเที่ยวใช้คนละสี ตรงกับหมุดบนแผนที่',
+     new Set((five.page.match(/color:#[0-9a-f]{6}/g) || [])
+       .filter(c => !/#059669|#e11d48|#7c3aed/.test(c))).size >= 5,
+     [...new Set((five.page.match(/color:#[0-9a-f]{6}/g) || []))].join(' '));
+
+  const noMain = await mapOf(legFive(3), false);
+  ok('ใบที่เบิกเฉพาะ Taxi (ไม่มีหมุดเส้นทางหลัก) ก็ยังอ่านเที่ยวได้',
+     noMain.legs === 3, noMain.legs + ' เที่ยว');
+
+  const noPins = await mapOf([{ date: '2026-10-22', direction: 'ขาไป', amount: 90,
+                                from: 'ก', to: 'ข' }], true);
+  ok('เที่ยวที่ยังไม่ปักหมุด ไม่ถูกนับ (วาดไม่ได้อยู่แล้ว)',
+     noPins.legs === 0, noPins.legs + ' เที่ยว');
+
+  console.log('');
+  console.log('═══ 10. เรียกตัววาดแผนที่จริง ภาพที่ได้ต้องต่างกันเมื่อมีเที่ยว Taxi ═══');
+  /* ข้อ 9 ตรวจแค่ตารางใต้แผนที่ ซึ่งยังไม่พิสูจน์ว่า "เส้นถูกวาดลงภาพ"
+     ข้อนี้เรียกตัววาดจริงสองครั้ง ต่างกันแค่มี/ไม่มีเที่ยว Taxi
+     ถ้าเส้นถูกวาดจริง ภาพสองใบต้องไม่เหมือนกัน */
+  /* ตอนต้นเทสต์มีการวาง renderRouteMapImage ตัวปลอมไว้ (คืนสตริง MAPSTUB)
+     ถ้าไม่โหลดหน้าใหม่ ข้อนี้จะไปเรียกตัวปลอมแล้วได้ภาพเท่ากันทั้งสองครั้ง
+     ซึ่งเป็น "เขียวหลอก" กลับด้าน — ตกทั้งที่โค้ดจริงถูก (เจอจริงตอนรันครั้งแรก) */
+  await send('Page.navigate', { url: APP + '/history.html' });
+  await sleep(5000);
+
+  const drawReal = await ev([
+    "const tr = { fromGeo:{lat:13.60,lng:100.53}, toGeo:{lat:13.91,lng:100.60},",
+    "             from:'บ้าน', to:'ดอนเมือง' };",
+    "const legs = " + JSON.stringify(
+      [{ fromGeo: { lat: 13.62, lng: 100.45 }, toGeo: { lat: 13.75, lng: 100.70 } },
+       { fromGeo: { lat: 13.70, lng: 100.40 }, toGeo: { lat: 13.85, lng: 100.65 } },
+       { fromGeo: { lat: 13.66, lng: 100.58 }, toGeo: { lat: 13.80, lng: 100.48 } }]) + ";",
+    "const a = await renderRouteMapImage(tr, []);",
+    "const b = await renderRouteMapImage(tr, legs);",
+    "const onlyLegs = await renderRouteMapImage({}, legs);",
+    "return { hasA: !!a, hasB: !!b, same: a === b, hasOnlyLegs: !!onlyLegs,",
+    "         lenA: a ? a.length : 0, lenB: b ? b.length : 0 };"
+  ].join(NL));
+  ok('วาดแผนที่ของเส้นทางหลักได้', drawReal.hasA === true);
+  ok('วาดแผนที่ตอนมีเที่ยว Taxi ได้', drawReal.hasB === true);
+  ok('ภาพต่างกันจริง — แปลว่าเส้นของเที่ยว Taxi ถูกวาดลงไป',
+     drawReal.same === false, 'ขนาดภาพ ' + drawReal.lenA + ' vs ' + drawReal.lenB);
+  ok('ใบที่ไม่มีหมุดเส้นทางหลักเลย ก็ยังได้แผนที่จากเที่ยว Taxi',
+     drawReal.hasOnlyLegs === true);
+
+  console.log('');
   ok('ไม่มี JavaScript error ตลอดการทดสอบ', pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '));
 
   console.log('');
