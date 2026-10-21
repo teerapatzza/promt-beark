@@ -38,6 +38,11 @@ const results = [];
 const ok = (n, pass, d = '') => { results.push(pass);
   console.log((pass ? '  ผ่าน  ' : '  ตก    ') + n + (d ? '  -> ' + d : '')); };
 
+/* ขึ้นบรรทัดใหม่แบบไม่ต้องเขียน escape ในสตริง
+   เครื่องมือแก้ไฟล์ของสภาพแวดล้อมนี้เคยทำ \n ในสตริงพังมาหลายครั้ง
+   เก็บไว้เป็นค่าคงที่แทน จะได้ไม่ต้องไล่ซ่อมอีก */
+const NEWLINE = String.fromCharCode(10);
+
 /** ใบเบิกจำลอง — เปลี่ยนเฉพาะวิธีคิดค่าพาหนะ ส่วนอื่นเหมือนกันทุกใบ */
 const mkRecord = (costs, extra) => ({
   id: 9101, requestedBy: 'ธีรภัทร คุ้มวงษ์', amount: 1100,
@@ -77,6 +82,31 @@ const READ_ROWS = [
   "  return out;",
   "}"
 ].join('\n');
+
+/** อ่านใบรับรองแทนใบเสร็จ (FM-SAM-095-00): ติ๊กช่องไหน ยอดอยู่บล็อกไหน
+ *  - หัวบรรทัด "ค่า Taxi" กับ "ค่าน้ำมันเชื้อเพลิง" ติ๊กด้วย ☑ / ☐
+ *  - บล็อก Taxi  = ตั้งแต่หัว Taxi ถึงก่อนหัวค่าน้ำมัน
+ *  - บล็อกน้ำมัน = ตั้งแต่หัวค่าน้ำมันลงไปจนจบใบ
+ *  หมายเหตุ: rcFromTo ซ้อนตารางไว้ข้างใน จึงอ่านเป็นข้อความทั้งแถว ไม่ไล่ช่อง */
+const READ_RC = [
+  "window.renderRouteMapImage = async () => null;",
+  "async function readRc(rec) {",
+  "  const b = await buildDocumentHtml(rec, function(){});",
+  "  const d = document.createElement('div'); d.innerHTML = b.html;",
+  "  const rows = [...d.querySelectorAll('tr')]",
+  "    .map(tr => (tr.textContent || '').replace(/\s+/g, ' ').trim());",
+  "  const iTaxi = rows.findIndex(t => t.indexOf('ค่า Taxi') >= 0);",
+  "  const iFuel = rows.findIndex(t => t.indexOf('ค่าน้ำมันเชื้อเพลิง') >= 0);",
+  "  if (iTaxi < 0 || iFuel < 0) throw new Error('หาแถวใบรับรองไม่เจอ');",
+  "  return {",
+  "    taxiHead: rows[iTaxi], fuelHead: rows[iFuel],",
+  "    taxiTick: rows[iTaxi].indexOf('\u2611') >= 0,",
+  "    fuelTick: rows[iFuel].indexOf('\u2611') >= 0,",
+  "    taxiBlock: rows.slice(iTaxi, iFuel).join(' | '),",
+  "    fuelBlock: rows.slice(iFuel).join(' | ')",
+  "  };",
+  "}"
+].join(NEWLINE);
 
 try {
   let u;
@@ -158,52 +188,49 @@ try {
   ok('2.2 ยังว่าง', !both['2.2'], String(both['2.2'] ?? 'ว่าง'));
 
   console.log('');
-  console.log('═══ 5. ใบรับรองค่าพาหนะ: เหมาจ่ายติ๊กช่อง "ค่า Taxi" และบอกจาก-ถึง ═══');
-
-  /* 20 ต.ค. 2569 — เจ้าของงานเปิดเอกสารจริงแล้วทักสองเรื่อง
-       ก. ใบเหมาจ่ายไม่มีข้อมูลว่าจากไหนไปไหน
-       ข. ให้ติ๊กลงช่อง "ค่า Taxi" ไม่ใช่ "ค่าน้ำมันเชื้อเพลิง"
-     ก. เกิดเพราะบรรทัด จาก/ถึง ผูกกับ carType แต่ยอดเงินไม่ผูก
-     ใบที่ carType เป็น "ไม่ระบุ" จึงพิมพ์ยอดโดยไม่มีทั้งติ๊กและต้นทางปลายทาง */
-  const READ_RC = [
-    "window.renderRouteMapImage = async () => null;",
-    "async function readRc(rec) {",
-    "  const b = await buildDocumentHtml(rec, function(){});",
-    "  const d = document.createElement('div'); d.innerHTML = b.html;",
-    "  const rows = [...d.querySelectorAll('tr')].map(tr =>",
-    "    [...tr.querySelectorAll('td')].map(x => (x.textContent||'').replace(/\s+/g,' ').trim()));",
-    "  const find = word => rows.findIndex(r => r.some(c => c.indexOf(word) >= 0));",
-    "  const iTaxi = find('ค่า Taxi'), iFuel = find('ค่าน้ำมันเชื้อเพลิง');",
-    "  const tick = i => i < 0 ? null : rows[i].join(' ').indexOf('☑') >= 0;",
-    "  const txt  = i => i < 0 ? '' : rows[i].join(' | ');",
-    "  return { taxiTick: tick(iTaxi), fuelTick: tick(iFuel),",
-    "           taxiHead: txt(iTaxi), fuelHead: txt(iFuel),",
-    "           taxiBlock: rows.slice(iTaxi+1, iFuel).map(r => r.join(' | ')).join('  //  '),",
-    "           fuelBlock: rows.slice(iFuel+1, iFuel+6).map(r => r.join(' | ')).join('  //  ') };",
-    "}"
-  ].join('\n');
-
-  const rcFlat = await ev(READ_RC + '\nreturn await readRc(' + JSON.stringify(flatRec) + ');');
-  ok('ติ๊กช่อง "ค่า Taxi"', rcFlat.taxiTick === true, rcFlat.taxiHead.slice(0, 70));
-  ok('ไม่ติ๊กช่อง "ค่าน้ำมันเชื้อเพลิง"', rcFlat.fuelTick === false, rcFlat.fuelHead.slice(0, 70));
-  /* วัดจากทั้งบล็อกใต้หัวข้อ ไม่นับทีละแถว เพราะ rcFromTo สร้างตารางซ้อน
-     ดัชนีแถวจึงไม่ตรงกับบรรทัดที่เห็นบนกระดาษ (ตัววัดตัวแรกผิดแบบนี้) */
-  const blk = rcFlat.taxiBlock;
-  ok('บล็อกค่า Taxi มีต้นทางและปลายทาง',
-     /บ้าน/.test(blk) && /ดอนเมือง/.test(blk), blk.slice(0, 100));
-  ok('มียอดรายขาสองก้อน ก้อนละ 550',
-     (blk.match(/550\.00/g) || []).length === 2,
-     (blk.match(/550\.00/g) || []).length + ' ก้อน');
-  ok('มีวันที่ทั้งขาไปและขากลับ',
-     /20\/10\/2569/.test(blk) && /22\/10\/2569/.test(blk), blk.slice(0, 120));
-  ok('บล็อกค่าน้ำมันไม่มียอดซ้ำ',
-     !/550\.00/.test(rcFlat.fuelBlock), rcFlat.fuelBlock.slice(0, 80));
-
   console.log('');
   console.log('═══ 6. ใบคิดตามระยะจริง ยังติ๊กช่องค่าน้ำมันเหมือนเดิม ═══');
   const rcDist = await ev(READ_RC + '\nreturn await readRc(' + JSON.stringify(distRec) + ');');
   ok('ติ๊กช่อง "ค่าน้ำมันเชื้อเพลิง"', rcDist.fuelTick === true, rcDist.fuelHead.slice(0, 70));
   ok('ไม่ติ๊กช่อง "ค่า Taxi" เพราะไม่ได้นั่ง Taxi', rcDist.taxiTick === false, rcDist.taxiHead.slice(0, 70));
+
+  console.log('');
+  console.log('=== 7. เหมาจ่าย + ขับรถเอง ต้องติ๊กช่องค่าน้ำมัน ไม่ใช่ Taxi ===');
+
+  /* 21 ต.ค. 2569 — ผู้ใช้แจ้งใบจริงของ รศ.นพ.ปิยะ (ใบที่ 91)
+     เลือกรถส่วนตัว + เหมาจ่าย แต่ใบที่พิมพ์ไปติ๊กช่อง Taxi
+     ข้อมูลจริงในใบ: _carType = "ไป-กลับ" · taxiEntries = []
+     เจ้าของงานสั่งว่า "เหมาจ่ายแยกเป็น 2 กรณีเหมือนเดิม taxi หรือค่าน้ำมัน
+     ถ้าเขาติ๊กอะไร ในใบ pdf ก็ไปติ๊กตรงนั้น" */
+  const carFlat = await ev(READ_RC + NEWLINE + 'return await readRc(' + JSON.stringify(flatRec) + ');');
+  ok('ขับรถเอง: ติ๊กช่องค่าน้ำมันเชื้อเพลิง', carFlat.fuelTick === true, carFlat.fuelHead.slice(0, 70));
+  ok('ขับรถเอง: ไม่ติ๊กช่อง Taxi', carFlat.taxiTick === false, carFlat.taxiHead.slice(0, 70));
+  ok('ยอดเหมาจ่ายอยู่ในบล็อกค่าน้ำมัน',
+     (carFlat.fuelBlock.match(/550\.00/g) || []).length === 2,
+     (carFlat.fuelBlock.match(/550\.00/g) || []).length + ' ก้อน');
+  ok('บล็อก Taxi ไม่มียอดซ้ำ',
+     !/550\.00/.test(carFlat.taxiBlock), carFlat.taxiBlock.slice(0, 70));
+  ok('ยังบอกว่าเป็นเหมาจ่ายและช่วงระยะทาง',
+     /เหมาจ่าย/.test(carFlat.taxiBlock + carFlat.fuelBlock)
+     && /41\.00 - 50\.99/.test(carFlat.taxiBlock + carFlat.fuelBlock));
+
+  console.log('');
+  console.log('=== 8. เหมาจ่าย + นั่ง Taxi ต้องติ๊กช่อง Taxi ===');
+  const taxiFlatRec = mkRecord(Object.assign({}, BASE, {
+    taxiEntries: [{ date: '2026-10-20', direction: 'ขาไป',   amount: 0 },
+                  { date: '2026-10-22', direction: 'ขากลับ', amount: 0 }]
+  }), Object.assign({}, { _carType: 'ไม่ระบุ' }, {
+    _fuelMethod: 'flat',
+    _flatRate: { total: 1100, legs: [
+      { dir: 'ขาไป',   km: 110, amount: 550, label: 'ระยะทาง 41.00 - 50.99 กม.' },
+      { dir: 'ขากลับ', km: 110, amount: 550, label: 'ระยะทาง 41.00 - 50.99 กม.' } ] }
+  }));
+  const taxiFlat = await ev(READ_RC + NEWLINE + 'return await readRc(' + JSON.stringify(taxiFlatRec) + ');');
+  ok('นั่ง Taxi: ติ๊กช่อง Taxi', taxiFlat.taxiTick === true, taxiFlat.taxiHead.slice(0, 70));
+  ok('นั่ง Taxi: ไม่ติ๊กช่องค่าน้ำมัน', taxiFlat.fuelTick === false, taxiFlat.fuelHead.slice(0, 70));
+  ok('ยอดเหมาจ่ายอยู่ในบล็อก Taxi',
+     (taxiFlat.taxiBlock.match(/550\.00/g) || []).length === 2,
+     (taxiFlat.taxiBlock.match(/550\.00/g) || []).length + ' ก้อน');
 
   ok('ไม่มี JavaScript error ตลอดการทดสอบ', pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '));
 

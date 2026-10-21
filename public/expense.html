@@ -1280,7 +1280,47 @@
         ret:  { color: '#7c3aed', tip: 'ปลายทางขากลับ (ลากได้)' },
         retfrom: { color: '#a855f7', tip: 'จุดเริ่มต้นขากลับ (ลากได้)' }
     };
-    const getGeo = w => w === 'from' ? geoFrom : w === 'to' ? geoTo : w === 'retfrom' ? geoRetFrom : geoRet;
+    /* ══════════ ช่อง จาก/ถึง ของแถว Taxi ใช้ตัวค้นหาตัวเดียวกับเส้นทางหลัก ══════════
+       21 ต.ค. 2569 — เจ้าของงานสั่งว่า "ก็เหมือนช่องค้นหาไปกลับเหมือนน้ำมันไม่ได้หรอ
+       ทำไมต้องทำให้มันต่าง" และก่อนหน้านั้น "เป็นช่องเสริชแล้วแต่ว่าไม่มีหมุด"
+
+       ของเดิมเขียนตัวค้นหาไว้อีกตัวต่างหาก จึงขาดสองอย่างที่ช่องน้ำมันมี
+         ก. ไม่มีรายการ "คุณหมายถึง" ระหว่างพิมพ์
+         ข. พิมพ์เองแล้วไม่กดเลือกจากรายการ = ไม่มีหมุด และหน้าจอไม่บอกอะไรเลย
+       ตรงกับที่ผู้ใช้เจอพอดี
+
+       ใช้ตัวเดียวกันได้ ขอแค่ "ปลายทางของหมุด" ต่างกัน จึงเก็บช่องของแถว Taxi
+       ไว้ในทะเบียนนี้ แล้วส่งกุญแจ 'taxi:n' แทนชื่อขา ('from'/'to'/...)
+       ฟังก์ชันที่เกี่ยวกับหมุดทุกตัวเช็คทะเบียนนี้ก่อนเป็นอย่างแรก
+
+       หมุดของแถว Taxi เก็บที่ช่องตัวเอง ไม่แตะ geoFrom/geoTo ซึ่งเป็นฐานคิด
+       ค่าน้ำมันและเหมาจ่าย ถ้าไปทับกันเมื่อไหร่ เงินเพี้ยนทั้งใบ
+       ส่วนค่าโดยสารยังมาจากมิเตอร์ที่ผู้ใช้กรอกเท่านั้น ไม่เกี่ยวกับหมุดเลย */
+    const TAXI_SINKS = new Map();
+    let _taxiSinkSeq = 0;
+    function taxiSinkKey(input) {
+        if (!input.dataset.sinkKey) input.dataset.sinkKey = 'taxi:' + (++_taxiSinkSeq);
+        TAXI_SINKS.set(input.dataset.sinkKey, input);
+        return input.dataset.sinkKey;
+    }
+    const taxiSinkInput = w =>
+        (typeof w === 'string' && w.slice(0, 5) === 'taxi:') ? (TAXI_SINKS.get(w) || null) : null;
+
+    /** ข้อความบอกสถานะหมุดใต้ช่องของแถว Taxi — คู่กับ fromHint/toHint ของเส้นทางหลัก */
+    function taxiPinHint(input, html) {
+        const cell = input.closest('div.relative')?.parentElement;
+        const el = cell?.querySelector('.taxi-pin-hint');
+        if (el) el.innerHTML = html;
+    }
+
+    const getGeo = w => {
+        const ti = taxiSinkInput(w);
+        if (ti) return (ti.dataset.lat && ti.dataset.lng)
+            ? { lat: parseFloat(ti.dataset.lat), lng: parseFloat(ti.dataset.lng),
+                label: ti.value.trim(), precision: 'search', source: 'taxi' }
+            : null;
+        return w === 'from' ? geoFrom : w === 'to' ? geoTo : w === 'retfrom' ? geoRetFrom : geoRet;
+    };
     const setGeo = (w, v) => { if (w === 'from') geoFrom = v; else if (w === 'to') geoTo = v;
                                else if (w === 'retfrom') geoRetFrom = v; else geoRet = v; };
     const getMk  = w => w === 'from' ? mFrom : w === 'to' ? mTo : w === 'retfrom' ? mRetFrom : mRet;
@@ -1288,6 +1328,19 @@
                                else if (w === 'retfrom') mRetFrom = v; else mRet = v; };
 
     function setPoint(which, lat, lng, label, precision, source) {
+        /* แถว Taxi ไม่มีหมุดบนแผนที่เส้นทางหลัก ถ้าปล่อยให้ไหลลงไปถึง setGeo
+           หมุดของเที่ยว Taxi จะไปทับเส้นทางหลัก แล้วค่าน้ำมันเพี้ยนทั้งใบ */
+        const ti = taxiSinkInput(which);
+        if (ti) {
+            ti.dataset.lat = lat; ti.dataset.lng = lng;
+            ti.dataset.touched = '1';          // ยืนยันเองแล้ว เส้นทางหลักห้ามมาเขียนทับ
+            if (label) ti.value = label;
+            taxiPinHint(ti, '<span class="text-emerald-700">ปักหมุดที่ <b>'
+                + escHtml(label || ti.value) + '</b> แล้ว</span>');
+            const row = ti.closest('.taxi-entry');
+            if (row) refreshTaxiLegNote(row);
+            return;
+        }
         initRouteMap();
         const ll = L.latLng(lat, lng);
         const cfg = PT[which] || PT.to;
@@ -1749,8 +1802,6 @@
          ก. ให้ชื่อสถานที่ถูกต้องตอนพิมพ์ลงเอกสาร
          ข. บอกระยะทางของเที่ยวนั้นให้ผู้ใช้เห็น
        เงินยังเป็นค่าโดยสารที่ผู้ใช้กรอกตามมิเตอร์เสมอ ไม่ถูกแตะเลย        */
-    let _taxiSugSeq = 0;
-
     function taxiSugBox(input) {
         return input.parentElement?.querySelector('.taxi-sug') || null;
     }
@@ -1772,63 +1823,31 @@
         } catch (e) { note.textContent = ''; }
     }
 
+    /* คิดระยะทางใหม่เฉพาะตอนหมุดคู่นี้เปลี่ยนจริง
+       syncTaxiRoutes ถูกเรียกทุกครั้งที่เส้นทางหลักขยับ ถ้าไม่กันไว้
+       จะยิงหาเส้นทางซ้ำ ๆ ทั้งที่หมุดเดิมทั้งคู่ */
+    function refreshTaxiLegNote(row) {
+        const f = row.querySelector('.taxi-from'), t = row.querySelector('.taxi-to');
+        const sig = [f?.dataset.lat, f?.dataset.lng, t?.dataset.lat, t?.dataset.lng].join(',');
+        if (row.dataset.pinSig === sig) return;
+        row.dataset.pinSig = sig;
+        updateTaxiLegNote(row);
+    }
+
     function attachTaxiPlaceSearch(input) {
-        if (!input || input.dataset.searchOn) return;
-        input.dataset.searchOn = '1';
+        if (!input) return;
         const box = taxiSugBox(input);
         if (!box) return;
-        let timer = null;
-
-        const close = () => box.classList.add('hidden');
-        document.addEventListener('click', e => {
-            if (!input.contains(e.target) && !box.contains(e.target)) close();
-        });
-
-        input.addEventListener('input', function () {
+        attachSearchTo(input, box, taxiSinkKey(input), function () {
             // พิมพ์เองแล้ว = ไม่ให้เส้นทางหลักมาเขียนทับอีก (กติกาเดิมของ syncTaxiRoutes)
             this.dataset.touched = '1';
-            // พิมพ์ใหม่ = พิกัดเดิมใช้ไม่ได้แล้ว ต้องเลือกจากรายการอีกครั้ง
+            // พิมพ์ใหม่ = พิกัดเดิมเป็นของชื่อเก่า ใช้ไม่ได้แล้ว
             delete this.dataset.lat; delete this.dataset.lng;
             const row = this.closest('.taxi-entry');
-            if (row) { const n = row.querySelector('.taxi-leg-note'); if (n) n.textContent = ''; }
-
-            clearTimeout(timer);
-            const q = this.value.trim();
-            if (q.length < 2) return close();
-            const my = ++_taxiSugSeq;
-            box.classList.remove('hidden');
-            box.innerHTML = '<div class="p-2 text-xs text-slate-500">กำลังค้นหา...</div>';
-
-            timer = setTimeout(async () => {
-                const r = await placeSearch(q);
-                if (my !== _taxiSugSeq) return;
-                const list = (r.data || []).slice(0, 6);
-                if (!list.length) {
-                    box.innerHTML = '<div class="p-2 text-xs text-slate-500">ไม่พบ "'
-                        + escHtml(q) + '" — พิมพ์ชื่อหลักสั้น ๆ ดูอีกครั้ง</div>';
-                    return;
-                }
-                box.innerHTML = list.map((p, i) =>
-                    '<button type="button" data-i="' + i + '" class="w-full text-left px-2.5 py-1.5 '
-                    + 'hover:bg-blue-50 text-xs border-b border-slate-100 last:border-0">'
-                    + '<div class="font-semibold text-slate-700">' + escHtml(p.name || '') + '</div>'
-                    + (p.address ? '<div class="text-[10px] text-slate-400">'
-                        + escHtml(p.address) + '</div>' : '')
-                    + '</button>').join('');
-                box.querySelectorAll('button[data-i]').forEach(btn => {
-                    btn.addEventListener('click', async () => {
-                        const p = list[parseInt(btn.dataset.i, 10)];
-                        input.value = p.name || input.value;
-                        input.dataset.touched = '1';
-                        if (p.lat != null && p.lon != null) {
-                            input.dataset.lat = p.lat; input.dataset.lng = p.lon;
-                        }
-                        close();
-                        const row = input.closest('.taxi-entry');
-                        if (row) await updateTaxiLegNote(row);
-                    });
-                });
-            }, 250);
+            if (row) {
+                delete row.dataset.pinSig;
+                const n = row.querySelector('.taxi-leg-note'); if (n) n.textContent = '';
+            }
         });
     }
 
@@ -1985,13 +2004,31 @@
     /** เส้นทางที่แถว Taxi ทิศทางนี้ควรเป็น อ่านจากเส้นทางหลักด้านบน */
     function taxiRouteFor(dir) {
         const v = id => (document.getElementById(id)?.value || '').trim();
-        const out = { from: v('travelFrom'), to: v('travelTo') };
+        /* ดึงหมุดของเส้นทางหลักมาด้วย ไม่ใช่แค่ชื่อ
+           ผู้ใช้สั่งว่า "มันก็ต้องเป็นหมุดเหมือนกรณีเบิกรถปกติสิ"
+           ชื่อกับพิกัดต้องมาคู่กันเสมอ ไม่งั้นป้ายระยะทางจะอ้างหมุดของชื่ออื่น */
+        const g = w => { const p = getGeo(w); return p ? { lat: p.lat, lng: p.lng } : null; };
+        const out = { from: v('travelFrom'), to: v('travelTo'),
+                      fromPin: g('from'), toPin: g('to') };
         // เคสปกติกลับทางเดิม จึงสลับต้นทาง-ปลายทางของขาไป
         // กรณีพิเศษมีช่องขากลับของตัวเอง เว้นว่างไว้ความหมายคือกลับทางเดิม
         const ret = isNormalTrip()
-            ? { from: out.to, to: out.from }
-            : { from: v('travelReturnFrom') || out.to, to: v('travelReturnTo') || out.from };
+            ? { from: out.to, to: out.from, fromPin: out.toPin, toPin: out.fromPin }
+            : { from: v('travelReturnFrom') || out.to,
+                to:   v('travelReturnTo')   || out.from,
+                fromPin: g('retfrom') || out.toPin,
+                toPin:   g('ret')     || out.fromPin };
         return (dir === 'ขากลับ') ? ret : out;
+    }
+
+    /** ใส่ชื่อ + หมุดลงช่องของแถว Taxi พร้อมกัน ห้ามใส่ชื่อโดยไม่ใส่หมุด */
+    function setTaxiField(el, name, pin) {
+        if (!el) return;
+        el.value = name;
+        delete el.dataset.lat; delete el.dataset.lng;
+        if (pin && pin.lat != null && pin.lng != null) {
+            el.dataset.lat = pin.lat; el.dataset.lng = pin.lng;
+        }
     }
 
     /* ══════════ แถว Taxi ตามเส้นทางหลักให้เอง ══════════
@@ -2012,8 +2049,9 @@
             const pick = taxiRouteFor(dir);
             const f = row.querySelector('.taxi-from');
             const t = row.querySelector('.taxi-to');
-            if (f && !f.dataset.touched) f.value = pick.from;
-            if (t && !t.dataset.touched) t.value = pick.to;
+            if (f && !f.dataset.touched) setTaxiField(f, pick.from, pick.fromPin);
+            if (t && !t.dataset.touched) setTaxiField(t, pick.to,   pick.toPin);
+            refreshTaxiLegNote(row);
         });
     }
 
@@ -2028,16 +2066,15 @@
         const t = row.querySelector('.taxi-to');
         // กดปุ่มนี้ = ขอให้กลับไปตามเส้นทางหลัก จึงล้างธง "ผู้ใช้แก้เอง" ด้วย
         // ไม่งั้นกดแล้วเติมให้ครั้งเดียว พอแก้เส้นทางหลักก็ค้างอีก
-        /* ดึงชื่อจากเส้นทางหลักมาเติม พิกัดที่แถวเคยเลือกไว้จึงไม่ใช่ของชื่อใหม่แล้ว
-           ถ้าปล่อยไว้ ป้ายระยะทางจะอ้างพิกัดเก่าที่ไม่ตรงกับชื่อที่เห็น */
-        [f, t].forEach(el => {
-            if (!el) return;
-            delete el.dataset.touched; delete el.dataset.lat; delete el.dataset.lng;
-        });
-        if (f) f.value = pick.from;
-        if (t) t.value = pick.to;
+        /* ดึงทั้งชื่อและหมุดจากเส้นทางหลักมาเติม (setTaxiField ล้างของเก่าให้เอง)
+           ถ้าเอาแต่ชื่อมา ป้ายระยะทางจะอ้างพิกัดเก่าที่ไม่ตรงกับชื่อที่เห็น */
+        [f, t].forEach(el => { if (el) delete el.dataset.touched; });
+        setTaxiField(f, pick.from, pick.fromPin);
+        setTaxiField(t, pick.to,   pick.toPin);
         const legNote = row.querySelector('.taxi-leg-note');
         if (legNote) legNote.textContent = '';
+        delete row.dataset.pinSig;
+        refreshTaxiLegNote(row);
 
         // กระพริบให้เห็นว่าเติมอะไรลงไป ไม่งั้นกดแล้วไม่รู้ว่าเกิดอะไรขึ้น
         [f, t].forEach(el => {
@@ -2370,9 +2407,15 @@
 
     /* ── ช่องค้นหาสถานที่ ── */
     function attachPlaceSearch(inputId, boxId, which) {
-        const input = document.getElementById(inputId);
-        const box   = document.getElementById(boxId);
+        attachSearchTo(document.getElementById(inputId), document.getElementById(boxId), which);
+    }
+
+    /** ตัวค้นหาสถานที่ตัวจริง ใช้ร่วมกันทั้งเส้นทางหลักและแถว Taxi
+     *  onType = งานพิเศษของช่องนั้นตอนผู้ใช้พิมพ์ (แถว Taxi ใช้ล้างหมุดเดิม) */
+    function attachSearchTo(input, box, which, onType) {
         if (!input || !box) return;
+        if (input.dataset.searchOn) return;        // เรียกซ้ำได้ ไม่ติดตัวค้นหาซ้อน
+        input.dataset.searchOn = '1';
         let timer = null;
 
         const close = () => box.classList.add('hidden');
@@ -2384,6 +2427,7 @@
         // ผู้ใช้จะได้ไม่ต้องนั่งรอหน้าจอว่าง และเห็นชื่อที่ถูกต้องให้กดเลือกได้ทันที
         let seq = 0;
         input.addEventListener('input', function () {
+            if (onType) onType.call(this);
             clearTimeout(timer);
             const q = this.value.trim();
             if (q.length < 2) return close();
@@ -2419,6 +2463,8 @@
 
     /** ข้อความใต้ช่องกรอก บอกสถานะของหมุดตรงๆ */
     function pointHint(which, html) {
+        const ti = taxiSinkInput(which);
+        if (ti) return taxiPinHint(ti, html);
         const el = document.getElementById(
             which === 'from' ? 'fromHint' : which === 'to' ? 'toHint'
             : which === 'retfrom' ? 'returnFromHint' : 'returnToHint');
@@ -2426,7 +2472,7 @@
     }
 
     function markUnconfirmed(which) {
-        const inp = document.getElementById(
+        const inp = taxiSinkInput(which) || document.getElementById(
             which === 'from' ? 'travelFrom' : which === 'to' ? 'travelTo'
             : which === 'retfrom' ? 'travelReturnFrom' : 'travelReturnTo');
         const g = getGeo(which);
@@ -2450,7 +2496,8 @@
 
     /** ถ้ามีข้อความแต่ยังไม่มีหมุด ให้ค้นหาแล้วปักหมุดจากผลอันดับแรกให้เลย */
     async function autoResolvePoint(which) {
-        const inp = document.getElementById(
+        const taxiInp = taxiSinkInput(which);
+        const inp = taxiInp || document.getElementById(
             which === 'from' ? 'travelFrom' : which === 'to' ? 'travelTo'
             : which === 'retfrom' ? 'travelReturnFrom' : 'travelReturnTo');
         if (!inp) return;
@@ -2472,6 +2519,16 @@
         if (!hit) {
             // บ้านเลขที่ในซอยมักไม่มีในแผนที่ ถ้าที่ตรงนั้นคือบ้านซึ่งระบบรู้พิกัดอยู่แล้ว
             // ทางออกที่ง่ายที่สุดคือลบข้อความทิ้ง ไม่ใช่ไปลากหมุดหรือกรอกระยะทางเอง
+            /* แถว Taxi ไม่มีแผนที่ให้ลากหมุด และไม่มีช่อง "ขอกรอกเอง"
+               ข้อความของเส้นทางหลักจึงใช้ไม่ได้ ต้องบอกทางออกที่ทำได้จริง */
+            if (taxiInp) {
+                pointHint(which, '<span class="text-rose-600">หาตำแหน่งของ "'
+                    + escHtml(txt) + '" ไม่เจอ</span>'
+                    + '<span class="block text-slate-500">พิมพ์ชื่อหลักสั้น ๆ แล้วกดเลือกจากรายการ '
+                    + 'หรือกด "ใช้เส้นทางหลัก" — ไม่มีหมุดก็ยังเบิกได้ '
+                    + 'เพราะค่าโดยสารคิดจากมิเตอร์ที่กรอกเอง</span>');
+                return;
+            }
             const backToStart = (which === 'ret')
                 ? '<span class="block text-slate-600">ถ้าจะกลับที่จุดเริ่มต้น (บ้าน) '
                   + '<b>ลบข้อความในช่องนี้ออก</b> ระบบจะใช้พิกัดบ้านที่มีอยู่แล้วให้เอง</span>'
@@ -3193,25 +3250,31 @@
                         <option value="ไป-กลับ">ไป-กลับ (แยกยอด)</option>
                     </select>
                 </div>
+                <!-- 21 ต.ค. 2569 — เจ้าของงานสั่งให้ช่องค้นหาของ Taxi หน้าตาเหมือนของค่าน้ำมัน
+                     "ก็เหมือนช่องค้นหาไปกลับเหมือนน้ำมันไม่ได้หรอ ทำไมต้องทำให้มันต่าง"
+                     จึงใช้ป้ายชื่อ สี และขนาดช่องชุดเดียวกับเส้นทางหลักด้านบน
+                     ต่างกันแค่ "วิธีคิดเงิน" ซึ่งของ Taxi คิดจากมิเตอร์ที่กรอกเอง -->
                 <div>
-                    <label class="text-[10px] text-slate-400 font-bold block mb-0.5">จาก</label>
+                    <label class="block text-xs font-bold text-emerald-700 mb-1">จุดเริ่มต้น</label>
                     <div class="relative">
-                        <input type="text" class="taxi-from w-full border border-slate-200 px-2 py-1.5 rounded text-xs outline-none focus:border-blue-400" value="${fromVal}" autocomplete="off" placeholder="พิมพ์ชื่อสถานที่ แล้วเลือกจากรายการ">
-                        <div class="taxi-sug hidden absolute z-[9200] w-full bg-white border border-slate-200 shadow-xl rounded-lg mt-1 max-h-56 overflow-y-auto overscroll-contain"></div>
+                        <input type="text" class="taxi-from w-full border-2 border-white p-3 rounded-lg text-sm shadow-sm focus:border-emerald-400 outline-none" value="${fromVal}" autocomplete="off" placeholder="พิมพ์ชื่อสถานที่ แล้วเลือกจากรายการ">
+                        <div class="taxi-sug hidden absolute z-[9200] w-full bg-white border border-slate-200 shadow-xl rounded-xl mt-1 max-h-64 overflow-y-auto overscroll-contain"></div>
                     </div>
+                    <p class="taxi-pin-hint text-xs text-slate-400 mt-1">ตามเส้นทางหลักด้านบนให้เอง แก้เองได้</p>
                 </div>
                 <div>
-                    <div class="flex items-center justify-between mb-0.5 gap-2">
-                        <label class="text-[10px] text-slate-400 font-bold">ถึง</label>
+                    <div class="flex items-center justify-between mb-1 gap-2">
+                        <label class="text-xs font-bold text-rose-700">จุดที่ลงจากรถ</label>
                         <button type="button" onclick="fillTaxiFromRoute(this)"
-                            class="taxi-use-route text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline whitespace-nowrap"
+                            class="taxi-use-route text-[11px] font-bold text-blue-600 hover:text-blue-800 hover:underline whitespace-nowrap"
                             title="ดึงต้นทาง-ปลายทางจากเส้นทางหลักด้านบนมาเติมให้">ใช้เส้นทางหลัก</button>
                     </div>
                     <div class="relative">
-                        <input type="text" class="taxi-to w-full border border-slate-200 px-2 py-1.5 rounded text-xs outline-none focus:border-blue-400" value="${toVal}" autocomplete="off" placeholder="พิมพ์ชื่อสถานที่ แล้วเลือกจากรายการ">
-                        <div class="taxi-sug hidden absolute z-[9200] w-full bg-white border border-slate-200 shadow-xl rounded-lg mt-1 max-h-56 overflow-y-auto overscroll-contain"></div>
+                        <input type="text" class="taxi-to w-full border-2 border-white p-3 rounded-lg text-sm shadow-sm focus:border-rose-400 outline-none" value="${toVal}" autocomplete="off" placeholder="พิมพ์ชื่อสถานที่ แล้วเลือกจากรายการ">
+                        <div class="taxi-sug hidden absolute z-[9200] w-full bg-white border border-slate-200 shadow-xl rounded-xl mt-1 max-h-64 overflow-y-auto overscroll-contain"></div>
                     </div>
-                    <p class="taxi-leg-note text-[10px] text-slate-400 mt-1"></p>
+                    <p class="taxi-pin-hint text-xs text-slate-400 mt-1">ตามเส้นทางหลักด้านบนให้เอง แก้เองได้</p>
+                    <p class="taxi-leg-note text-[11px] text-slate-500 mt-1"></p>
                 </div>
             </div>
             <div class="flex items-end gap-2">
@@ -3292,7 +3355,12 @@
     }
 
     function removeTaxiEntry(btn) {
-        btn.closest('.taxi-entry').remove();
+        const row = btn.closest('.taxi-entry');
+        // ถอนช่องของแถวนี้ออกจากทะเบียนหมุดด้วย ไม่งั้นทะเบียนจะอ้างช่องที่ถูกลบไปแล้ว
+        row.querySelectorAll('.taxi-from, .taxi-to').forEach(el => {
+            if (el.dataset.sinkKey) TAXI_SINKS.delete(el.dataset.sinkKey);
+        });
+        row.remove();
         calculateTravelTotal();
     }
 
@@ -5106,6 +5174,26 @@
             // เปิดใบเดิมมาแก้ ต้องติ๊กการ์ดต่อขาให้ตรงกับที่บันทึกไว้
             // ตั้งค่าตรงๆ ไม่เรียก onLegModeChange เพราะฟังก์ชันนั้นจะล้างรายการที่เพิ่งกู้คืนมา
             syncLegCardsFromForm();
+
+            /* ══════════ คืนวิธีคิดค่าพาหนะ ══════════
+               21 ต.ค. 2569 — ผู้ใช้แจ้งว่า "กด edit รายการมันไม่ได้เซฟในอันที่อัปเดตล่าสุด
+               มันจะบั๊กกลับไปที่ยังไม่เหมาจ่าย"
+
+               _fuelMethod กับ _flatRate ถูกบันทึกลงใบตั้งแต่แรก แต่ไม่เคยมีโค้ดอ่านกลับ
+               เปิดใบมาแก้จึงได้ค่าเริ่มต้นเป็น "คิดตามระยะจริง" เสมอ
+               วัดกับใบจริงของ รศ.นพ.ปิยะ (ใบที่ 91): เก็บไว้ 500 บาทแบบเหมาจ่าย
+               เปิดมาแก้กลายเป็น 155 บาท และถ้ากดบันทึกทับจะเขียน distance ทับของเดิม
+               เงินหายไป 345 บาทโดยไม่มีใครรู้ตัว
+
+               ต้องคืนหลัง syncLegCardsFromForm() เพราะหมวดกับติ๊กการ์ดต้องพร้อมก่อน
+               ไม่งั้น applyCategoryFlatRate() จะรีเซ็ตกลับเป็น distance ทับอีกรอบ */
+            const savedMethod = meta._fuelMethod === 'flat' ? 'flat' : 'distance';
+            const methodRadio = document.querySelector(
+                'input[name="fuelMethod"][value="' + savedMethod + '"]');
+            if (methodRadio) {
+                methodRadio.checked = true;
+                if (typeof onFuelMethodChange === 'function') onFuelMethodChange();
+            }
 
             // Extra bottom entries
             document.getElementById('extraAddrLine').value = meta._extraAddr || '';

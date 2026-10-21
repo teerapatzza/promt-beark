@@ -170,20 +170,82 @@ try {
      e2.total === 380, e2.total + ' บาท');
 
   console.log('');
-  console.log('═══ 6. กด "ใช้เส้นทางหลัก" ต้องล้างหมุดเก่าของแถวด้วย ═══');
+  /* 21 ต.ค. 2569 — เดิมข้อนี้คุมว่า "กดแล้วหมุดต้องถูกล้างเป็นว่าง"
+     เพราะของเดิมดึงมาแต่ชื่อ หมุดเก่าจึงเป็นของสถานที่คนละแห่งกับชื่อที่เห็น
+
+     เจ้าของงานสั่งว่า "มันก็ต้องเป็นหมุดเหมือนกรณีเบิกรถปกติสิ"
+     ตอนนี้ปุ่มนี้ดึงทั้งชื่อและหมุดของเส้นทางหลักมาพร้อมกัน
+     กติกาที่แท้จริงจึงไม่ใช่ "ต้องว่าง" แต่คือ "ชื่อกับหมุดต้องเป็นของที่เดียวกัน" */
+  console.log('═══ 6. กด "ใช้เส้นทางหลัก" ต้องได้ทั้งชื่อและหมุดของเส้นทางหลัก ═══');
   const f = await ev([
     "const row=document.querySelector('#taxiEntriesList .taxi-entry');",
     "row.querySelector('[onclick*=fillTaxiFromRoute]').click();",
     "await new Promise(r=>setTimeout(r,600));",
     "const ff=row.querySelector('.taxi-from'), tt=row.querySelector('.taxi-to');",
     "return { from: ff.value, to: tt.value, lat: ff.dataset.lat || null,",
+    "         toLat: tt.dataset.lat || null,",
     "         note: (row.querySelector('.taxi-leg-note')||{}).textContent||'' };"
   ].join('\n'));
   ok('ชื่อกลับไปตามเส้นทางหลัก', f.from === 'บ้าน' && f.to === 'ดอนเมือง',
      f.from + ' → ' + f.to);
-  ok('หมุดเก่าของแถวถูกล้าง ไม่ค้างอ้างชื่อที่ไม่ตรงกัน', f.lat === null, String(f.lat));
-  ok('ป้ายระยะทางเก่าถูกล้างด้วย', f.note.trim() === '', f.note.trim());
+  ok('หมุดของแถวตามมาด้วย ตรงกับชื่อที่เห็น ไม่ใช่หมุดเก่าที่คนละที่',
+     Math.abs(parseFloat(f.lat) - 13.6591) < 0.0001, String(f.lat));
+  ok('หมุดปลายทางของแถวตามมาด้วย',
+     Math.abs(parseFloat(f.toLat) - 13.9126) < 0.0001, String(f.toLat));
+  ok('คิดระยะทางของเที่ยวใหม่ให้ด้วย', /กม\./.test(f.note), f.note.trim());
 
+  console.log('');
+  console.log('');
+  /* 21 ต.ค. 2569 — เจ้าของงานทักซ้ำว่า "taxi เป็นช่องเสริชแล้วแต่ว่าไม่มีหมุด"
+     ต้นตอ: ตัวค้นหาของ Taxi เป็นคนละตัวกับของเส้นทางหลัก
+     ของเส้นทางหลักจะปักหมุดให้เองตอนคลิกออกจากช่อง ของ Taxi ไม่ทำ
+     ผู้ใช้ที่พิมพ์เองแล้วไม่กดเลือกจากรายการ จึงไม่มีหมุดเลยและจอไม่บอกอะไร
+     ตอนนี้ทั้งสองที่ใช้ตัวเดียวกัน (attachSearchTo) พฤติกรรมจึงต้องเหมือนกัน */
+  console.log('═══ 7. พิมพ์เองแล้วไม่กดเลือก พอออกจากช่องต้องปักหมุดให้ เหมือนช่องค่าน้ำมัน ═══');
+  const g = await ev([
+    "const row=document.querySelector('#taxiEntriesList .taxi-entry');",
+    "const ff=row.querySelector('.taxi-from');",
+    "delete ff.dataset.lat; delete ff.dataset.lng;",
+    "ff.value='ตากสิน'; ff.dispatchEvent(new Event('input',{bubbles:true}));",
+    "await new Promise(r=>setTimeout(r,500));",
+    "const typedLat = ff.dataset.lat || null;",     // พิมพ์แล้วยังไม่ควรมีหมุด
+    "ff.dispatchEvent(new Event('blur',{bubbles:true}));",
+    "await new Promise(r=>setTimeout(r,1200));",
+    "const cell = ff.closest('div.relative').parentElement;",
+    "return { typedLat: typedLat, lat: ff.dataset.lat || null, val: ff.value,",
+    "         hint: (cell.querySelector('.taxi-pin-hint')||{}).textContent || '',",
+    "         mainFrom: (geoFrom||{}).label || '', mainLat: (geoFrom||{}).lat };"
+  ].join('\n'));
+  ok('ระหว่างพิมพ์ยังไม่มีหมุด (หมุดเก่าถูกล้าง)', g.typedLat === null, String(g.typedLat));
+  ok('ออกจากช่องแล้วระบบปักหมุดให้เอง', g.lat !== null, String(g.lat));
+  ok('บอกผู้ใช้ว่าเลือกที่ไหนให้', /ตากสิน/.test(g.hint), g.hint.trim().slice(0, 70));
+  ok('หมุดเส้นทางหลักยังไม่ถูกแตะ แม้ใช้ตัวค้นหาตัวเดียวกัน',
+     g.mainFrom === 'บ้าน' && Math.abs(g.mainLat - 13.6591) < 0.0001,
+     g.mainFrom + ' @ ' + g.mainLat);
+
+  console.log('');
+  console.log('═══ 8. หน้าตาช่องต้องเหมือนช่องค้นหาของค่าน้ำมัน ═══');
+  const h = await ev([
+    "const row=document.querySelector('#taxiEntriesList .taxi-entry');",
+    "const cls = el => (el.className||'');",
+    "const main = document.getElementById('travelFrom');",
+    "const same = a => ['border-2','p-3','rounded-lg','text-sm','shadow-sm']",
+    "                   .every(k => cls(a).indexOf(k) >= 0);",
+    "return { mainOk: same(main),",
+    "         fromOk: same(row.querySelector('.taxi-from')),",
+    "         toOk:   same(row.querySelector('.taxi-to')),",
+    "         nHints: row.querySelectorAll('.taxi-pin-hint').length,",
+    "         labels: [...row.querySelectorAll('label')].map(l=>l.textContent.trim()) };"
+  ].join('\n'));
+  ok('ช่องของเส้นทางหลักใช้ชุดคลาสนี้อยู่จริง', h.mainOk === true);
+  ok('ช่อง "จาก" ของ Taxi ใช้ชุดเดียวกัน', h.fromOk === true);
+  ok('ช่อง "ถึง" ของ Taxi ใช้ชุดเดียวกัน', h.toOk === true);
+  ok('มีที่บอกสถานะหมุดครบทั้งสองช่อง', h.nHints === 2, h.nHints + ' ช่อง');
+  ok('ป้ายชื่อช่องอ่านรู้เรื่องเหมือนเส้นทางหลัก',
+     h.labels.some(l => /จุดเริ่มต้น/.test(l)) && h.labels.some(l => /จุดที่ลงจากรถ/.test(l)),
+     h.labels.join(' · ').slice(0, 80));
+
+  console.log('');
   ok('ไม่มี JavaScript error ตลอดการทดสอบ', pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '));
 
   console.log('');

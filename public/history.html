@@ -756,9 +756,26 @@
                 const flatOut = flatInfo ? flatLeg('ขาไป')   : null;
                 const flatRet = flatInfo ? flatLeg('ขากลับ') : null;
 
-                const rcTaxiOn      = flatInfo ? !!(flatOut || flatRet) : (hasTaxiOut || hasTaxiRet);
-                const rcTaxiHasOut  = flatInfo ? !!flatOut : hasTaxiOut;
-                const rcTaxiHasRet  = flatInfo ? !!flatRet : hasTaxiRet;
+                /* 21 ต.ค. 2569 — ผู้ใช้แจ้งว่าเลือกรถส่วนตัว + เหมาจ่าย แต่ใบที่พิมพ์
+                   ไปติ๊กช่อง Taxi (ใบจริงใบที่ 91: _carType="ไป-กลับ" taxiEntries=[])
+                   เจ้าของงานสั่งว่า "เหมาจ่ายแยกเป็น 2 กรณีเหมือนเดิม taxi หรือค่าน้ำมัน
+                   ถ้าเขาติ๊กอะไร ในใบ pdf ก็ไปติ๊กตรงนั้น"
+
+                   ของเดิม (2.21.0) ให้เหมาจ่ายลงช่อง Taxi เสมอ ซึ่งผิดกับใบที่ขับรถเอง
+                   ตอนนี้ดูจากพาหนะที่ใช้จริง: มีแถว Taxi -> ช่อง Taxi
+                   ติ๊กรถส่วนตัว (carType) -> ช่องค่าน้ำมันเชื้อเพลิง
+                   ยอดเหมาจ่ายไปลงช่องที่ถูกติ๊ก ไม่ใช่ช่องตายตัว */
+                const flatByTaxi = flatInfo && (hasTaxiOut || hasTaxiRet);
+                const flatByCar  = flatInfo && !flatByTaxi && carType !== 'ไม่ระบุ';
+                // เหมาจ่ายที่ไม่รู้ว่านั่งอะไรเลย ให้ลงช่อง Taxi ไว้ก่อน
+                // เพราะ บัญชี ๘ ข้อ ๕ เป็นค่าพาหนะ ไม่ใช่ค่าเชื้อเพลิง
+                const flatNoVehicle = flatInfo && !flatByTaxi && !flatByCar;
+                const flatOnTaxiLine = flatByTaxi || flatNoVehicle;
+
+                const rcTaxiOn      = flatInfo ? (flatOnTaxiLine && !!(flatOut || flatRet))
+                                               : (hasTaxiOut || hasTaxiRet);
+                const rcTaxiHasOut  = flatInfo ? (flatOnTaxiLine && !!flatOut) : hasTaxiOut;
+                const rcTaxiHasRet  = flatInfo ? (flatOnTaxiLine && !!flatRet) : hasTaxiRet;
                 const rcTaxiOutDate = flatInfo ? dateGo   : (firstTaxiOut ? legDateText(firstTaxiOut.date) : '');
                 const rcTaxiRetDate = flatInfo ? dateBack : (firstTaxiRet ? legDateText(firstTaxiRet.date) : '');
                 const rcTaxiOutFrom = flatInfo ? tr.from : (firstTaxiOut ? firstTaxiOut.from : '');
@@ -767,15 +784,21 @@
                     : (firstTaxiRet ? (firstTaxiRet.direction === 'ไป-กลับ' ? firstTaxiRet.to : firstTaxiRet.from) : '');
                 const rcTaxiRetTo   = flatInfo ? retTo
                     : (firstTaxiRet ? (firstTaxiRet.direction === 'ไป-กลับ' ? firstTaxiRet.from : firstTaxiRet.to) : '');
-                const rcTaxiOutAmt  = flatInfo ? ((flatOut || {}).amount || 0) : taxiOutDisplayAmt;
-                const rcTaxiRetAmt  = flatInfo ? ((flatRet || {}).amount || 0) : taxiRetDisplayAmt;
+                const rcTaxiOutAmt  = flatInfo ? (flatOnTaxiLine ? ((flatOut || {}).amount || 0) : 0)
+                                               : taxiOutDisplayAmt;
+                const rcTaxiRetAmt  = flatInfo ? (flatOnTaxiLine ? ((flatRet || {}).amount || 0) : 0)
+                                               : taxiRetDisplayAmt;
 
-                // บรรทัดค่าน้ำมันเชื้อเพลิง — ใบที่เลือกเหมาจ่ายไม่ใช้บรรทัดนี้แล้ว
-                const rcFuelOn      = !flatInfo && carType !== 'ไม่ระบุ';
-                const rcFuelHasOut  = !flatInfo && (carType === 'ขาไป'   || carType === 'ไป-กลับ');
-                const rcFuelHasRet  = !flatInfo && (carType === 'ขากลับ' || carType === 'ไป-กลับ');
-                const rcFuelOutAmt  = flatInfo ? 0 : fuelOut;
-                const rcFuelRetAmt  = flatInfo ? 0 : fuelRet;
+                /* บรรทัดค่าน้ำมันเชื้อเพลิง
+                   ใบคิดตามระยะจริง: ติ๊กเมื่อมีการเบิกรถ (เหมือนเดิมทุกประการ)
+                   ใบเหมาจ่ายที่ขับรถเอง: ติ๊กที่นี่ และยอดเหมาจ่ายมาลงที่นี่ */
+                const rcFuelOn      = flatInfo ? flatByCar : (carType !== 'ไม่ระบุ');
+                const rcFuelHasOut  = (flatInfo ? flatByCar : true)
+                                      && (carType === 'ขาไป'   || carType === 'ไป-กลับ');
+                const rcFuelHasRet  = (flatInfo ? flatByCar : true)
+                                      && (carType === 'ขากลับ' || carType === 'ไป-กลับ');
+                const rcFuelOutAmt  = flatInfo ? (flatByCar ? ((flatOut || {}).amount || 0) : 0) : fuelOut;
+                const rcFuelRetAmt  = flatInfo ? (flatByCar ? ((flatRet || {}).amount || 0) : 0) : fuelRet;
 
                 /* คำอธิบายวิธีคิดของใบเหมาจ่าย
                    เดิมข้อความนี้อยู่บนบรรทัดระยะทางของบล็อกค่าน้ำมัน (rcDist)
