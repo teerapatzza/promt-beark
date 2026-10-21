@@ -231,6 +231,44 @@ try {
   });
 
   console.log('');
+  console.log('═══ 8. พักคู่ กับใคร ต้องขึ้นในใบ และแผนที่ต้องเคารพติ๊กของผู้ใช้ ═══');
+  /* 21 ต.ค. 2569 — เอกสารมีบรรทัด "( ) พักคู่ กับ ______" รออยู่แล้ว
+     แต่ฟอร์มไม่เคยเก็บชื่อผู้ร่วมพัก ช่องในใบจึงว่างตลอด
+     และตัวสร้างเอกสารก็ไม่เคยอ่านค่าติ๊ก "ใช้แผนที่จากระบบ"
+     คนที่ติ๊กออกแล้วแนบภาพเอง จึงได้แผนที่ของพร้อมเบิกแถมไปอีกหน้า */
+  const docOf = async (patch) => ev([
+    "window.renderRouteMapImage = async () => 'data:image/png;base64,MAPSTUB';",
+    "const rec = " + JSON.stringify(patch) + ";",
+    "const b = await buildDocumentHtml(rec, function(){});",
+    "const d = document.createElement('div'); d.innerHTML = b.html;",
+    "return { text: d.textContent.replace(/\s+/g,' '), html: b.html };"
+  ].join(NL));
+
+  const hotelRec = mkRec([], 2000);
+  hotelRec.inputMetadata._pdfTemplates = ['REPORT'];
+  hotelRec.inputMetadata._costs.hotelEntries = {
+    name: 'โรงแรมทดสอบ',
+    entries: [{ type: 'พักคู่', rate: '1000', nights: '2', withWho: 'นพ.สมชาย ใจดี' }]
+  };
+  const hotelDoc = await docOf(hotelRec);
+  ok('ชื่อผู้ร่วมพักขึ้นในใบ ไม่ใช่เส้นว่าง',
+     /นพ\.สมชาย ใจดี/.test(hotelDoc.text),
+     (hotelDoc.text.match(/พักคู่ กับ[^0-9]{0,40}/) || [''])[0].trim());
+
+  const mapOn = mkRec([], 300);
+  mapOn.inputMetadata._travel.fromGeo = { lat: 13.8, lng: 100.6, precision: 'exact' };
+  mapOn.inputMetadata._travel.toGeo   = { lat: 13.85, lng: 100.52, precision: 'exact' };
+  const onDoc = await docOf(mapOn);
+  ok('ติ๊กไว้ (ใบเก่าไม่มีคีย์นี้) ยังวาดแผนที่ให้เหมือนเดิม',
+     onDoc.html.indexOf('MAPSTUB') >= 0, 'มีหน้าแผนที่');
+
+  const mapOff = JSON.parse(JSON.stringify(mapOn));
+  mapOff.inputMetadata._travel.useAppMap = false;
+  const offDoc = await docOf(mapOff);
+  ok('ติ๊กออกแล้วแผนที่ของพร้อมเบิกต้องไม่โผล่ในเอกสาร',
+     offDoc.html.indexOf('MAPSTUB') < 0, 'ไม่มีหน้าแผนที่');
+
+  console.log('');
   ok('ไม่มี JavaScript error ตลอดการทดสอบ', pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '));
 
   console.log('');

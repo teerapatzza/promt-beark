@@ -577,10 +577,23 @@ app.put('/expenses/:id', requireAuth, (req, res) => {
     ? original.attachments.images : [];
   const newImgs = (expense.attachments && Array.isArray(expense.attachments.images))
     ? expense.attachments.images : null;
-  if (oldImgs.length && (newImgs === null || newImgs.length === 0)) {
+  /* 21 ต.ค. 2569 — ตาข่ายนี้ทำให้ "ลบไฟล์ออกจนหมด" เป็นไปไม่ได้
+     เจ้าของงานแจ้งว่าเอาไฟล์ออกไม่ได้ ไล่ดูแล้วเจอว่าถึงหน้าเว็บจะส่ง images: []
+     มาตามที่ผู้ใช้สั่ง ตรงนี้ก็คืนของเดิมกลับไปให้ทุกครั้ง
+
+     หน้าเว็บรุ่นใหม่ติดธง attachmentsComplete มาด้วย แปลว่า
+     "รายการที่ส่งมาคือรายการที่ผู้ใช้ตั้งใจให้เหลือ" ว่างก็คือว่างจริง
+     รุ่นเก่าที่ไม่มีธงยังได้ตาข่ายเดิม ใบเก่าจึงไม่มีทางไฟล์หาย */
+  const claimsComplete = expense.attachmentsComplete === true;
+  if (!claimsComplete && oldImgs.length && (newImgs === null || newImgs.length === 0)) {
     expense.attachments = Object.assign({}, expense.attachments, { images: oldImgs });
     console.log('[expenses] #' + id + ' คืนไฟล์แนบเดิม ' + oldImgs.length + ' ไฟล์ (payload ไม่ได้ส่งมา)');
   }
+  if (claimsComplete && oldImgs.length && newImgs && newImgs.length === 0) {
+    console.log('[expenses] #' + id + ' ผู้ใช้สั่งลบไฟล์แนบทั้งหมด ' + oldImgs.length + ' ไฟล์');
+  }
+  // ธงนี้เป็นเรื่องของการส่งข้อมูล ไม่ใช่เนื้อหาของใบ ไม่ต้องเก็บลงฐานข้อมูล
+  delete expense.attachmentsComplete;
 
   db.prepare('UPDATE expenses SET data = ? WHERE id = ?').run(JSON.stringify(expense), id);
   expense.id = id;

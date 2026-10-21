@@ -1112,7 +1112,19 @@
                                 <td style="width: 30px; border: none; padding: 0;"></td>
                                 <td colspan="4" style="border: none; padding: 0;">
                                     1.1 &nbsp;&nbsp; ( <span style="font-family: Arial; font-size: 16px;">${hotelSingle}</span> ) พักเดี่ยว 
-                                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ( <span style="font-family: Arial; font-size: 16px;">${hotelDouble}</span> ) พักคู่ กับ <span class="solid-line" style="width: 250px;"></span>
+                                    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ( <span style="font-family: Arial; font-size: 16px;">${hotelDouble}</span> ) พักคู่ กับ <span class="solid-line" style="width: 250px;">${
+                                        /* 21 ต.ค. 2569 — ช่องนี้เคยว่างเปล่ามาตลอด เพราะฟอร์มไม่เคยเก็บชื่อผู้ร่วมพัก
+                                           ตอนนี้เก็บไว้ที่ entry.withWho ของรายการที่เลือกพักคู่
+                                           ใบเก่าไม่มีค่านี้ ก็ยังว่างเหมือนเดิม ไม่กระทบอะไร */
+                                        (() => {
+                                            const es = (c.hotelEntries && c.hotelEntries.entries) || [];
+                                            const hit = es.find(e => e && e.type === 'พักคู่' && (e.withWho || '').trim());
+                                            // escape ในที่ ไม่เรียกตัวช่วยจากสโคปอื่น (esc ตัวนั้นอยู่คนละฟังก์ชัน)
+                                            return hit ? String(hit.withWho).trim()
+                                                .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                                                .replace(/>/g, '&gt;').replace(/"/g, '&quot;') : '';
+                                        })()
+                                    }</span>
                                 </td>
                             </tr>
                             <tr>
@@ -1626,7 +1638,18 @@
             // แผนที่: วาดตอนพิมพ์จากพิกัดที่บันทึกไว้ ไม่ได้เก็บรูปในฐานข้อมูล
             let mapPageHtml = '';
             const _tr = (data.inputMetadata && data.inputMetadata._travel) || null;
-            if (_tr && _tr.fromGeo && _tr.toGeo) {
+            /* 21 ต.ค. 2569 — หน้ากรอกมีติ๊ก "ใช้แผนที่จากระบบ" มาตั้งแต่แรก
+               เอาติ๊กออกแล้วแนบภาพจาก Google Maps เองได้ และฟอร์มก็เก็บค่า
+               _travel.useAppMap ไว้ให้ครบ แต่ตัวสร้างเอกสารไม่เคยอ่านค่านี้เลย
+               วาดแผนที่ระบบทุกครั้งที่ใบมีพิกัดครบ
+
+               ผลคือคนที่ตั้งใจใช้ภาพของตัวเอง ได้แผนที่ของพร้อมเบิกแถมไปอีกหน้า
+               (เจ้าของงานแจ้ง 21 ต.ค. — "ถ้าเขาติ๊กออก แผนที่ในพร้อมเบิกต้องไม่โผล่ไปด้วย")
+
+               ใบเก่าที่ไม่มีค่านี้ถือว่าใช้แผนที่ระบบเหมือนเดิม จะได้ไม่เปลี่ยนหน้าตา
+               ภาพที่ผู้ใช้แนบเองอยู่ในไฟล์แนบอยู่แล้ว จึงพิมพ์ออกมาตามปกติ */
+            const _useAppMap = !_tr || _tr.useAppMap !== false;
+            if (_useAppMap && _tr && _tr.fromGeo && _tr.toGeo) {
                 // ใบเบิกเก่าไม่มี useAppMap แต่มีพิกัดครบ ก็วาดแผนที่ให้ด้วย
                 say('⏳ กำลังวาดแผนที่...');
                 const km = _tr.distOut || (_tr.route && _tr.route.km) || '-';

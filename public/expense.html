@@ -2263,9 +2263,11 @@
         if (!routeMap) return;
         routeMap.invalidateSize();
         const pts = [mFrom, mTo, mRetFrom, mRet].filter(Boolean).map(m => m.getLatLng());
-        if (routeLine || retLine) {
+        // เส้นของเที่ยว Taxi ต้องอยู่ในกรอบที่ซูมให้ด้วย ไม่งั้นวาดแล้วมองไม่เห็น
+        const taxiLines = (typeof taxiLegLines !== 'undefined') ? taxiLegLines : [];
+        if (routeLine || retLine || taxiLines.length) {
             let b = null;
-            [routeLine, retLine].filter(Boolean).forEach(l => {
+            [routeLine, retLine].concat(taxiLines).filter(Boolean).forEach(l => {
                 b = b ? b.extend(l.getBounds()) : L.latLngBounds(l.getBounds());
             });
             pts.forEach(p => b.extend(p));
@@ -2307,6 +2309,56 @@
     }
 
     /** คำนวณระยะทางตามถนนจริงจาก /map-route */
+    /* ══════════ เส้นทางของเที่ยว Taxi บนแผนที่ ══════════
+       21 ต.ค. 2569 — เจ้าของงานกรอก Taxi ขากลับสองเที่ยว แล้วทักว่า
+       "เลือกขากลับ 2 อัน แต่แมพมีแค่เส้นเดียวเห็นไหม"
+
+       ถูกของเขา — ของเดิมแผนที่วาดแค่เส้นทางหลัก (ขาไป + ขากลับ)
+       เที่ยว Taxi มีหมุดของตัวเองตั้งแต่ 2.22.0 แต่ไม่เคยถูกวาดเลย
+
+       วาดแยกสี (ส้ม เส้นประ) ให้ต่างจากเส้นทางหลักชัด ๆ
+       เพราะเส้นทางหลักคือฐานคิดค่าน้ำมัน/เหมาจ่าย ส่วนเที่ยว Taxi
+       คิดเงินจากมิเตอร์ ไม่เกี่ยวกับระยะทางบนแผนที่เลย
+       ถ้าใช้สีเดียวกันจะชวนให้เข้าใจผิดว่าเส้นพวกนี้มีผลกับเงิน */
+    let taxiLegLines = [];
+    function clearTaxiLegLines() {
+        taxiLegLines.forEach(function (ln) {
+            try { routeMap.removeLayer(ln); } catch (e) {}
+        });
+        taxiLegLines = [];
+    }
+
+    async function drawTaxiLegLines() {
+        if (!routeMap) return;
+        clearTaxiLegLines();
+        const rows = [...document.querySelectorAll('.taxi-entry')];
+        if (!rows.length) return;
+
+        const pin = el => (el && el.dataset.lat && el.dataset.lng)
+            ? { lat: parseFloat(el.dataset.lat), lng: parseFloat(el.dataset.lng) } : null;
+
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            const a = pin(row.querySelector('.taxi-from'));
+            const b = pin(row.querySelector('.taxi-to'));
+            if (!a || !b) continue;                       // ยังไม่ได้ปักหมุดครบ ข้ามไป
+            // หมุดชี้ที่เดียวกันทั้งคู่ ลากเส้นไปก็ไม่เห็นอะไร
+            if (Math.abs(a.lat - b.lat) < 1e-6 && Math.abs(a.lng - b.lng) < 1e-6) continue;
+            try {
+                const leg = await routeLeg(a, b);
+                const coords = (leg && leg.coords && leg.coords.length)
+                    ? leg.coords : [[a.lat, a.lng], [b.lat, b.lng]];
+                const dir = row.querySelector('.taxi-dir')?.value || 'ขาไป';
+                const ln = L.polyline(coords,
+                    { color: '#ea580c', weight: 4, opacity: .8, dashArray: '4 6' }).addTo(routeMap);
+                ln.bindTooltip('Taxi เที่ยวที่ ' + (i + 1) + ' (' + dir + ')'
+                    + (leg && leg.km ? ' ' + leg.km.toLocaleString('th-TH') + ' กม.' : ''),
+                    { sticky: true });
+                taxiLegLines.push(ln);
+            } catch (e) { /* ลากเส้นไม่ได้ก็ไม่กระทบการคิดเงิน */ }
+        }
+    }
+
     async function recalcRoute(userAsked) {
         // ชื่อจุดเริ่มต้น/จุดหมายอาจเพิ่งเปลี่ยน ช่องขากลับต้องบอกให้ตรงว่าเว้นว่างแล้วได้ที่ไหน
         if (typeof updateReturnPlaceholders === 'function') updateReturnPlaceholders();
@@ -2410,6 +2462,7 @@
                     'ไม่ได้เบิกขากลับ จึงไม่คิดระยะทางขากลับ');
             }
             if (typeof calculateTravelTotal === 'function') calculateTravelTotal();
+            await drawTaxiLegLines();
             fitRoute();
 
             const worst = [geoFrom.precision, geoTo.precision]
@@ -2857,6 +2910,8 @@
     function onTripDatesChange() {
         if (typeof updateLegDateLabels === 'function') updateLegDateLabels();
         if (typeof syncTaxiDatesFromLegs === 'function') syncTaxiDatesFromLegs();
+        // จำนวนคืนที่พักเดาได้จากช่วงวันเดินทาง เปลี่ยนวันแล้วต้องตามไปด้วย
+        if (typeof fillAccommodationNights === 'function') fillAccommodationNights();
         const a = document.getElementById('dateStart');
         const b = document.getElementById('dateEnd');
         const sum = document.getElementById('tripSummary');
@@ -3263,9 +3318,13 @@
 
         // Only auto-sync if user hasn't manually edited the extraAddrLine field
         if (addrLine._userEdited) return;
+        addrLine.value = buildExtraAddrFromFields();
+    }
 
+    /** ที่อยู่แถวท้ายตารางแบบที่ระบบประกอบให้เอง จากช่องที่อยู่ด้านบน */
+    function buildExtraAddrFromFields() {
         const v = (id) => document.getElementById(id)?.value?.trim() || '';
-        const parts = [
+        return [
             v('addrNo'),
             v('addrSoi') ? 'ซอย ' + v('addrSoi') : '',
             v('addrRoad') ? 'ถนน' + v('addrRoad') : '',
@@ -3273,8 +3332,7 @@
             v('addrDist'),
             v('addrProv'),
             v('addrZip'),
-        ].filter(Boolean);
-        addrLine.value = parts.join(' ');
+        ].filter(Boolean).join(' ');
     }
 
     function markExtraAddrAsUserEdited() {
@@ -3805,22 +3863,70 @@
         const index = container.children.length;
         const div = document.createElement('div');
         div.className = 'accommodation-entry mb-2 p-2 bg-slate-50 rounded border border-slate-200';
+        /* 21 ต.ค. 2569 — เอกสารมีบรรทัด "( ) พักคู่ กับ ______" รออยู่แล้ว
+           แต่ฟอร์มไม่เคยมีช่องให้กรอกชื่อคนที่พักด้วย ช่องในใบจึงว่างตลอด
+           เจ้าของงานสั่งว่า "ถ้าเขาเลือกว่าพักคู่ ก็มีช่องให้เขาพิมพ์ชื่อว่าพักกับใคร
+           ให้ใส่ชื่อแล้วไปแสดงใน pdf"
+           ช่องนี้โผล่เฉพาะตอนเลือกพักคู่ ไม่ไปกวนคนที่พักเดี่ยว และไม่แตะยอดเงิน */
         div.innerHTML = `
             <div class="flex items-center gap-2">
                 <span class="text-xs text-slate-600 w-8">${index + 1}.</span>
-                <select class="accommodation-type border p-2 rounded text-sm outline-none focus:border-blue-500 flex-shrink-0" style="width: 110px;">
+                <select class="accommodation-type border p-2 rounded text-sm outline-none focus:border-blue-500 flex-shrink-0" style="width: 110px;"
+                    onchange="onAccommodationTypeChange(this)">
                     <option value="พักเดี่ยว">พักเดี่ยว</option>
                     <option value="พักคู่">พักคู่</option>
                 </select>
                 <input type="number" class="accommodation-rate border p-2 rounded text-sm outline-none focus:border-blue-500 flex-1" placeholder="บาท/คืน" oninput="calculateTravelTotal()">
                 <span class="text-xs text-slate-600">×</span>
-                <input type="number" class="accommodation-nights border p-2 rounded text-sm outline-none focus:border-blue-500 flex-1" placeholder="คืน" oninput="calculateTravelTotal()">
+                <input type="number" class="accommodation-nights border p-2 rounded text-sm outline-none focus:border-blue-500 flex-1" placeholder="คืน" oninput="this.dataset.touched='1'; calculateTravelTotal()">
                 <button type="button" onclick="removeAccommodationEntry(this)" class="text-red-600 hover:text-red-800 text-sm px-2">✕</button>
+            </div>
+            <div class="accommodation-with-wrap hidden mt-2 pl-8">
+                <label class="block text-[11px] font-bold text-slate-600 mb-1">พักคู่กับใคร
+                    <span class="font-normal text-slate-400">— ชื่อนี้จะขึ้นในใบรายงานการเดินทาง ช่อง "พักคู่ กับ"</span>
+                </label>
+                <input type="text" maxlength="120" class="accommodation-with w-full border p-2 rounded text-sm outline-none focus:border-blue-500"
+                    placeholder="ชื่อผู้ร่วมพัก">
             </div>
         `;
         container.appendChild(div);
+        fillAccommodationNights(div);
         calculateTravelTotal();
     };
+
+    /** เลือกพักคู่ = เปิดช่องให้กรอกชื่อผู้ร่วมพัก เลือกพักเดี่ยว = ซ่อนและล้างทิ้ง */
+    function onAccommodationTypeChange(sel) {
+        const row = sel.closest('.accommodation-entry');
+        if (!row) return;
+        const wrap = row.querySelector('.accommodation-with-wrap');
+        const inp  = row.querySelector('.accommodation-with');
+        const isDouble = sel.value === 'พักคู่';
+        if (wrap) wrap.classList.toggle('hidden', !isDouble);
+        // กลับไปพักเดี่ยวแล้วชื่อยังค้าง จะถูกพิมพ์ลงใบทั้งที่ไม่ได้พักคู่แล้ว
+        if (!isDouble && inp) inp.value = '';
+    }
+
+    /* จำนวนคืนเดาได้จากช่วงวันเดินทางที่กรอกไว้ด้านบน ไม่ต้องให้นับเอง
+       เจ้าของงานสั่งว่า "เติมให้เอง แก้ทับได้"
+       พอผู้ใช้แก้เองแล้วจะไม่ถูกเขียนทับอีก (กติกา touched เดิมของระบบ) */
+    function tripNights() {
+        const a = document.getElementById('dateStart')?.value;
+        const b = document.getElementById('dateEnd')?.value;
+        if (!a || !b) return 0;
+        const ms = new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00');
+        const n = Math.round(ms / 86400000);
+        return n > 0 ? n : 0;
+    }
+    function fillAccommodationNights(scope) {
+        const n = tripNights();
+        if (!n) return;
+        const rows = scope ? [scope] : [...document.querySelectorAll('.accommodation-entry')];
+        rows.forEach(function (row) {
+            const el = row.querySelector('.accommodation-nights');
+            if (el && !el.dataset.touched && !el.value) el.value = n;
+        });
+        if (typeof calculateTravelTotal === 'function') calculateTravelTotal();
+    }
 
     function removeAccommodationEntry(btn) {
         btn.closest('.accommodation-entry').remove();
@@ -3845,10 +3951,14 @@
         const hotelName = document.getElementById('hotelName')?.value || '';
         const entries = [];
         document.querySelectorAll('.accommodation-entry').forEach(entry => {
+            const type = entry.querySelector('.accommodation-type').value;
+            const withWho = (entry.querySelector('.accommodation-with')?.value || '').trim();
             entries.push({
-                type: entry.querySelector('.accommodation-type').value,
+                type: type,
                 rate: entry.querySelector('.accommodation-rate').value,
-                nights: entry.querySelector('.accommodation-nights').value
+                nights: entry.querySelector('.accommodation-nights').value,
+                // ส่งชื่อผู้ร่วมพักไปเฉพาะตอนพักคู่ ไม่งั้นชื่อที่ค้างจะไปโผล่ในใบ
+                withWho: type === 'พักคู่' ? withWho : ''
             });
         });
         return {
@@ -4145,7 +4255,8 @@
 
                         <div id="manualMapUploadBox" class="hidden">
                             <p class="text-xs text-slate-600 mb-2">อัปโหลดภาพเอง (เลือกได้หลายไฟล์)</p>
-                            <input type="file" id="mapManualUpload" accept="image/*" multiple class="w-full text-sm text-slate-600 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700 file:font-medium transition-all cursor-pointer border-2 border-dashed border-blue-300 rounded-lg p-3 hover:border-blue-500">
+                            <input type="file" id="mapManualUpload" accept="image/*" multiple onchange="renderPickedFiles(this)" class="w-full text-sm text-slate-600 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700 file:font-medium transition-all cursor-pointer border-2 border-dashed border-blue-300 rounded-lg p-3 hover:border-blue-500">
+                            <div class="picked-files hidden flex flex-wrap gap-1.5 mt-2"></div>
                         </div>
                     </div>`;
                     return;
@@ -4155,7 +4266,8 @@
                 eviDiv.innerHTML += `
                     <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-4">
                         <label class="block text-sm font-bold text-slate-600 mb-2">${label} ${reqTag(r)}</label>
-                        <input type="file" accept="image/*,application/pdf,.pdf" multiple data-field="${field}" data-label="${label}" class="general-file-upload ${reqClass} text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-slate-200 file:text-slate-700 hover:file:bg-slate-300 transition-all">
+                        <input type="file" accept="image/*,application/pdf,.pdf" multiple data-field="${field}" data-label="${label}" onchange="renderPickedFiles(this)" class="general-file-upload ${reqClass} text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-slate-200 file:text-slate-700 hover:file:bg-slate-300 transition-all">
+                        <div class="picked-files hidden flex flex-wrap gap-1.5 mt-2"></div>
                         <p class="text-xs text-slate-400 mt-1.5">รับทั้งรูปภาพและไฟล์ PDF — PDF หลายหน้าจะถูกแนบให้ครบทุกหน้า</p>
                     </div>`;
             });
@@ -5017,7 +5129,11 @@
             projectId: null,
             requestedBy: requester,
             description: descForRecord,
-            status: "OBLIGATED", inputMetadata: metadata, attachments: { images: uploadedImages }, amount: finalAmount
+            status: "OBLIGATED", inputMetadata: metadata, attachments: { images: uploadedImages }, amount: finalAmount,
+            /* บอกเซิร์ฟเวอร์ว่ารายการไฟล์แนบที่ส่งมาคือรายการที่ตั้งใจให้เหลือจริง ๆ
+               ไม่ใช่ "ลืมส่ง" — ถ้าไม่มีธงนี้ เซิร์ฟเวอร์จะคืนไฟล์เดิมกลับมาให้
+               ซึ่งทำให้ลบไฟล์ออกจนหมดไม่ได้เลย (ดูคอมเมนต์ที่ PUT /expenses/:id) */
+            attachmentsComplete: true
         };
 
         try {
@@ -5092,6 +5208,52 @@
                  title="ลบไฟล์นี้ออกจากรายการ"
                  class="absolute top-1 right-1 w-6 h-6 rounded-full bg-rose-600 text-white text-xs font-bold leading-none">×</button>
              </div>`).join('');
+    }
+
+    /* ══════════ เอาไฟล์ที่เพิ่งเลือกออกได้ทีละไฟล์ ══════════
+       21 ต.ค. 2569 — เจ้าของงานแจ้งว่า "แนบไปแล้วแนบเลย กดเอาไฟล์ออกไม่ได้"
+
+       ช่องแนบไฟล์ของเบราว์เซอร์เลือกใหม่ได้อย่างเดียว เอาออกทีละไฟล์ไม่ได้
+       ของเดิมมีปุ่มลบเฉพาะไฟล์ที่ "เคยบันทึกไว้แล้ว" ส่วนไฟล์ที่เพิ่งเลือกในรอบนี้
+       ถ้าเลือกผิดก็ต้องเลือกใหม่ทั้งชุด หรือไม่ก็ทิ้งฟอร์มแล้วเริ่มใหม่
+
+       เขียนรายการไฟล์ลง input.files ใหม่ด้วย DataTransfer ซึ่งเป็นวิธีเดียว
+       ที่มาตรฐานยอมให้แก้ FileList ได้ */
+    window.renderPickedFiles = function (input) {
+        if (!input) return;
+        const box = input.parentElement?.querySelector('.picked-files');
+        if (!box) return;
+        const files = [...(input.files || [])];
+        box.classList.toggle('hidden', files.length === 0);
+        if (!files.length) { box.innerHTML = ''; return; }
+
+        const kb = n => n < 1024 * 1024
+            ? Math.max(1, Math.round(n / 1024)) + ' KB'
+            : (n / 1024 / 1024).toFixed(1) + ' MB';
+        box.innerHTML = files.map(function (f, i) {
+            return '<span class="inline-flex items-center gap-1.5 bg-white border border-slate-200 '
+                 + 'rounded-full pl-2.5 pr-1 py-1 text-[11px] text-slate-700">'
+                 + '<span class="max-w-[190px] truncate" title="' + escHtml(f.name) + '">'
+                 + escHtml(f.name) + '</span>'
+                 + '<span class="text-slate-400">' + kb(f.size) + '</span>'
+                 + '<button type="button" data-i="' + i + '" title="เอาไฟล์นี้ออก"'
+                 + ' class="pf-x w-5 h-5 rounded-full bg-slate-100 hover:bg-rose-100 '
+                 + 'text-slate-500 hover:text-rose-600 leading-none">×</button></span>';
+        }).join('');
+        box.querySelectorAll('.pf-x').forEach(function (b) {
+            b.addEventListener('click', function () {
+                removePickedFile(input, parseInt(b.dataset.i, 10));
+            });
+        });
+    };
+
+    function removePickedFile(input, idx) {
+        const files = [...(input.files || [])];
+        if (idx < 0 || idx >= files.length) return;
+        const dt = new DataTransfer();
+        files.forEach(function (f, i) { if (i !== idx) dt.items.add(f); });
+        input.files = dt.files;
+        renderPickedFiles(input);
     }
 
     window.removeExistingAttachment = function (i) {
@@ -5216,6 +5378,17 @@
                     retPath = tr.returnPath || null;
                     retInfo = tr.returnRoute || null;
                 }
+
+                /* คืนค่าติ๊ก "ใช้แผนที่จากระบบ"
+                   21 ต.ค. 2569 — ค่านี้ถูกบันทึกลงใบมาตลอดแต่ไม่เคยถูกอ่านกลับ
+                   ใบที่ตั้งใจติ๊กออกแล้วแนบภาพเอง พอกดแก้จะกลับมาติ๊กเองเงียบ ๆ
+                   แล้วแผนที่ระบบจะโผล่กลับเข้าเอกสารโดยที่เจ้าของใบไม่ได้สั่ง
+                   ใบเก่าที่ไม่มีคีย์นี้ถือว่าใช้แผนที่ระบบเหมือนเดิม */
+                const mapChk = document.getElementById('useAppMapImage');
+                if (mapChk) {
+                    mapChk.checked = tr.useAppMap !== false;
+                    if (typeof onUseAppMapToggle === 'function') onUseAppMapToggle();
+                }
             }
 
             document.getElementById('carType').value   = meta._carType   || 'ไม่ระบุ';
@@ -5243,9 +5416,18 @@
                     addAccommodationEntry();
                     const entries = accommodationContainer.querySelectorAll('.accommodation-entry');
                     const lastEntry = entries[entries.length - 1];
-                    lastEntry.querySelector('.accommodation-type').value = entry.type || 'พักเดี่ยว';
+                    const typeSel = lastEntry.querySelector('.accommodation-type');
+                    typeSel.value = entry.type || 'พักเดี่ยว';
                     lastEntry.querySelector('.accommodation-rate').value = entry.rate || '';
-                    lastEntry.querySelector('.accommodation-nights').value = entry.nights || '';
+                    const nightsEl = lastEntry.querySelector('.accommodation-nights');
+                    nightsEl.value = entry.nights || '';
+                    // ค่าที่มาจากใบจริง ห้ามให้ตัวเติมจำนวนคืนอัตโนมัติมาเขียนทับ
+                    if (entry.nights) nightsEl.dataset.touched = '1';
+                    const withEl = lastEntry.querySelector('.accommodation-with');
+                    if (withEl) withEl.value = entry.withWho || '';
+                    // เปิด/ปิดช่องชื่อผู้ร่วมพักให้ตรงกับประเภทที่เพิ่งคืนค่า
+                    if (typeof onAccommodationTypeChange === 'function')
+                        onAccommodationTypeChange(typeSel);
                 });
             }
 
@@ -5364,8 +5546,24 @@
                 }
             }
 
-            // Extra bottom entries
-            document.getElementById('extraAddrLine').value = meta._extraAddr || '';
+            /* ── ที่อยู่แถวท้ายตาราง ──
+               21 ต.ค. 2569 — เจอตอนตรวจว่า "เปิดใบมาแก้แล้วกดบันทึกเฉย ๆ
+               ข้อมูลเปลี่ยนไหม" ปรากฏว่าบรรทัดนี้ถูกเขียนทับทุกครั้ง
+
+               ใบเก็บไว้ว่า  "141/36 ซอยสุขสวัสดิ์ 55 ถนนสุขสวัสดิ์ สมุทรปราการ 10290"
+               เปิดมาแก้ได้ "141/36 ซอย สุขสวัสดิ์ 55 ถนนสุขสวัสดิ์ ปากคลองบางปลากด
+                             พระสมุทรเจดีย์ สมุทรปราการ 10290"
+               คือระบบประกอบใหม่จากช่องที่อยู่ ทับข้อความที่เจ้าของใบตั้งใจแก้เอง
+
+               ถ้าข้อความในใบตรงกับที่ระบบประกอบได้อยู่แล้ว = ไม่เคยถูกแก้มือ
+               ปล่อยให้ตามช่องที่อยู่ต่อไปเหมือนเดิม
+               ถ้าต่างกัน = เจ้าของใบแก้เอง ต้องตีตราว่าห้ามเขียนทับ */
+            const addrLineEl = document.getElementById('extraAddrLine');
+            addrLineEl.value = meta._extraAddr || '';
+            if (meta._extraAddr && typeof buildExtraAddrFromFields === 'function') {
+                const norm = s => String(s || '').replace(/\s+/g, ' ').trim();
+                addrLineEl._userEdited = norm(meta._extraAddr) !== norm(buildExtraAddrFromFields());
+            }
             const extraList = document.getElementById('extraActivitiesList');
             extraList.innerHTML = '<p class="text-xs text-slate-400 italic">ยังไม่มีรายการ — กดปุ่ม "เพิ่มแถว" ด้านบน</p>';
             if (Array.isArray(meta._extraActivities) && meta._extraActivities.length > 0) {
