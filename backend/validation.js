@@ -175,6 +175,16 @@ function validateExpense(expense, category, globalTaxiMax) {
         const capRet = capOf(areas.ret.inMetro);
         /** เที่ยวนี้เป็นขาไปหรือขากลับ ใช้เพดานของขานั้น */
         const capByDir = dir => (dir === 'ขากลับ' ? capRet : capOut);
+        /* 21 ต.ค. 2569 — ถ้าเที่ยวนั้นมีหมุดของตัวเอง ให้ตัดสินพื้นที่จากหมุดนั้น
+           ใบที่เบิกเฉพาะ Taxi ไม่มีหมุดเส้นทางหลัก พื้นที่จึงถูกมองว่า "นอกเขต"
+           แล้วได้วงเงินหลวมกว่าที่ควร ทั้งที่เที่ยวนั้นวิ่งอยู่ใน กทม.
+           หมุดของเที่ยวตรงกับความจริงมากกว่าหมุดของเส้นทางหลักอยู่แล้ว
+           เที่ยวที่ยังไม่มีหมุด ใช้เพดานของขาตามเดิม ใบเก่าจึงไม่เปลี่ยนผล */
+        const capForEntry = entry => {
+            if (entry && entry.fromGeo && entry.toGeo)
+                return capOf(MetroArea.tripArea(entry.fromGeo, entry.toGeo).inMetro);
+            return capByDir(entry && entry.direction);
+        };
         const asText = cap => (cap === Infinity ? 'ไม่จำกัด' : cap.toLocaleString());
         const taxiCap = capOut;                       // เผื่อโค้ดเก่าที่ยังอ้างชื่อนี้
         const capText = asText(capOut);
@@ -215,7 +225,8 @@ function validateExpense(expense, category, globalTaxiMax) {
             // Validate taxi amount limits
             // แถวเดียวที่กรอกทั้งสองขา ต้องเทียบคนละเพดาน เพราะคนละเที่ยว
             if (entry.direction === 'ไป-กลับ') {
-                if ((entry.amountOut || 0) > capOut) {
+                const capRound = capForEntry(entry);
+                if ((entry.amountOut || 0) > capRound) {
                     errors.push({
                         field: `taxiEntry${index}`,
                         level: 'error',
@@ -226,16 +237,16 @@ function validateExpense(expense, category, globalTaxiMax) {
                             `💡 กรุณาลดยอดเงินให้ไม่เกิน ${asText(capOut)} บาท`
                     });
                 }
-                if ((entry.amountRet || 0) > capRet) {
+                if ((entry.amountRet || 0) > capRound) {
                     errors.push({
                         field: `taxiEntry${index}`,
                         level: 'error',
                         message: `❌ ยอดค่า Taxi เกินวงเงินที่อนุมัติ! (ขากลับ)\n` +
-                            `💰 ${entry.amountRet} บาท > ${asText(capRet)} บาท`
+                            `💰 ${entry.amountRet} บาท > ${asText(capRound)} บาท`
                     });
                 }
             } else {
-                const cap = capByDir(entry.direction);
+                const cap = capForEntry(entry);
                 if ((entry.amount || 0) > cap) {
                     errors.push({
                         field: `taxiEntry${index}`,

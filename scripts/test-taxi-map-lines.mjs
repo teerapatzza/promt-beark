@@ -126,6 +126,11 @@ try {
   ok('ใช้สีต่างจากเส้นทางหลัก (ไม่ใช่สีน้ำเงิน/ม่วงของเส้นทางหลัก)',
      drawn.colors.every(c => c !== '#2563eb' && c !== '#7c3aed'),
      drawn.colors.join(', '));
+  /* 21 ต.ค. 2569 — เจ้าของงานทักว่า "สีมันเหมือนกันเกิน"
+     สองเที่ยวในย่านเดียวกัน (ขากลับ ขากลับ) เส้นทับกันจนแยกไม่ออก */
+  ok('แต่ละเที่ยวใช้คนละสี ไม่ใช่สีเดียวกันหมด',
+     new Set(drawn.colors).size === drawn.colors.length,
+     drawn.colors.join(' / '));
   ok('เป็นเส้นประ แยกจากเส้นทางหลักด้วยสายตา', drawn.dashed === true);
 
   console.log('');
@@ -195,6 +200,79 @@ try {
      removed.rows + ' เที่ยว · ' + removed.lines + ' เส้น');
   ok('หมุดของแถวที่ลบไปหายตามด้วย ไม่ค้างบนแผนที่',
      removed.marks === removed.rows * 2, removed.marks + ' หมุด');
+
+  console.log('');
+  console.log('═══ 5. ทุกเที่ยวเป็น "ขากลับ" เหมือนกันก็ต้องรองรับ ═══');
+  /* 21 ต.ค. 2569 — เจ้าของงานสั่งว่า "บางครั้งเขาอาจจะเขียนเป็น ขากลับ ขากลับ
+     ถ้าเขายืนยันเราก็ต้องรองรับเคสเขา" */
+  const sameDir = await ev([
+    // ข้อ 4 ลบแถวไปหนึ่ง เติมกลับให้ครบสามเที่ยว จะได้ทดสอบ "ขากลับ ขากลับ ขากลับ" จริง
+    "while (document.querySelectorAll('.taxi-entry').length < 3) addTaxiEntry('ขากลับ');",
+    "await new Promise(r=>setTimeout(r,600));",
+    "{const pts=[[13.72,100.52,13.65,100.49],[13.80,100.60,13.70,100.55]];",
+    " [...document.querySelectorAll('.taxi-entry')].forEach((r,i)=>{",
+    "   const f=r.querySelector('.taxi-from'), t=r.querySelector('.taxi-to');",
+    "   if(!f.dataset.lat){ const p=pts[i%pts.length];",
+    "     f.value='ต้นทาง '+(i+1); f.dataset.lat=p[0]; f.dataset.lng=p[1]; f.dataset.touched='1';",
+    "     t.value='ปลายทาง '+(i+1); t.dataset.lat=p[2]; t.dataset.lng=p[3]; t.dataset.touched='1'; } });}",
+    "document.querySelectorAll('.taxi-entry').forEach(r=>{",
+    "  const s=r.querySelector('.taxi-dir'); s.value='ขากลับ';",
+    "  s.dispatchEvent(new Event('change',{bubbles:true})); });",
+    "await new Promise(r=>setTimeout(r,400));",
+    "await drawTaxiLegLines();",
+    "await new Promise(r=>setTimeout(r,600));",
+    "const rows=[...document.querySelectorAll('.taxi-entry')];",
+    "return { dirs: rows.map(r=>r.querySelector('.taxi-dir').value),",
+    "         lines: (taxiLegLines||[]).length,",
+    "         marks: (taxiLegMarkers||[]).length,",
+    "         colors: (taxiLegLines||[]).map(l=>l.options.color) };"
+  ].join(NL));
+  ok('มีหลายเที่ยวให้ทดสอบจริง ไม่ใช่เที่ยวเดียว', sameDir.dirs.length >= 3,
+     sameDir.dirs.length + ' เที่ยว');
+  ok('ทุกแถวเป็นขากลับได้ ระบบไม่บังคับให้ต่างทิศ',
+     sameDir.dirs.every(d => d === 'ขากลับ'), sameDir.dirs.join(', '));
+  ok('ยังวาดเส้นครบทุกเที่ยวแม้ทิศทางซ้ำกัน',
+     sameDir.lines === sameDir.dirs.length, sameDir.lines + ' เส้น');
+  ok('ยังแยกสีได้แม้ทิศทางซ้ำกัน',
+     new Set(sameDir.colors).size === sameDir.colors.length,
+     sameDir.colors.join(' / '));
+
+  console.log('');
+  console.log('═══ 6. เบิกเฉพาะ Taxi (ไม่มีเส้นทางหลัก) ต้องบันทึกได้ ═══');
+  /* 21 ต.ค. 2569 — ตัวตรวจบังคับให้กรอกเส้นทางหลักเสมอ
+     ใบที่เบิกเฉพาะ Taxi จึงบันทึกไม่ได้ ทั้งที่กรอกแถว Taxi ครบแล้ว
+     ("ทั้ง ๆ ที่ผมใส่ครบถ้วนแล้วนะ") */
+  const saveTry = await ev([
+    "window.__saved=null; window.__a=[];",
+    "window.alert = m => { window.__a.push(String(m)); };",
+    "const of2=window.fetch;",
+    "window.fetch=function(u,i){const s=(typeof u==='string')?u:(u&&u.url)||'';",
+    "  if(i&&(i.method==='POST'||i.method==='PUT')&&s.indexOf('/expenses')>=0){",
+    "    window.__saved=i.body; return new Promise(()=>{}); }",
+    "  return of2(u,i);};",
+    "const rb=document.getElementById('requestedBy'); if(rb) rb.value='ทดสอบ แท็กซี่ล้วน';",
+    "const an=document.getElementById('activityName'); if(an) an.value='ประชุม';",
+    "document.querySelectorAll('.taxi-entry').forEach((r,i)=>{",
+    "  const amt=r.querySelector('.taxi-amt-ret'); if(amt){ amt.value=String(150+i*10);",
+    "    amt.dispatchEvent(new Event('input',{bubbles:true})); } });",
+    "await new Promise(r=>setTimeout(r,700));",
+    "const b=document.getElementById('submitBtn'); if(b){ b.disabled=false; b.click(); }",
+    "await new Promise(r=>setTimeout(r,2200));",
+    "return { body: window.__saved, alerts: window.__a.slice(0,2) };"
+  ].join(NL));
+  const blocked = (saveTry.alerts || []).some(a => /จุดที่รถไปส่ง/.test(a));
+  ok('ไม่ถูกบล็อกด้วยข้อความ "ระบุจุดเริ่มต้นและจุดที่รถไปส่ง"',
+     !blocked, (saveTry.alerts || []).join(' | ').slice(0, 120) || 'ไม่มีข้อความเตือน');
+  let sentObj = null;
+  try { sentObj = JSON.parse(saveTry.body || 'null'); } catch (e) {}
+  ok('ส่งข้อมูลออกไปได้จริง', !!sentObj,
+     sentObj ? 'ส่งออกแล้ว' : ((saveTry.alerts || []).join(' | ').slice(0, 150) || 'ไม่ได้ส่ง'));
+  if (sentObj) {
+    const ents = ((sentObj.inputMetadata || {})._costs || {}).taxiEntries || [];
+    ok('แนบหมุดของแต่ละเที่ยวไปด้วย (ใช้ตัดสินวงเงินตามพื้นที่)',
+       ents.length > 0 && ents.every(e => e.fromGeo && e.toGeo),
+       JSON.stringify(ents.map(e => !!(e.fromGeo && e.toGeo))));
+  }
 
   console.log('');
   ok('ไม่มี JavaScript error ตลอดการทดสอบ', pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '));

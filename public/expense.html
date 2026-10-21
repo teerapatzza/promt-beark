@@ -2352,17 +2352,27 @@
        ลากได้เหมือนหมุดเส้นทางหลัก เพราะแผนที่ไม่มีทุกซอยทุกบ้านเลขที่
        วิธีที่ระบบนี้ใช้มาตลอดคือหาที่ใกล้ ๆ แล้วให้ผู้ใช้ลากหมุดเอง
        ลากเสร็จพิกัดเขียนกลับลงช่องนั้น แล้ววัดระยะทางของเที่ยวใหม่ให้ */
-    const TAXI_PIN = {
-        from: { color: '#f97316', what: 'จุดเริ่มต้น' },
-        to:   { color: '#c2410c', what: 'จุดที่ลงจากรถ' }
-    };
+    /* สีแยกรายเที่ยว — เจ้าของงานทักว่า "สีมันเหมือนกันเกิน"
+       เที่ยวที่ซ้อนทับกันบนแผนที่ (เช่น ขากลับ ขากลับ สองเที่ยวในย่านเดียวกัน)
+       ถ้าใช้สีเดียวกันหมดจะแยกไม่ออกว่าเส้นไหนหมุดไหนเป็นของเที่ยวอะไร
+       เลี่ยงน้ำเงิน (#2563eb) กับม่วง (#7c3aed) เพราะเป็นสีของเส้นทางหลัก */
+    const TAXI_COLORS = [
+        { line: '#ea580c', from: '#f97316', to: '#9a3412' },   // ส้ม
+        { line: '#0d9488', from: '#14b8a6', to: '#115e59' },   // เขียวน้ำทะเล
+        { line: '#c026d3', from: '#d946ef', to: '#86198f' },   // บานเย็น
+        { line: '#ca8a04', from: '#eab308', to: '#854d0e' },   // เหลืองทอง
+        { line: '#0369a1', from: '#0ea5e9', to: '#075985' },   // ฟ้า
+        { line: '#be123c', from: '#f43f5e', to: '#881337' }    // แดงกุหลาบ
+    ];
+    const taxiColorOf = i => TAXI_COLORS[i % TAXI_COLORS.length];
+    const TAXI_PIN_WHAT = { from: 'จุดเริ่มต้น', to: 'จุดที่ลงจากรถ' };
 
     function addTaxiMarker(input, which, legNo) {
         const lat = parseFloat(input.dataset.lat), lng = parseFloat(input.dataset.lng);
         if (!isFinite(lat) || !isFinite(lng)) return;
-        const cfg = TAXI_PIN[which];
-        const mk = L.marker([lat, lng], { draggable: true, icon: pin(cfg.color) }).addTo(routeMap);
-        mk.bindTooltip('Taxi เที่ยวที่ ' + legNo + ' — ' + cfg.what
+        const col = taxiColorOf(legNo - 1);
+        const mk = L.marker([lat, lng], { draggable: true, icon: pin(col[which]) }).addTo(routeMap);
+        mk.bindTooltip('Taxi เที่ยวที่ ' + legNo + ' — ' + TAXI_PIN_WHAT[which]
             + (input.value ? ': ' + input.value : '') + ' (ลากได้)', { sticky: true });
         mk.on('dragend', function () {
             const p = mk.getLatLng();
@@ -2406,7 +2416,8 @@
                     ? leg.coords : [[a.lat, a.lng], [b.lat, b.lng]];
                 const dir = row.querySelector('.taxi-dir')?.value || 'ขาไป';
                 const ln = L.polyline(coords,
-                    { color: '#ea580c', weight: 4, opacity: .8, dashArray: '4 6' }).addTo(routeMap);
+                    { color: taxiColorOf(i).line, weight: 4, opacity: .85,
+                      dashArray: '4 6' }).addTo(routeMap);
                 ln.bindTooltip('Taxi เที่ยวที่ ' + (i + 1) + ' (' + dir + ')'
                     + (leg && leg.km ? ' ' + leg.km.toLocaleString('th-TH') + ' กม.' : ''),
                     { sticky: true });
@@ -4035,11 +4046,23 @@
         const entries = [];
         document.querySelectorAll('.taxi-entry').forEach(div => {
             const dir = div.querySelector('.taxi-dir').value;
+            /* 21 ต.ค. 2569 — เก็บหมุดของเที่ยวไปด้วย
+               วงเงิน Taxi ผูกกับพื้นที่ (ในเขต 750 / นอกเขตตามจริง)
+               ของเดิมตัดสินพื้นที่จากหมุดของ "เส้นทางหลัก" อย่างเดียว
+               ใบที่เบิกเฉพาะ Taxi ไม่มีหมุดเส้นทางหลัก ระบบจึงมองว่าอยู่นอกเขต
+               แล้วปล่อยวงเงินหลวมกว่าที่ควร ทั้งที่เที่ยวนั้นวิ่งอยู่ใน กทม.
+
+               ตอนนี้เที่ยว Taxi มีหมุดของตัวเองแล้ว ส่งไปด้วยเพื่อให้ตัดสิน
+               พื้นที่ของเที่ยวนั้นได้ตรง ๆ ทั้งฝั่งหน้าเว็บและฝั่งเซิร์ฟเวอร์ */
+            const geoOf = el => (el && el.dataset.lat && el.dataset.lng)
+                ? { lat: parseFloat(el.dataset.lat), lng: parseFloat(el.dataset.lng) } : null;
             const e = {
                 date:      div.querySelector('.taxi-date').value,
                 direction: dir,
                 from:      div.querySelector('.taxi-from').value,
                 to:        div.querySelector('.taxi-to').value,
+                fromGeo:   geoOf(div.querySelector('.taxi-from')),
+                toGeo:     geoOf(div.querySelector('.taxi-to')),
             };
             if (dir === 'ขากลับ') {
                 e.amount = parseFloat(div.querySelector('.taxi-amt-ret').value) || 0;
@@ -4746,8 +4769,25 @@
             // แล้วบันทึกลงฐานข้อมูลเป็น {} ทำให้เอกสารพิมพ์ออกมาเป็น [object Object]
             const travelFrom = document.getElementById('travelFrom')?.value || '';
             const travelTo   = document.getElementById('travelTo')?.value   || '';
-            if (needReceipt && (!travelFrom.trim() || !travelTo.trim()))
-                return alert("❌ กรุณาระบุสถานที่ 'จุดเริ่มต้น' และ 'จุดที่รถไปส่ง' ให้ครบถ้วน");
+            /* 21 ต.ค. 2569 — ใบที่เบิกเฉพาะ Taxi ไม่ได้ใช้เส้นทางหลักเลย
+               ใบรับรองค่าพาหนะดึง จาก/ถึง จากแถว Taxi ของแต่ละเที่ยว
+               ของเดิมบังคับให้กรอกเส้นทางหลักเสมอ ผู้ใช้ที่กรอกแถว Taxi ครบแล้ว
+               จึงบันทึกไม่ได้ และหาไม่เจอว่าต้องไปแก้ตรงไหน
+               (เจ้าของงานเจอเอง: "ทั้ง ๆ ที่ผมใส่ครบถ้วนแล้วนะ")
+
+               เงื่อนไขที่ถูกคือ "ใบนี้มีที่มาของเส้นทางหรือยัง" ไม่ใช่
+               "กรอกช่องเส้นทางหลักหรือยัง" — แถว Taxi ที่ปักหมุดครบก็นับ */
+            const taxiRowsOk = (function () {
+                const rows = [...document.querySelectorAll('.taxi-entry')];
+                if (!rows.length) return false;
+                return rows.every(function (r) {
+                    const f = r.querySelector('.taxi-from'), t = r.querySelector('.taxi-to');
+                    return !!(f && t && f.value.trim() && t.value.trim());
+                });
+            })();
+            if (needReceipt && (!travelFrom.trim() || !travelTo.trim()) && !taxiRowsOk)
+                return alert("❌ กรุณาระบุสถานที่ 'จุดเริ่มต้น' และ 'จุดที่รถไปส่ง' ให้ครบถ้วน\n\n" +
+                             "หรือถ้าเบิกเฉพาะค่า Taxi ให้กรอก จุดเริ่มต้น/จุดที่ลงจากรถ ของทุกเที่ยวให้ครบ");
             /* ขากลับต้องรู้ทั้งจุดออกและจุดถึง แต่ "รู้" ไม่ได้แปลว่าต้องพิมพ์
                เว้นว่าง = ใช้จุดของขาไป ซึ่งมีพิกัดอยู่แล้ว เป็นกติกาที่เขียนไว้ในช่องนั่นเอง
                ของเดิมบังคับให้พิมพ์ปลายทางเสมอ และยังอ้างถึงติ๊ก "ขากลับไปที่อื่น"
