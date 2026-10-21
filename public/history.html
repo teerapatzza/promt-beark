@@ -765,8 +765,20 @@
                    ตอนนี้ดูจากพาหนะที่ใช้จริง: มีแถว Taxi -> ช่อง Taxi
                    ติ๊กรถส่วนตัว (carType) -> ช่องค่าน้ำมันเชื้อเพลิง
                    ยอดเหมาจ่ายไปลงช่องที่ถูกติ๊ก ไม่ใช่ช่องตายตัว */
-                const flatByTaxi = flatInfo && (hasTaxiOut || hasTaxiRet);
-                const flatByCar  = flatInfo && !flatByTaxi && carType !== 'ไม่ระบุ';
+                /* 21 ต.ค. 2569 — ใบที่กรอกตั้งแต่ 2.23.0 ตอบมาตรง ๆ ว่าเดินทางด้วยอะไร
+                   (_flatVehicle) ให้ยึดคำตอบนั้นก่อนเสมอ เพราะเป็นคำที่คนกรอกพูดเอง
+
+                   ก่อนหน้านั้นไม่มีคำถามนี้ ต้องเดาจากร่องรอยที่เหลืออยู่ในใบ
+                   ใบเก่าจึงยังใช้ทางเดาเดิม ห้ามตัดทิ้ง ไม่งั้นใบที่ออกไปแล้ว
+                   จะพิมพ์ออกมาไม่เหมือนของจริงที่ส่งการเงินไป */
+                const flatVeh = flatInfo
+                    ? (meta._flatVehicle === 'taxi' ? 'taxi'
+                     : meta._flatVehicle === 'car'  ? 'car' : null)
+                    : null;
+                const flatByTaxi = flatInfo
+                    && (flatVeh ? flatVeh === 'taxi' : (hasTaxiOut || hasTaxiRet));
+                const flatByCar  = flatInfo
+                    && (flatVeh ? flatVeh === 'car' : (!flatByTaxi && carType !== 'ไม่ระบุ'));
                 // เหมาจ่ายที่ไม่รู้ว่านั่งอะไรเลย ให้ลงช่อง Taxi ไว้ก่อน
                 // เพราะ บัญชี ๘ ข้อ ๕ เป็นค่าพาหนะ ไม่ใช่ค่าเชื้อเพลิง
                 const flatNoVehicle = flatInfo && !flatByTaxi && !flatByCar;
@@ -793,10 +805,13 @@
                    ใบคิดตามระยะจริง: ติ๊กเมื่อมีการเบิกรถ (เหมือนเดิมทุกประการ)
                    ใบเหมาจ่ายที่ขับรถเอง: ติ๊กที่นี่ และยอดเหมาจ่ายมาลงที่นี่ */
                 const rcFuelOn      = flatInfo ? flatByCar : (carType !== 'ไม่ระบุ');
-                const rcFuelHasOut  = (flatInfo ? flatByCar : true)
-                                      && (carType === 'ขาไป'   || carType === 'ไป-กลับ');
-                const rcFuelHasRet  = (flatInfo ? flatByCar : true)
-                                      && (carType === 'ขากลับ' || carType === 'ไป-กลับ');
+                /* ใบเหมาจ่ายบอกขาที่เบิกไว้ใน _flatRate.legs อยู่แล้ว ต้องอ่านจากตรงนั้น
+                   จะอ่านจาก carType ไม่ได้ เพราะใบที่กดเหมาจ่ายตั้งแต่แรกได้ "ไม่ระบุ"
+                   แล้วจะไม่พิมพ์ขาไหนออกมาเลยทั้งที่เบิกทั้งไปและกลับ */
+                const rcFuelHasOut  = flatInfo ? (flatByCar && !!flatOut)
+                                      : (carType === 'ขาไป'   || carType === 'ไป-กลับ');
+                const rcFuelHasRet  = flatInfo ? (flatByCar && !!flatRet)
+                                      : (carType === 'ขากลับ' || carType === 'ไป-กลับ');
                 const rcFuelOutAmt  = flatInfo ? (flatByCar ? ((flatOut || {}).amount || 0) : 0) : fuelOut;
                 const rcFuelRetAmt  = flatInfo ? (flatByCar ? ((flatRet || {}).amount || 0) : 0) : fuelRet;
 
@@ -1224,9 +1239,9 @@
                                 ${rcRow('', flatInfo ? rcFlatNote : rcFromTo('', ''), '')}
 
                                 ${rcRow('', rcSquare(rcFuelOn) + ' ค่าน้ำมันเชื้อเพลิง &nbsp;&nbsp;&nbsp;&nbsp;'
-                                        + rcCircle(rcFuelOn && carType === 'ขาไป')   + ' ขาไป &nbsp;&nbsp;&nbsp;&nbsp;'
-                                        + rcCircle(rcFuelOn && carType === 'ขากลับ') + ' ขากลับ &nbsp;&nbsp;&nbsp;&nbsp;'
-                                        + rcCircle(rcFuelOn && carType === 'ไป-กลับ') + ' ไป-กลับ', '')}
+                                        + rcCircle(rcFuelHasOut && !rcFuelHasRet) + ' ขาไป &nbsp;&nbsp;&nbsp;&nbsp;'
+                                        + rcCircle(rcFuelHasRet && !rcFuelHasOut) + ' ขากลับ &nbsp;&nbsp;&nbsp;&nbsp;'
+                                        + rcCircle(rcFuelHasOut && rcFuelHasRet)  + ' ไป-กลับ', '')}
 
                                 ${rcRow(rcFuelHasOut ? dateGo : '',
                                         rcFromTo(rcFuelHasOut ? tr.from : '', rcFuelHasOut ? tr.to : ''), '')}

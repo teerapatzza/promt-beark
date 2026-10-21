@@ -703,6 +703,37 @@
                                 <span class="text-slate-500">— คิดเป็นก้อนตามช่วงระยะทาง แยกทีละเที่ยว รวมค่าทางด่วนแล้ว</span></span>
                         </label>
                         <div id="flatRateNote" class="hidden mt-2 text-[11px] leading-relaxed"></div>
+
+                        <!-- ── เหมาจ่ายเดินทางด้วยอะไร ──
+                             21 ต.ค. 2569 — ใบรับรองค่าพาหนะ (FM-SAM-095-00) มีให้กาแค่
+                             "ค่า Taxi" กับ "ค่าน้ำมันเชื้อเพลิง" ไม่มีช่องกลางสำหรับเหมาจ่าย
+                             ต้องเลือกกาอันใดอันหนึ่งตามที่เขาเดินทางจริง
+
+                             ก่อนหน้านี้ไม่ได้ถาม คนที่กดเหมาจ่ายตั้งแต่แรกจึงได้
+                             carType = "ไม่ระบุ" ใบเลยกาช่อง Taxi เสมอ
+                             คนที่ขับรถไปเองบอกระบบไม่ได้เลย (เจ้าของงานแจ้ง 21 ต.ค.)
+
+                             ข้อนี้ไม่แตะเงินแม้แต่บาทเดียว — ยอดยังมาจาก flatResult()
+                             ซึ่งคิดจากช่วงระยะทางอย่างเดียว ไม่เคยอ่านค่านี้
+                             และห้ามเอาไปผูกกับ carType เพราะในโหมดเหมาจ่าย carType
+                             แปลว่า "เบิกขาไหนบ้าง" ไม่ใช่ "นั่งรถอะไร" ผูกแล้วจำนวนขาจะเพี้ยน -->
+                        <div id="flatVehicleBox" class="hidden mt-2.5 pt-2.5 border-t border-slate-200">
+                            <div class="text-xs font-bold text-slate-700 mb-1.5">เดินทางด้วยอะไร
+                                <span class="font-normal text-slate-500">— ใช้กาช่องในใบรับรองค่าพาหนะ ไม่มีผลกับยอดเงิน</span>
+                            </div>
+                            <div class="flex flex-wrap gap-x-5 gap-y-1">
+                                <label class="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+                                    <input type="radio" name="flatVehicle" value="car" checked
+                                        onchange="onFlatVehicleChange()" class="cursor-pointer">
+                                    <span>รถส่วนตัว <span class="text-slate-500">(กาช่องค่าน้ำมันเชื้อเพลิง)</span></span>
+                                </label>
+                                <label class="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+                                    <input type="radio" name="flatVehicle" value="taxi"
+                                        onchange="onFlatVehicleChange()" class="cursor-pointer">
+                                    <span>Taxi <span class="text-slate-500">(กาช่องค่า Taxi)</span></span>
+                                </label>
+                            </div>
+                        </div>
                     </div>
 
                     <div id="flatLegNote" class="hidden mb-3 text-[11px] px-2.5 py-1.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800"></div>
@@ -1897,8 +1928,42 @@
         if (fuelNote) fuelNote.classList.toggle('hidden', flat);
 
         applyFlatLockToTaxi();
+        applyFlatVehicleBox();
         showFlatRateNote();
         if (typeof calculateTravelTotal === 'function') calculateTravelTotal();
+    }
+
+    /* ── "เดินทางด้วยอะไร" ของโหมดเหมาจ่าย ──
+       โผล่เฉพาะตอนเลือกเหมาจ่าย เพราะโหมดคิดตามระยะจริงมีติ๊กพาหนะของตัวเองอยู่แล้ว
+       ข้อนี้ตอบใบรับรองค่าพาหนะอย่างเดียว ไม่เข้าสูตรคิดเงินเลยสักทาง */
+    function applyFlatVehicleBox() {
+        const box = document.getElementById('flatVehicleBox');
+        if (!box) return;
+        const flat = flatMethodOn();
+        box.classList.toggle('hidden', !flat);
+        if (!flat) return;
+
+        /* เดาคำตอบแรกให้จากสิ่งที่เขาทำมาก่อนหน้า ถ้ากรอกเที่ยว Taxi ไว้แล้ว
+           ก็แปลว่านั่ง Taxi มา ไม่ต้องให้ตอบซ้ำ — แต่พอเขาแตะเองเมื่อไหร่
+           ให้ถือว่าคำตอบของเขาเป็นใหญ่ ห้ามเดาทับอีก (กติกา touched เดิมของระบบ) */
+        const picked = document.querySelector('input[name="flatVehicle"]:checked');
+        if (picked && picked.dataset.touched) return;
+        const hasTaxi = !!document.querySelector('.taxi-entry');
+        const want = hasTaxi ? 'taxi' : 'car';
+        const r = document.querySelector('input[name="flatVehicle"][value="' + want + '"]');
+        if (r) r.checked = true;
+    }
+
+    function onFlatVehicleChange() {
+        document.querySelectorAll('input[name="flatVehicle"]')
+            .forEach(function (r) { r.dataset.touched = '1'; });
+        // ไม่เรียกคิดเงินใหม่โดยตั้งใจ ข้อนี้ไม่มีผลกับยอด
+    }
+
+    /** เดินทางด้วยอะไรในโหมดเหมาจ่าย — 'car' หรือ 'taxi' */
+    function flatVehicleValue() {
+        const r = document.querySelector('input[name="flatVehicle"]:checked');
+        return (r && r.value === 'taxi') ? 'taxi' : 'car';
     }
 
     /** บอกผู้ใช้ว่าเงินก้อนนี้มาจากไหน ทีละเที่ยว ไม่ใช่โชว์แค่ยอดรวม */
@@ -4558,6 +4623,10 @@
                 const fr = typeof flatResult === 'function' ? flatResult() : null;
                 if (fr && fr.ok) {
                     metadata._fuelMethod = 'flat';
+                    /* เดินทางด้วยอะไร ใช้ตัดสินว่าใบรับรองจะกาช่องไหน
+                       ไม่เกี่ยวกับยอดเงิน ยอดมาจาก fr.total ด้านล่างทั้งก้อน */
+                    metadata._flatVehicle = typeof flatVehicleValue === 'function'
+                        ? flatVehicleValue() : 'car';
                     metadata._flatRate = {
                         total: fr.total,
                         legs: fr.legs.map(function (l) {
@@ -5193,6 +5262,27 @@
             if (methodRadio) {
                 methodRadio.checked = true;
                 if (typeof onFuelMethodChange === 'function') onFuelMethodChange();
+            }
+
+            /* คืนคำตอบ "เดินทางด้วยอะไร" ของใบเดิม ต้องทำหลัง onFuelMethodChange()
+               เพราะตัวนั้นเป็นคนเดาค่าเริ่มต้นให้ ถ้าคืนก่อนจะถูกเดาทับ
+
+               ตีตรา touched ไว้ด้วย = คำตอบนี้มาจากใบจริง ไม่ใช่ค่าที่ระบบเดา
+               ห้ามให้อะไรมาเปลี่ยนทีหลัง ไม่งั้นเปิดใบมาดูเฉย ๆ แล้วกดบันทึก
+               ช่องที่กาในใบจะเปลี่ยนเองเงียบ ๆ */
+            if (savedMethod === 'flat') {
+                const savedVeh = meta._flatVehicle === 'taxi' ? 'taxi'
+                               : meta._flatVehicle === 'car'  ? 'car'
+                               : null;
+                if (savedVeh) {
+                    const vr = document.querySelector(
+                        'input[name="flatVehicle"][value="' + savedVeh + '"]');
+                    if (vr) {
+                        vr.checked = true;
+                        document.querySelectorAll('input[name="flatVehicle"]')
+                            .forEach(function (x) { x.dataset.touched = '1'; });
+                    }
+                }
             }
 
             // Extra bottom entries

@@ -232,6 +232,60 @@ try {
      (taxiFlat.taxiBlock.match(/550\.00/g) || []).length === 2,
      (taxiFlat.taxiBlock.match(/550\.00/g) || []).length + ' ก้อน');
 
+  console.log('');
+  console.log('');
+  /* 21 ต.ค. 2569 — เจ้าของงานอนุมัติให้ถามในฟอร์มว่า "เดินทางด้วยอะไร"
+     เพราะคนที่กดเหมาจ่ายตั้งแต่แรกจะได้ _carType = "ไม่ระบุ" + taxiEntries = []
+     ใบเลยกาช่อง Taxi เสมอ คนที่ขับรถเองบอกระบบไม่ได้
+
+     คำตอบเก็บใน _flatVehicle และต้องชนะการเดาจากร่องรอยเดิมทุกกรณี
+     เพราะเป็นคำที่คนกรอกพูดเอง ไม่ใช่สิ่งที่ระบบอนุมานให้ */
+  console.log('=== 9. ใบเหมาจ่ายที่ตอบว่า "รถส่วนตัว" แม้ไม่มี carType ก็ต้องกาช่องค่าน้ำมัน ===');
+  const vehCarRec = mkRecord(BASE, Object.assign({}, { _carType: 'ไม่ระบุ' }, {
+    _fuelMethod: 'flat',
+    _flatVehicle: 'car',
+    _flatRate: { total: 1100, legs: [
+      { dir: 'ขาไป',   km: 110, amount: 550, label: 'ระยะทาง 41.00 - 50.99 กม.' },
+      { dir: 'ขากลับ', km: 110, amount: 550, label: 'ระยะทาง 41.00 - 50.99 กม.' } ] }
+  }));
+  const vehCar = await ev(READ_RC + NEWLINE + 'return await readRc(' + JSON.stringify(vehCarRec) + ');');
+  ok('ตอบรถส่วนตัว: ติ๊กช่องค่าน้ำมันเชื้อเพลิง', vehCar.fuelTick === true, vehCar.fuelHead.slice(0, 70));
+  ok('ตอบรถส่วนตัว: ไม่ติ๊กช่อง Taxi', vehCar.taxiTick === false, vehCar.taxiHead.slice(0, 70));
+  ok('ยอดเหมาจ่ายลงบล็อกค่าน้ำมัน',
+     (vehCar.fuelBlock.match(/550\.00/g) || []).length === 2,
+     (vehCar.fuelBlock.match(/550\.00/g) || []).length + ' ก้อน');
+  ok('ยังบอกขาไป-ขากลับครบ แม้ carType = ไม่ระบุ',
+     /ไป-กลับ/.test(vehCar.fuelHead) && /◉/.test(vehCar.fuelHead),
+     vehCar.fuelHead.slice(0, 70));
+
+  console.log('');
+  console.log('=== 10. ใบเหมาจ่ายที่ตอบว่า "Taxi" ต้องกาช่อง Taxi แม้จะเคยติ๊กรถไว้ ===');
+  const vehTaxiRec = mkRecord(BASE, {
+    _carType: 'ไป-กลับ',            // ร่องรอยเก่าชี้ไปทางรถส่วนตัว
+    _fuelMethod: 'flat',
+    _flatVehicle: 'taxi',            // แต่คนกรอกบอกเองว่านั่ง Taxi
+    _flatRate: { total: 1100, legs: [
+      { dir: 'ขาไป',   km: 110, amount: 550, label: 'ระยะทาง 41.00 - 50.99 กม.' },
+      { dir: 'ขากลับ', km: 110, amount: 550, label: 'ระยะทาง 41.00 - 50.99 กม.' } ] }
+  });
+  const vehTaxi = await ev(READ_RC + NEWLINE + 'return await readRc(' + JSON.stringify(vehTaxiRec) + ');');
+  ok('คำตอบของคนกรอกชนะร่องรอยเก่า: ติ๊กช่อง Taxi', vehTaxi.taxiTick === true, vehTaxi.taxiHead.slice(0, 70));
+  ok('ไม่ติ๊กช่องค่าน้ำมัน', vehTaxi.fuelTick === false, vehTaxi.fuelHead.slice(0, 70));
+  ok('ยอดเหมาจ่ายลงบล็อก Taxi',
+     (vehTaxi.taxiBlock.match(/550\.00/g) || []).length === 2,
+     (vehTaxi.taxiBlock.match(/550\.00/g) || []).length + ' ก้อน');
+
+  console.log('');
+  console.log('=== 11. ใบเก่าที่ไม่มีคำตอบนี้ ต้องพิมพ์เหมือนเดิมเป๊ะ ===');
+  const oldFlat = await ev(READ_RC + NEWLINE + 'return await readRc(' + JSON.stringify(flatRec) + ');');
+  ok('ใบเก่า (_carType=ไป-กลับ ไม่มี _flatVehicle) ยังติ๊กค่าน้ำมัน',
+     oldFlat.fuelTick === true && oldFlat.taxiTick === false,
+     'น้ำมัน=' + oldFlat.fuelTick + ' Taxi=' + oldFlat.taxiTick);
+  ok('ใบเก่ายอดยังอยู่ที่บล็อกเดิม',
+     (oldFlat.fuelBlock.match(/550\.00/g) || []).length === 2,
+     (oldFlat.fuelBlock.match(/550\.00/g) || []).length + ' ก้อน');
+
+  console.log('');
   ok('ไม่มี JavaScript error ตลอดการทดสอบ', pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '));
 
   console.log('');

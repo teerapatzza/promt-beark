@@ -63,6 +63,10 @@ const SAVED = {
                toGeo:   { lat: 13.85, lng: 100.52, precision: 'exact', label: 'สรพ.' } },
     _carType: 'ไป-กลับ',
     _fuelMethod: 'flat',
+    /* 21 ต.ค. 2569 — ใบตั้งแต่ 2.23.0 บอกเองว่าเดินทางด้วยอะไร
+       ใบนี้ขับรถไปเอง เปิดมาแก้ต้องกลับมาเป็น "รถส่วนตัว"
+       ถ้าถูกเดาทับแล้วกดบันทึก ช่องที่กาในใบจะเปลี่ยนเองเงียบ ๆ */
+    _flatVehicle: 'car',
     _flatRate: { total: 500, legs: [
       { dir: 'ขาไป',   km: 15.5, amount: 250, label: 'ระยะทาง 11.00 - 20.99 กม.' },
       { dir: 'ขากลับ', km: 15.5, amount: 250, label: 'ระยะทาง 11.00 - 20.99 กม.' } ] },
@@ -124,6 +128,8 @@ try {
     "return {",
     "  method: r ? r.value : null,",
     "  flatOn: (typeof flatMethodOn === 'function') ? flatMethodOn() : null,",
+    "  vehicle: (document.querySelector('input[name=\"flatVehicle\"]:checked')||{}).value || null,",
+    "  vehicleBoxShown: !document.getElementById('flatVehicleBox').classList.contains('hidden'),",
     "  carType: (document.getElementById('carType')||{}).value,",
     "  from: (document.getElementById('travelFrom')||{}).value,",
     "  to: (document.getElementById('travelTo')||{}).value,",
@@ -134,6 +140,8 @@ try {
   ok('ติ๊กกลับมาที่ "เหมาจ่าย" ไม่ใช่ "ตามระยะจริง"', st.method === 'flat', String(st.method));
   ok('ระบบรู้ว่าอยู่โหมดเหมาจ่าย', st.flatOn === true, String(st.flatOn));
   ok('ยอดบนหน้าจอยังเป็น 500 เท่าใบจริง', st.total === 500, st.total + ' บาท');
+  ok('คำถาม "เดินทางด้วยอะไร" โผล่ขึ้นมา', st.vehicleBoxShown === true);
+  ok('คำตอบเดิมกลับมาเป็น "รถส่วนตัว" ไม่ถูกเดาทับ', st.vehicle === 'car', String(st.vehicle));
   ok('จุดเริ่มต้น-จุดหมายกลับมาครบ',
      st.from === 'โชคชัย 4 ซอย 32' && st.to === 'สถาบันรับรองคุณภาพสถานพยาบาล',
      st.from + ' → ' + st.to);
@@ -160,6 +168,8 @@ try {
        !!(m._flatRate && Number(m._flatRate.total) === 500), JSON.stringify(m._flatRate || null).slice(0, 90));
     ok('ยอดที่ส่งออกไปยังเป็น 500', Number(sentObj.amount) === 500, String(sentObj.amount));
     ok('รูปแบบรถยังเป็นไป-กลับเหมือนเดิม', m._carType === 'ไป-กลับ', String(m._carType));
+    ok('ส่งคำตอบพาหนะเดิมกลับไป ไม่กลายเป็น taxi',
+       m._flatVehicle === 'car', String(m._flatVehicle));
   }
 
   ok('ไม่มี JavaScript error ตลอดการทดสอบ', pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '));
