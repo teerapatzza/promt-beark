@@ -1063,6 +1063,25 @@
                                 <div id="affiliationListContainer" class="space-y-2 mt-3"></div>
                             </div>
 
+                            <!-- Activity List
+                                 21 ต.ค. 2569 — ช่อง "ระบุกิจกรรม" ในหน้ากรอกใบเบิก
+                                 เปลี่ยนจากพิมพ์อิสระเป็นเลือกประเภทจากรายการนี้
+                                 ผู้ใช้พิมพ์เพิ่มเองได้ที่หน้ากรอก แล้วมาโผล่ที่นี่
+                                 แอดมินมีหน้าที่เก็บกวาดชื่อซ้ำหรือชื่อที่พิมพ์ผิด -->
+                            <div class="p-4 bg-slate-50 rounded-lg border border-slate-200 mt-4">
+                                <div class="flex justify-between items-center mb-3">
+                                    <div>
+                                        <label class="block text-sm font-bold text-slate-700">📋 รายการประเภทกิจกรรม</label>
+                                        <p class="text-xs text-slate-500 mt-1">ประเภทสั้น ๆ ที่ขึ้นแถวบนของใบรับรองค่าพาหนะ เช่น กิจกรรมเยี่ยมสำรวจ — รายละเอียดยาว ๆ ผู้ใช้พิมพ์ที่แถวล่างแทน</p>
+                                    </div>
+                                    <button type="button" onclick="addActivityType()"
+                                        class="text-xs bg-violet-600 text-white px-3 py-1.5 rounded-lg hover:bg-violet-700 font-medium">
+                                        + เพิ่มประเภท
+                                    </button>
+                                </div>
+                                <div id="activityListContainer" class="space-y-2 mt-3"></div>
+                            </div>
+
                             <!-- Action Buttons -->
                             <div class="flex items-center gap-4 pt-6 border-t-2 border-slate-200">
                                 <button onclick="saveSettings()"
@@ -2245,6 +2264,10 @@
             window.affiliationList = settings.affiliationList || [];
             renderAffiliations();
 
+            // Populate activity-type list
+            window.activityList = settings.activityList || [];
+            renderActivityTypes();
+
             loading.classList.add('hidden');
             form.classList.remove('hidden');
         } catch (err) {
@@ -2355,7 +2378,8 @@
                 hotelRateSingle: parseInt(document.getElementById('setting-hotelRateSingle').value) || 1500,
                 hotelRateDouble: parseInt(document.getElementById('setting-hotelRateDouble').value) || 1000,
                 positionList: window.positionList || [],
-                affiliationList: window.affiliationList || []
+                affiliationList: window.affiliationList || [],
+                activityList: window.activityList || []
             };
 
             console.log('📤 Sending to backend:', settings);
@@ -2436,7 +2460,8 @@
                 hotelRateSingle: parseInt(document.getElementById('setting-hotelRateSingle').value) || 1500,
                 hotelRateDouble: parseInt(document.getElementById('setting-hotelRateDouble').value) || 1000,
                 positionList: window.positionList || [],
-                affiliationList: window.affiliationList || []
+                affiliationList: window.affiliationList || [],
+                activityList: window.activityList || []
             };
 
             const res = await fetch('/settings', {
@@ -2449,6 +2474,85 @@
             console.log('✅ Affiliations auto-saved successfully!');
         } catch (err) {
             console.error('❌ Auto-save affiliations failed:', err);
+            alert('❌ บันทึกไม่สำเร็จ: ' + err.message);
+        }
+    }
+
+    // ── Activity-type Management ───────────────────────────
+    // รายการนี้ผู้ใช้เติมเข้ามาเองได้จากหน้ากรอกใบเบิก (/settings/list-append)
+    // แอดมินจึงมีหน้าที่หลักคือเก็บกวาดชื่อซ้ำหรือชื่อที่พิมพ์ผิด
+    const escAdminHtml = s => String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+    function renderActivityTypes() {
+        const container = document.getElementById('activityListContainer');
+        if (!container) return;
+        if (!window.activityList || window.activityList.length === 0) {
+            container.innerHTML = '<p class="text-xs text-slate-400 italic">ยังไม่มีประเภทกิจกรรม — กดปุ่ม "+ เพิ่มประเภท" ด้านบน</p>';
+            return;
+        }
+        container.innerHTML = window.activityList.map((act, i) => `
+            <div class="flex items-center gap-2 p-2 bg-white rounded border border-slate-200">
+                <span class="text-xs text-slate-500 w-6">${i + 1}.</span>
+                <input type="text" value="${escAdminHtml(act)}"
+                    class="activity-input flex-1 border border-slate-200 px-3 py-1.5 rounded text-sm outline-none focus:border-violet-400"
+                    onchange="updateActivityType(${i}, this.value)">
+                <button type="button" onclick="removeActivityType(${i})"
+                    class="text-red-500 hover:text-red-700 text-sm px-2">
+                    ✕
+                </button>
+            </div>
+        `).join('');
+    }
+
+    async function addActivityType() {
+        if (!window.activityList) window.activityList = [];
+        window.activityList.push('ประเภทใหม่');
+        renderActivityTypes();
+        await autoSaveActivityTypes();
+    }
+
+    async function removeActivityType(index) {
+        /* ลบแล้วใบเก่าที่เคยเลือกประเภทนี้ไม่เปลี่ยนตาม เพราะใบเก็บข้อความไว้ในตัวเอง
+           บอกให้ชัด จะได้ไม่มีใครกลัวว่าลบแล้วใบที่ส่งไปแล้วจะเปลี่ยน */
+        if (confirm('ลบประเภท "' + (window.activityList[index] || '') + '" ออกจากรายการ?\n\n'
+                  + 'ใบเบิกที่เคยเลือกประเภทนี้ไปแล้วจะไม่เปลี่ยนตาม')) {
+            window.activityList.splice(index, 1);
+            renderActivityTypes();
+            await autoSaveActivityTypes();
+        }
+    }
+
+    window.updateActivityType = async function (index, value) {
+        window.activityList[index] = value.trim();
+        clearTimeout(window._activitySaveTimeout);
+        window._activitySaveTimeout = setTimeout(async () => {
+            await autoSaveActivityTypes();
+        }, 1000);
+    };
+
+    async function autoSaveActivityTypes() {
+        try {
+            const settings = {
+                fuelRate: parseFloat(document.getElementById('setting-fuelRate').value) || 5,
+                taxiMaxPerTrip: parseInt(document.getElementById('setting-taxiMaxPerTrip').value) || 300,
+                taxiMaxOutsidePerTrip: parseInt(document.getElementById('setting-taxiMaxOutsidePerTrip').value) || 1200,
+                hotelRateSingle: parseInt(document.getElementById('setting-hotelRateSingle').value) || 1500,
+                hotelRateDouble: parseInt(document.getElementById('setting-hotelRateDouble').value) || 1000,
+                positionList: window.positionList || [],
+                affiliationList: window.affiliationList || [],
+                activityList: window.activityList || []
+            };
+            const res = await fetch('/settings', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(settings)
+            });
+            if (!res.ok) throw new Error('Failed to save');
+            console.log('✅ Activity types auto-saved successfully!');
+        } catch (err) {
+            console.error('❌ Auto-save activity types failed:', err);
             alert('❌ บันทึกไม่สำเร็จ: ' + err.message);
         }
     }

@@ -393,7 +393,12 @@
                      ชื่อกิจกรรมถูกพิมพ์ลงเอกสารสองที่ (ช่องกิจกรรม กับ กิจกรรมเพิ่มเติม)
                      วัดแล้วหน้าเริ่มล้น A4 ที่ราว 250 ตัวอักษร ที่ 200 ยังเหลือที่ว่าง 6px
                      ใบที่ยาวที่สุดที่ใช้งานจริงอยู่ที่ 158 ตัวอักษร -->
-                <input type="text" id="activityName" maxlength="200" placeholder="ระบุชื่อกิจกรรม (จะแสดงเฉพาะในใบรับรองแทนใบเสร็จฯ)" class="w-full border-2 border-slate-200 p-3.5 rounded-xl text-lg focus:border-blue-500 outline-none transition-all" oninput="syncActivityFromMainToExtra(); updateActivityCounter()">
+                <!-- 21 ต.ค. 2569 — เปลี่ยนจากพิมพ์อิสระเป็นเลือกประเภทจากรายการ
+                     เจ้าของงานเปิดใบจริงแล้วเห็นว่าชื่อกิจกรรมที่พิมพ์เองยาวมาก
+                     จนไปดันช่องในใบ PDF สูงขึ้นจนใบเกือบตกไปอีกหน้า
+                     ช่องนี้จึงเหลือแค่ "ประเภท" สั้น ๆ ส่วนรายละเอียดย้ายไปแถวล่าง
+                     ไม่มีในรายการก็พิมพ์เพิ่มได้ คนถัดไปเห็นทันที (กลไกเดียวกับบทบาท/ส่วนงาน) -->
+                <input type="text" id="activityName" maxlength="200" placeholder="เลือกประเภทกิจกรรม หรือพิมพ์เพิ่มเอง" class="w-full border-2 border-slate-200 p-3.5 rounded-xl text-lg focus:border-blue-500 outline-none transition-all" oninput="syncActivityFromMainToExtra(); updateActivityCounter()">
                 <div id="activityCounter" class="hidden text-xs mt-1.5 text-right"></div>
                 <!-- พรีวิวว่าชื่อกิจกรรมจะขึ้นกี่บรรทัดบนเอกสารจริง -->
                 <div id="activityPreview" class="hidden mt-2"></div>
@@ -740,6 +745,12 @@
 
                     <div id="taxiCapNote" class="hidden mb-3 text-[11px] px-2.5 py-1.5 rounded-md bg-amber-50 border border-amber-200 text-amber-800"></div>
 
+                    <!-- 21 ต.ค. 2569 — ใบรับรองค่าพาหนะกางทุกเที่ยวเป็นบรรทัดของตัวเอง
+                         ตารางย่อตัวเองตามจำนวนเที่ยวได้ถึง 11 เที่ยว (วัดจากหน้าจริง)
+                         เกินกว่านั้นใส่หน้าเดียวไม่ลงแม้จะย่อจนเล็กที่สุดที่ยังอ่านออก
+                         ต้องบอกตั้งแต่ตอนกรอก ไม่ใช่ให้ไปเจอตอนพิมพ์ออกมา -->
+                    <div id="taxiRowsNote" class="hidden mb-3 text-[11px] px-2.5 py-1.5 rounded-md bg-rose-50 border border-rose-200 text-rose-800"></div>
+
                     <!-- ═══════════ ขาไป (เคสปกติใช้การ์ดนี้ใบเดียว) ═══════════ -->
                     <div class="bg-white rounded-xl border-2 border-emerald-200 p-4 mb-4">
                         <div class="flex items-baseline gap-2 mb-3 pb-2 border-b border-emerald-100">
@@ -989,6 +1000,10 @@
                         <div id="extraActivitiesList" class="space-y-2">
                             <p class="text-xs text-slate-400 italic">ยังไม่มีรายการ — กดปุ่ม "เพิ่มแถว" ด้านบน</p>
                         </div>
+                        <!-- บอกตั้งแต่ตอนพิมพ์ว่าใบจะย่อตัวอักษรลงแค่ไหน
+                             ผู้ใช้จะได้ตัดสินใจเองว่าจะเขียนสั้นลงหรือยอมให้ตัวเล็ก
+                             ดีกว่ามารู้ตอนเปิด PDF แล้วอ่านไม่ออก -->
+                        <p id="extraActFit" class="hidden text-xs mt-2"></p>
                     </div>
                 </div>
 
@@ -3273,14 +3288,10 @@
         // Sync address (if not user-edited)
         syncAddressToExtraLine();
 
-        // Auto-fill activity name into extra activities list
-        const actName = document.getElementById('activityName')?.value?.trim();
-        const list = document.getElementById('extraActivitiesList');
-        if (actName && list && !list.querySelector('.extra-activity')) {
-            addExtraActivity();
-            const inp = list.querySelector('.extra-act-text');
-            if (inp) inp.value = actName;
-        }
+        /* เดิมเอาชื่อกิจกรรมจากช่องบนมาเติมให้ ตอนนี้ช่องบนเป็น "ประเภท"
+           ส่วนแถวนี้เป็น "รายละเอียด" จึงเหลือแค่เปิดแถวว่างไว้ให้พิมพ์
+           เจ้าของงานสั่งว่าไม่ต้องให้กด + ก่อน ให้แสดงไปเลย */
+        ensureExtraActivityRow();
     }
 
     function applyProfileData() {
@@ -3385,6 +3396,7 @@
         // แถวที่เพิ่งเกิดต้องได้เส้นทางตามทิศทางของตัวเอง
         // ค่า value ที่ใส่ตอนสร้างเป็นของขาไปเสมอ แถวขากลับจึงต้องถูกแก้ให้ถูกทาง
         if (typeof syncTaxiRoutes === 'function') syncTaxiRoutes();
+        if (typeof updateTaxiRowsNote === 'function') updateTaxiRowsNote();
     }
 
     function onTaxiDirChange(select) {
@@ -3416,6 +3428,8 @@
         // เปลี่ยนทิศทางแล้วเส้นทางต้องตามไปด้วย ขากลับคือเส้นทางกลับหัวของขาไป
         // ของเดิมไม่ตาม ผู้ใช้สลับเป็นขากลับแล้วได้ จาก=บ้าน ถึง=ปลายทาง ซึ่งกลับหัว
         if (typeof syncTaxiRoutes === 'function') syncTaxiRoutes();
+        // ไป-กลับ กินสองบรรทัดในใบ สลับทิศทางแล้วจำนวนบรรทัดเปลี่ยน ต้องนับใหม่
+        if (typeof updateTaxiRowsNote === 'function') updateTaxiRowsNote();
         calculateTravelTotal();
     }
 
@@ -3426,6 +3440,7 @@
             if (el.dataset.sinkKey) TAXI_SINKS.delete(el.dataset.sinkKey);
         });
         row.remove();
+        if (typeof updateTaxiRowsNote === 'function') updateTaxiRowsNote();
         calculateTravelTotal();
     }
 
@@ -3559,20 +3574,55 @@
        "ค่าตั้งต้น" แปลว่าใช้ได้จนกว่าจะถูกแก้ทับ พอผู้ใช้พิมพ์ในแถวล่างแล้ว
        แถวนั้นจะถูกตีตราว่าตั้งเอง ช่องบนจะไม่ไหลลงมาทับอีก
        หลักเดียวกับที่ใช้กับเส้นทางแถว Taxi และช่องวันที่ */
-    function syncActivityFromMainToExtra() {
-        const mainActivity = document.getElementById('activityName')?.value || '';
-        if (!mainActivity.trim()) return;
+    /* 21 ต.ค. 2569 — ช่องบนกับแถวล่างไม่ใช่ของสิ่งเดียวกันอีกต่อไป
+         บน  = ประเภทกิจกรรม เลือกจากรายการ สั้น ๆ
+         ล่าง = รายละเอียดของกิจกรรมนั้น ยาวได้ ผู้ใช้พิมพ์เอง
+       การไหลลงจากบนไปล่างจึงเลิกทำ เพราะจะเอาชื่อประเภทไปวางในที่ของรายละเอียด
+       แล้วผู้ใช้ต้องมานั่งลบทิ้งทุกใบ
 
-        const first = document.querySelector('.extra-act-text');
-        if (first) {
-            // แถวที่ผู้ใช้พิมพ์เองแล้ว ห้ามเขียนทับ
-            if (!first.dataset.touched) first.value = mainActivity;
-            return;
-        }
-        // ยังไม่มีแถวเลย สร้างให้หนึ่งแถวแล้วเติมค่าตั้งต้นลงไป
+       ตัวฟังก์ชันยังอยู่และยังถูกเรียกจาก oninput ของช่องบน
+       หน้าที่ตอนนี้คือทำให้แน่ใจว่ามีแถวล่างให้พิมพ์เสมอ ไม่ต้องกด + ก่อน */
+    function syncActivityFromMainToExtra() {
+        ensureExtraActivityRow();
+    }
+
+    /** มีแถวกิจกรรมล่างให้พิมพ์อย่างน้อยหนึ่งแถวเสมอ */
+    function ensureExtraActivityRow() {
+        const list = document.getElementById('extraActivitiesList');
+        if (!list || list.querySelector('.extra-activity')) return;
         addExtraActivity();
-        const made = document.querySelector('.extra-act-text');
-        if (made && !made.dataset.touched) made.value = mainActivity;
+    }
+
+    /* ── บอกล่วงหน้าว่าใบจะย่อตัวอักษรลงแค่ไหน ──
+       21 ต.ค. 2569 — เจ้าของงานสั่งว่า "ยังไงก็ต้องห้ามตกอะ
+       หรือถ้าจะตกก็ต้องเตือนก่อน"
+
+       ใบไม่ตกแน่นอนแล้ว เพราะช่องจำกัด 200 ตัวอักษรและวัดแล้วว่า
+       ยาวสุดทั้งสองช่องยังอยู่ในหน้าเดียว (เหลือที่ว่าง 36px)
+       สิ่งที่ผู้ใช้ยังไม่รู้คือ "ตัวอักษรจะเล็กลงแค่ไหน" จึงบอกตรงนั้นแทน
+       ขั้นต้องตรงกับ ACT_STEPS ใน history.html เป๊ะ ไม่งั้นบอกผิด */
+    const ACT_FIT_STEPS = [
+        { upTo: 110, px: 13.5, note: '' },
+        { upTo: 170, px: 12.5, note: 'ใบจะย่อตัวอักษรลงเล็กน้อยให้พอดีช่อง' },
+        { upTo: 240, px: 11.5, note: 'ใบจะย่อตัวอักษรลงให้พอดีช่อง' }
+    ];
+    function actFitStep(n) {
+        return ACT_FIT_STEPS.find(function (s) { return n <= s.upTo; })
+            || { px: 10.5, note: 'ยาวมาก ใบจะย่อตัวอักษรลงจนเล็กที่สุดที่ยังอ่านออก' };
+    }
+
+    function updateExtraActivityFit() {
+        const box = document.getElementById('extraActFit');
+        if (!box) return;
+        const texts = [...document.querySelectorAll('.extra-act-text')]
+            .map(function (e) { return (e.value || '').trim(); }).filter(Boolean);
+        const longest = texts.reduce(function (a, b) { return b.length > a.length ? b : a; }, '');
+        const n = longest.length;
+        if (n <= 110) { box.className = 'hidden'; box.textContent = ''; return; }
+        const st = actFitStep(n);
+        box.className = 'text-xs mt-2 ' + (st.px <= 10.5 ? 'text-amber-700' : 'text-slate-500');
+        box.textContent = n + ' ตัวอักษร — ' + st.note
+            + ' (ขนาดในเอกสาร ' + st.px + 'px จากปกติ 13.5px) เอกสารยังอยู่ในหน้าเดียว';
     }
 
     function addExtraActivity() {
@@ -3582,7 +3632,7 @@
         const div = document.createElement('div');
         div.className = 'extra-activity flex gap-2 items-center';
         div.innerHTML = `
-            <input type="text" maxlength="200" class="extra-act-text flex-1 border border-slate-200 px-2.5 py-1.5 rounded-lg text-sm outline-none focus:border-blue-400" placeholder="ระบุกิจกรรม..." oninput="this.dataset.touched='1'">
+            <input type="text" maxlength="200" class="extra-act-text flex-1 border border-slate-200 px-2.5 py-1.5 rounded-lg text-sm outline-none focus:border-blue-400" placeholder="รายละเอียดกิจกรรม เช่น ชื่อเต็มของงาน สถานที่ วันที่" oninput="this.dataset.touched='1'; updateExtraActivityFit()">
             <button type="button" onclick="removeExtraActivity(this)" class="text-slate-300 hover:text-rose-500 transition-colors p-1 flex-shrink-0">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
@@ -3649,6 +3699,33 @@
         showTaxiCap(m);
     }
 
+    /* ── กี่เที่ยวถึงจะใส่ใบรับรองหน้าเดียวไม่ลง ──
+       ตารางในใบย่อตัวเองตามจำนวนเที่ยว วัดจากหน้าจริงแล้วรับได้ถึง 11 เที่ยว
+       (11 เที่ยวเหลือที่ว่าง 4px · 12 เที่ยวล้น 29px)
+       เกินกว่านั้นไม่มีทางย่อให้ลงโดยที่ยังอ่านออก จึงต้องบอกตั้งแต่ตอนกรอก
+       เจ้าของงานสั่งไว้ว่า "ยังไงก็ต้องห้ามตก หรือถ้าจะตกก็ต้องเตือนก่อน" */
+    const TAXI_ROWS_MAX = 11;
+    function taxiLegCount() {
+        let n = 0;
+        document.querySelectorAll('.taxi-entry').forEach(function (row) {
+            const d = row.querySelector('.taxi-dir')?.value || 'ขาไป';
+            n += (d === 'ไป-กลับ') ? 2 : 1;      // ไป-กลับ กินสองบรรทัดในใบ
+        });
+        return n;
+    }
+    function updateTaxiRowsNote() {
+        const box = document.getElementById('taxiRowsNote');
+        if (!box) return;
+        const n = taxiLegCount();
+        const over = n > TAXI_ROWS_MAX;
+        box.classList.toggle('hidden', !over);
+        box.innerHTML = over
+            ? 'เที่ยว Taxi ' + n + ' บรรทัด — ใบรับรองค่าพาหนะใส่ได้สูงสุด '
+              + TAXI_ROWS_MAX + ' บรรทัดต่อหนึ่งหน้า <b>เอกสารจะตกไปหน้าถัดไป</b> '
+              + 'แนะนำให้แยกเป็นใบเบิกคนละใบ'
+            : '';
+    }
+
     function showTaxiCap(metro) {
         const m = metro || isMetroTripFE();
         const has  = taxiMaxPerTrip !== Infinity;
@@ -3671,6 +3748,8 @@
                   ' บาทต่อเที่ยว</b> กรอกเกินจะบันทึกไม่ได้'
                 : '';
         }
+        updateTaxiRowsNote();
+
         // บอกด้วยว่าทำไมถึงไม่จำกัด ผู้ใช้จะได้ไม่สงสัยว่าระบบลืมตรวจ
         const areaNote = document.getElementById('taxiAreaNote');
         if (areaNote) {
@@ -5499,26 +5578,32 @@
     }
 
     /* ── ตำแหน่ง / สังกัด: เลือกจากรายการ หรือพิมพ์ค่าใหม่เองก็ได้ ── */
-    let knownPositions = [], knownAffils = [];
+    let knownPositions = [], knownAffils = [], knownActivities = [];
 
     // เปลี่ยนจาก <datalist> ของเบราว์เซอร์มาเป็น combobox ที่เราคุมหน้าตาเองได้
     // ชื่อฟังก์ชันคงเดิม จุดที่เรียกใช้ทั่วหน้าจึงไม่ต้องแก้
-    const CB_FOR = { positionOptions: 'position',  affilOptions: 'affiliation' };
+    const CB_FOR = { positionOptions: 'position',  affilOptions: 'affiliation',
+                     activityOptions: 'activityName' };
     const _cb = {};
     function fillDatalist(id, items) {
         const inputId = CB_FOR[id];
         if (!inputId || !window.Combobox) return;
         if (!_cb[id]) {
-            const isPos = id === 'positionOptions';
+            // ช่องไหนผูกกับรายการกลางตัวไหน และเรียกสิ่งที่เพิ่มว่าอะไร
+            const WIRE = {
+                positionOptions: { label: 'บทบาท',       key: 'positionList' },
+                affilOptions:    { label: 'ส่วนงาน',      key: 'affiliationList' },
+                activityOptions: { label: 'ประเภทกิจกรรม', key: 'activityList' }
+            };
+            const w = WIRE[id] || WIRE.affilOptions;
+            const bucket = () => id === 'positionOptions' ? knownPositions
+                               : id === 'activityOptions' ? knownActivities
+                               : knownAffils;
             _cb[id] = Combobox.attach(inputId, {
-                addLabel: isPos ? 'บทบาท' : 'ส่วนงาน',
+                addLabel: w.label,
                 // เพิ่มปุ๊บเก็บขึ้นเซิร์ฟเวอร์ปั๊บ ไม่ต้องรอกดบันทึกทั้งใบ
                 // คนถัดไปจะเห็นในรายการทันที และถ้าผู้ใช้ทิ้งฟอร์มไปค่าก็ไม่หาย
-                onCreate: (v) => rememberListValue(
-                    isPos ? 'positionList' : 'affiliationList',
-                    v,
-                    isPos ? knownPositions : knownAffils
-                )
+                onCreate: (v) => rememberListValue(w.key, v, bucket())
             });
         }
         if (_cb[id]) _cb[id].setItems(items || []);
@@ -5559,8 +5644,10 @@
                 // ตำแหน่ง/สังกัด: เลือกจากรายการหรือพิมพ์เองก็ได้
                 knownPositions = settings.positionList || [];
                 knownAffils    = settings.affiliationList || [];
+                knownActivities = settings.activityList || [];
                 fillDatalist('positionOptions', knownPositions);
                 fillDatalist('affilOptions', knownAffils);
+                fillDatalist('activityOptions', knownActivities);
 
                 // Store settings globally for validation
                 window.appSettings = settings;

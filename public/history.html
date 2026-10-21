@@ -97,6 +97,32 @@
               word-break: break-word; overflow-wrap: anywhere; white-space: normal;
           }
 
+          /* ── รายละเอียดกิจกรรมยาว ย่อตัวอักษรลงแทนที่จะดันช่องให้สูงขึ้น ──
+             21 ต.ค. 2569 — เจ้าของงานส่งใบจริงที่ชื่อกิจกรรมยาวสามบรรทัด
+             ช่องสูงขึ้นจนท้ายใบตกไปอีกหน้า ซึ่งห้ามเด็ดขาด
+
+             ย่อเป็นขั้น ไม่ใช่ย่อไล่ไปเรื่อย ๆ เพราะใบที่ยาวใกล้กันต้องหน้าตาเหมือนกัน
+             ขั้นต่ำสุดหยุดที่ 10.5px — ต่ำกว่านี้คนอ่านเอกสารการเงินไม่ไหว
+             ถ้ายาวจนขั้นต่ำสุดยังไม่พอ หน้ากรอกจะเตือนตั้งแต่ตอนพิมพ์ */
+          /* ── ย่อทั้งตารางใบรับรอง ไม่ใช่บีบเฉพาะความสูงแถว ──
+             21 ต.ค. 2569 — รอบแรกผมบีบแค่ padding กับความสูงขั้นต่ำของแถว
+             เจ้าของงานดูแล้วบอกว่า "ยิ่งบีบยิ่งดูไม่รู้เรื่อง ที่ผมอยากได้คือ
+             ต้องย่อทั้งหมดทั้งตาราง เพื่อรองรับการเพิ่มแถวในตาราง
+             ไม่ใช่ไปลดแค่แถวแต่อย่างอื่นอ้วนกว่าเดิม"
+
+             ถูกของเขา — บีบแถวอย่างเดียวทำให้ตัวหนังสือเท่าเดิมแต่ที่หายใจหาย
+             สัดส่วนเลยเพี้ยน ตอนนี้ขนาดทุกอย่างในตาราง (ระยะขอบ ความสูงแถว
+             สัญลักษณ์ติ๊ก ช่องจาก/ถึง) ผูกเป็น em กับขนาดตัวอักษรของตาราง
+             ปรับตัวเลขเดียวข้างล่างนี้ ทั้งตารางย่อตามกันทั้งหมด */
+          .pdf-page .rc-table { font-size: 13.5px; }   /* ค่าตั้งต้น = เท่าเดิม ใบที่แถวเยอะจะถูกตั้งทับเป็นรายใบ */
+
+          /* ผูกกับขนาดตารางเป็น em ไม่ใช่ px ตายตัว
+             ตอนตารางย่อเหลือ 12px ค่าตายตัว 12.5px กลายเป็น "ใหญ่ขึ้น" แทนที่จะเล็กลง
+             (เจอตอนเจ้าของงานถามว่าแน่ใจไหมว่าจะไม่ตกหน้า — ถามถูกจุด) */
+          .pdf-page .free-text.act-sm  { font-size: 0.95em; line-height: 1.5; }
+          .pdf-page .free-text.act-xs  { font-size: 0.87em; line-height: 1.4; }
+          .pdf-page .free-text.act-xxs { font-size: 0.80em; line-height: 1.3; }
+
         
         .solid-line { border-bottom: 1px solid #000; display: inline-block; text-align: center; }
         .dot-line { border-bottom: 1px dotted #000; display: inline-block; text-align: center; }
@@ -581,6 +607,24 @@
             const extraAddr = meta._extraAddr || '';
             const extraActivities = Array.isArray(meta._extraActivities) ? meta._extraActivities.filter(Boolean) : [];
 
+            /* ── ข้อความกิจกรรม: ยาวแค่ไหนก็ห้ามดันใบตกหน้า ──
+               ย่อขนาดตัวอักษรเป็นขั้น ๆ แทนการปล่อยให้ช่องสูงขึ้นเรื่อย ๆ
+               เลขขั้นมาจากการวัดความสูงหน้าเอกสารจริง ไม่ได้ตั้งลอย ๆ
+               (ดูชุดทดสอบ test-activity-fit.mjs ที่วัดความสูงหน้า A4 ทุกขั้น) */
+            const ACT_STEPS = [
+                { upTo: 110, cls: '' },
+                { upTo: 170, cls: ' act-sm' },
+                { upTo: 240, cls: ' act-xs' }
+            ];
+            const actClass = s => {
+                const n = String(s == null ? '' : s).trim().length;
+                const hit = ACT_STEPS.find(function (st) { return n <= st.upTo; });
+                return hit ? hit.cls : ' act-xxs';
+            };
+            /** ข้อความกิจกรรมพร้อมขนาดตัวอักษรที่พอดีกับช่อง */
+            const actSpan = s => '<span class="free-text' + actClass(s)
+                + '" style="display:inline">' + (s || '') + '</span>';
+
             /* ── ที่อยู่: แบ่งบรรทัดเอง ──
                ปล่อยให้เบราว์เซอร์ตัดบรรทัดในตารางที่มี rowspan แล้ว html2canvas
                จะวางบรรทัดที่สองผิดตำแหน่งจนตัวหนังสือทับกัน
@@ -689,6 +733,33 @@
                     : (taxiType === 'ขากลับ' || taxiType === 'ไป-กลับ');
                 const firstTaxiOut = taxiEntries.find(e => e.direction === 'ขาไป' || e.direction === 'ไป-กลับ');
                 const firstTaxiRet = taxiEntries.find(e => e.direction === 'ขากลับ' || e.direction === 'ไป-กลับ');
+
+                /* ── ทุกเที่ยว Taxi ต้องมีบรรทัด จาก/ถึง ของตัวเอง ──
+                   21 ต.ค. 2569 — เจ้าของงานกรอก Taxi ขากลับสองเที่ยว (140 + 160)
+                   ใบที่พิมพ์ออกมามีบรรทัด จาก/ถึง แค่บรรทัดเดียว แล้วเอาเงินสองก้อน
+                   มารวมเป็น 300 บาท เส้นทางในใบจึงไม่ตรงกับยอดที่เบิก
+                   คนตรวจเอกสารตามไม่ได้เลยว่า 300 มาจากไหน
+
+                   ต้นเหตุ: ของเดิมหยิบมาแค่เที่ยวแรกของแต่ละทิศ (firstTaxiOut/firstTaxiRet)
+                   แต่บวกเงินจากทุกเที่ยว สองอย่างนี้จึงไม่ตรงกันมาตลอด */
+                const taxiLegRows = [];
+                taxiEntries.forEach(e => {
+                    if (e.direction === 'ไป-กลับ') {
+                        const out = parseFloat(e.amountOut), ret = parseFloat(e.amountRet);
+                        const split = !isNaN(out) && !isNaN(ret) && (out > 0 || ret > 0);
+                        taxiLegRows.push({ date: e.date, from: e.from, to: e.to,
+                                           amount: split ? (out || 0) : (parseFloat(e.amount) || 0) });
+                        /* ขากลับของเที่ยวไป-กลับ คือเส้นทางเดิมกลับหัว
+                           ต้องขึ้นบรรทัดเสมอ แม้กรอกยอดมาก้อนเดียวไม่ได้แยกขา
+                           เพราะติ๊กด้านบนบอกว่า "ไป-กลับ" ถ้าพิมพ์ขาเดียว
+                           เอกสารจะขัดกันเอง (ของเดิมก็พิมพ์สองบรรทัดแบบนี้) */
+                        taxiLegRows.push({ date: e.date, from: e.to, to: e.from,
+                                           amount: split ? (ret || 0) : 0 });
+                    } else {
+                        taxiLegRows.push({ date: e.date, from: e.from, to: e.to,
+                                           amount: parseFloat(e.amount) || 0 });
+                    }
+                });
                 
                 let fuelDist = 0;
                 if(carType === 'ขาไป') fuelDist = distOut;
@@ -820,6 +891,16 @@
                    พอย้ายยอดมาบล็อก Taxi บรรทัดนั้นว่างลง คนตรวจเอกสารจึงเห็น
                    แต่ยอดเงิน ไม่รู้ว่าคิดด้วยวิธีไหนและเข้าช่วงระยะทางไหน
                    ใช้แถวว่างที่มีอยู่แล้วใต้บล็อก Taxi เลย์เอาต์กระดาษไม่เปลี่ยน */
+                /* บรรทัด จาก/ถึง ใต้ "ค่า Taxi" — หนึ่งบรรทัดต่อหนึ่งเที่ยว
+                   เอกสารต้นแบบมีไว้สามบรรทัด ถ้าเบิกน้อยกว่านั้นก็เว้นว่างไว้
+                   ถ้ามากกว่านั้นต้องเพิ่มบรรทัด ไม่ใช่เอาเงินมายุบรวมกัน
+                   ใบเก่าที่ไม่มีรายการรายเที่ยว (เก็บแค่ยอดรวมขาไป/ขากลับ)
+                   ยังพิมพ์แบบเดิมทุกประการ ห้ามให้ใบที่ส่งไปแล้วเปลี่ยนหน้าตา */
+                const rcTaxiLegRow = l => rcRow(
+                    l.date ? legDateText(l.date) : '',
+                    rcFromTo(l.from || '', l.to || ''),
+                    (Number(l.amount) || 0) > 0 ? formatNumber(Number(l.amount)) : '');
+
                 const rcFlatNote = flatInfo
                     ? 'เหมาจ่ายตามช่วงระยะทาง รวมค่าทางด่วนแล้ว &nbsp;—&nbsp; '
                       + (flatInfo.legs || []).map(function (l) {
@@ -829,15 +910,16 @@
                     : '';
 
 
+
                 /* ── ตัวช่วยวาดแถวในใบรับรองค่าพาหนะ ──
                    เอกสารต้นแบบตีเส้นทุกบรรทัดครบทั้งสามคอลัมน์
                    ของเดิมเชื่อมช่องเป็นบล็อกด้วย border-bottom:none หน้าตาจึงไม่ตรงแบบ
                    และช่องวันที่ของเดิมกินยาว 16 แถว ทำให้วันที่ลอยอยู่บรรทัดบนสุด */
                 const RC_BD   = '1px solid #000';
-                const rcTdDay = 'border:' + RC_BD + '; padding:3px 6px; text-align:center; vertical-align:middle; white-space:nowrap; font-size:12px;';
+                const rcTdDay = 'border:' + RC_BD + '; padding:0.22em 0.45em; text-align:center; vertical-align:middle; white-space:nowrap; font-size:0.89em;';
                 // แถวที่ไม่มีข้อความต้องสูงเท่าแถวอื่น ไม่งั้นบางจนดูเหมือนเส้นซ้อนกัน
-                const rcTdTxt = 'border:' + RC_BD + '; padding:3px 8px; vertical-align:middle; height:22px;';
-                const rcTdAmt = 'border:' + RC_BD + '; padding:3px 8px; text-align:right; vertical-align:middle; white-space:nowrap;';
+                const rcTdTxt = 'border:' + RC_BD + '; padding:0.22em 0.6em; vertical-align:middle; height:1.63em;';
+                const rcTdAmt = 'border:' + RC_BD + '; padding:0.22em 0.6em; text-align:right; vertical-align:middle; white-space:nowrap;';
                 const rcRow = (day, detail, amt) =>
                     '<tr><td style="' + rcTdDay + '">' + (day || '') + '</td>' +
                     '<td style="' + rcTdTxt + '">' + (detail || '') + '</td>' +
@@ -845,9 +927,9 @@
                 const rcFromTo = (f, t) =>
                     '<table style="width:100%;border-collapse:collapse;border:none;table-layout:fixed;"><tr>' +
                     '<td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:30px;line-height:1.6;">จาก</td>' +
-                    '<td style="border:none;padding:0 10px 0 0;vertical-align:top;width:calc(50% - 30px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;font-size:11.5px;">' + wrapCell(f, 28) + '</td>' +
+                    '<td style="border:none;padding:0 10px 0 0;vertical-align:top;width:calc(50% - 30px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;font-size:0.85em;">' + wrapCell(f, 28) + '</td>' +
                     '<td style="border:none;padding:0 4px 0 0;vertical-align:top;white-space:nowrap;width:30px;line-height:1.6;">ถึง</td>' +
-                    '<td style="border:none;padding:0;vertical-align:top;width:calc(50% - 30px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;font-size:11.5px;">' + wrapCell(t, 28) + '</td>' +
+                    '<td style="border:none;padding:0;vertical-align:top;width:calc(50% - 30px);word-break:break-word;overflow-wrap:anywhere;line-height:1.6;font-size:0.85em;">' + wrapCell(t, 28) + '</td>' +
                     '</tr></table>';
                 /* บรรทัดระยะทาง
                    วิธีคิดตามระยะจริง: ระยะทาง __ ก.ม. x __ เที่ยว x __ บาท  (ตามแบบฟอร์มเดิม)
@@ -864,8 +946,8 @@
                            '(เหมาจ่าย' + (leg && leg.label ? ' — ' + leg.label : '') + ' รวมค่าทางด่วนแล้ว)';
                 };
                 // เอกสารต้นแบบใช้ช่องสี่เหลี่ยมกับ "ประเภทค่าใช้จ่าย" และวงกลมกับ "ทิศทาง"
-                const rcSquare = on => '<span style="font-family:Arial;font-size:15px;vertical-align:middle;">' + (on ? '☑' : '☐') + '</span>';
-                const rcCircle = on => '<span style="font-family:Arial;font-size:18px;vertical-align:middle;">' + (on ? fontCircleCheck : fontCircleEmpty) + '</span>';
+                const rcSquare = on => '<span style="font-family:Arial;font-size:1.11em;vertical-align:middle;">' + (on ? '☑' : '☐') + '</span>';
+                const rcCircle = on => '<span style="font-family:Arial;font-size:1.33em;vertical-align:middle;">' + (on ? fontCircleCheck : fontCircleEmpty) + '</span>';
 
                 const tollTotal = parseFloat(c.tollAmount || 0);
                 // ใบเก่าไม่มีคีย์นี้ ได้ 0 เอกสารจึงออกมาเหมือนเดิมทุกตัวอักษร
@@ -1194,6 +1276,57 @@
 
                     const chkCarSelected = carType !== 'ไม่ระบุ' ? '☑' : '☐';
 
+                    /* ── ใบมีกี่เที่ยว ตารางก็ย่อตามนั้น ──
+                       21 ต.ค. 2569 — เจ้าของงานสั่งว่า "ต้องย่อทั้งหมดทั้งตาราง
+                       เพื่อรองรับการเพิ่มแถวในตาราง ไม่ใช่ไปลดแค่แถว
+                       แต่อย่างอื่นอ้วนกว่าเดิม"
+
+                       ทุกขนาดในตารางผูกเป็น em กับตัวเลขนี้ ปรับตัวเดียวย่อทั้งตาราง
+
+                       รอบนี้ตั้งค่าตั้งต้นไว้ที่ 13.5px = เท่าเดิมทุกประการ
+                       ใบที่คนส่วนใหญ่ใช้จึงหน้าตาไม่เปลี่ยนเลย
+                       (เรื่อง "ย่อทั้งใบให้ดูโปร่งขึ้น" ยังคุยกับเจ้าของงานไม่จบ แยกทำทีหลัง)
+
+                       ที่ต้องมีตอนนี้คือกันใบตกหน้า เพราะทุกเที่ยวขึ้นบรรทัดของตัวเองแล้ว
+                       ขั้นมาจากการวัดความสูงหน้าจริง (หน้า A4 = 1085px):
+                         4 เที่ยว 13.5px เหลือ 73px  ·  6 เที่ยว 12.5px เหลือ 40px
+                         8 เที่ยว 11.5px เหลือ 18px  ·  11 เที่ยว 10px เหลือ 4px
+                       ต่ำกว่า 10px ไม่ลงแล้ว เอกสารการเงินต้องอ่านออก
+                       เกิน 11 เที่ยวจึงใส่หน้าเดียวไม่ได้จริง ไม่ว่าจะย่อแค่ไหน — ฟอร์มเตือนแทน */
+                    const rcTableSize = (function () {
+                        const n = taxiLegRows.length;
+                        if (n <= 4) return 13.5;   // ใบส่วนใหญ่ — หน้าตาเท่าเดิมทุกประการ
+                        if (n <= 6) return 12.5;
+                        if (n <= 8) return 11.5;
+                        return 10;
+                    })();
+
+                const rcTaxiDetailRows = (function () {
+                    if (flatInfo) {
+                        // เหมาจ่าย: ยอดมาจากช่วงระยะทาง ไม่ได้มาจากเที่ยว Taxi จึงคงรูปเดิม
+                        return rcRow(rcTaxiHasOut ? rcTaxiOutDate : '',
+                                     rcFromTo(rcTaxiHasOut ? rcTaxiOutFrom : '', rcTaxiHasOut ? rcTaxiOutTo : ''),
+                                     rcTaxiOutAmt > 0 ? formatNumber(rcTaxiOutAmt) : '')
+                             + rcRow(rcTaxiHasRet ? rcTaxiRetDate : '',
+                                     rcFromTo(rcTaxiHasRet ? rcTaxiRetFrom : '', rcTaxiHasRet ? rcTaxiRetTo : ''),
+                                     rcTaxiRetAmt > 0 ? formatNumber(rcTaxiRetAmt) : '')
+                             + rcRow('', rcFlatNote, '');
+                    }
+                    if (!taxiLegRows.length) {
+                        // ใบเก่าที่เก็บแค่ยอดรวมรายทิศ ไม่มีรายการรายเที่ยวให้กาง
+                        return rcRow(rcTaxiHasOut ? rcTaxiOutDate : '',
+                                     rcFromTo(rcTaxiHasOut ? rcTaxiOutFrom : '', rcTaxiHasOut ? rcTaxiOutTo : ''),
+                                     rcTaxiOutAmt > 0 ? formatNumber(rcTaxiOutAmt) : '')
+                             + rcRow(rcTaxiHasRet ? rcTaxiRetDate : '',
+                                     rcFromTo(rcTaxiHasRet ? rcTaxiRetFrom : '', rcTaxiHasRet ? rcTaxiRetTo : ''),
+                                     rcTaxiRetAmt > 0 ? formatNumber(rcTaxiRetAmt) : '')
+                             + rcRow('', rcFromTo('', ''), '');
+                    }
+                    const rows = taxiLegRows.map(rcTaxiLegRow);
+                    while (rows.length < 3) rows.push(rcRow('', rcFromTo('', ''), ''));
+                    return rows.join('');
+                })();
+
                     templateHtml += `
                     <div class="pdf-page">
                         <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px;">
@@ -1209,7 +1342,7 @@
 
                         <h2 style="text-align: center; font-weight: bold; font-size: 18px; margin-bottom: 15px;">ใบรับรองแทนใบเสร็จรับเงิน - ค่าพาหนะ</h2>
 
-                        <table class="pdf-table">
+                        <table class="pdf-table rc-table" style="font-size:${rcTableSize}px;">
                             <thead>
                                 <tr style="background: white;">
                                     <th style="width: 16%; text-align: center; padding-left:6px; padding-right:6px;">วัน เดือน ปี</th>
@@ -1221,22 +1354,14 @@
                                 <!-- ลำดับแถวล้อตามเอกสารต้นแบบ FM-SAM-095-00
                                      วันที่อยู่บรรทัดเดียวกับขาเดินทางนั้น ไม่ลอยอยู่บนสุด
                                      ค่าน้ำมันแยกยอดรายขาไว้ที่บรรทัดระยะทางของขานั้น -->
-                                ${rcRow('', '<b>กิจกรรม</b> &nbsp;&nbsp;&nbsp; <span class="free-text" style="display:inline">' + actName + '</span>', '')}
+                                ${rcRow('', '<b>กิจกรรม</b> &nbsp;&nbsp;&nbsp; ' + actSpan(actName), '')}
 
                                 ${rcRow('', rcSquare(rcTaxiOn) + ' ค่า Taxi &nbsp;&nbsp;&nbsp;&nbsp;'
                                         + rcCircle(rcTaxiHasOut && !rcTaxiHasRet) + ' ขาไป &nbsp;&nbsp;&nbsp;&nbsp;'
                                         + rcCircle(rcTaxiHasRet && !rcTaxiHasOut) + ' ขากลับ &nbsp;&nbsp;&nbsp;&nbsp;'
                                         + rcCircle(rcTaxiHasOut && rcTaxiHasRet)  + ' ไป-กลับ', '')}
 
-                                ${rcRow(rcTaxiHasOut ? rcTaxiOutDate : '',
-                                        rcFromTo(rcTaxiHasOut ? rcTaxiOutFrom : '', rcTaxiHasOut ? rcTaxiOutTo : ''),
-                                        rcTaxiOutAmt > 0 ? formatNumber(rcTaxiOutAmt) : '')}
-
-                                ${rcRow(rcTaxiHasRet ? rcTaxiRetDate : '',
-                                        rcFromTo(rcTaxiHasRet ? rcTaxiRetFrom : '', rcTaxiHasRet ? rcTaxiRetTo : ''),
-                                        rcTaxiRetAmt > 0 ? formatNumber(rcTaxiRetAmt) : '')}
-
-                                ${rcRow('', flatInfo ? rcFlatNote : rcFromTo('', ''), '')}
+                                ${rcTaxiDetailRows}
 
                                 ${rcRow('', rcSquare(rcFuelOn) + ' ค่าน้ำมันเชื้อเพลิง &nbsp;&nbsp;&nbsp;&nbsp;'
                                         + rcCircle(rcFuelHasOut && !rcFuelHasRet) + ' ขาไป &nbsp;&nbsp;&nbsp;&nbsp;'
@@ -1261,7 +1386,7 @@
                                         otherTotal > 0 ? formatNumber(otherTotal) : '')}
 
                                 ${rcRow('', addrLinesHtml, '')}
-                                ${rcRow('', '<b>กิจกรรม</b>' + (extraActivities[0] ? ' &nbsp; <span class="free-text" style="display:inline">' + extraActivities[0] + '</span>' : ''), '')}
+                                ${rcRow('', '<b>กิจกรรม</b>' + (extraActivities[0] ? ' &nbsp; ' + actSpan(extraActivities[0]) : ''), '')}
                                 ${rcRow('', extraActivities[1] || '', '')}
 
                                 <!-- รวมทั้งสิ้น -->
@@ -1341,7 +1466,7 @@
                 // แถวกิจกรรม (rows 19-20)
                 grRowsHtml += `<tr>
                     <td style="height: 22px; border: 1px solid #000;"></td>
-                    <td style="padding: 4px 8px; border: 1px solid #000;"><b>กิจกรรม</b>${extraActivities[0] ? ' &nbsp; <span class="free-text" style="display:inline">' + extraActivities[0] + '</span>' : ''}</td>
+                    <td style="padding: 4px 8px; border: 1px solid #000;"><b>กิจกรรม</b>${extraActivities[0] ? ' &nbsp; ' + actSpan(extraActivities[0]) : ''}</td>
                     <td style="border: 1px solid #000;"></td>
                 </tr>
                 <tr>
@@ -1549,6 +1674,51 @@
 
            ตัวอักษรรวมต้องเท่าเดิมเป๊ะ ถ้าไม่เท่าให้คืนของเดิมไป
            ยอมให้เอกสารเสี่ยงทับ ดีกว่าทำข้อความหาย */
+        /* ══════════ ย่อใบรับรองจนพอดีหน้า — วัดจริง ไม่ใช่เดา ══════════
+           21 ต.ค. 2569 — เจ้าของงานถามว่า "แน่ใจใช่ไหมว่าถ้าชื่อกิจกรรมยาว ๆ
+           มันจะไม่มีเคสที่ตกไปหน้าอื่น" ไปวัดแล้วตอบว่าแน่ใจไม่ได้
+           ชื่อ 60 + รายละเอียด 200 ตัวอักษร + Taxi 4 เที่ยว = สูง 1,153px ล้น 68px
+
+           ต้นเหตุของวิธีเดิม: เดาขนาดจาก "จำนวนเที่ยว" อย่างเดียว
+           แต่ความสูงจริงมาจากหลายอย่างรวมกัน — ชื่อกิจกรรม รายละเอียด ที่อยู่
+           จำนวนเที่ยว ความยาวชื่อสถานที่ กฎที่นับแค่อย่างเดียวจึงรับประกันไม่ได้
+
+           ตัวนี้วัดความสูงหน้าจริงหลังวางลง DOM แล้วค่อยย่อทีละขั้นจนพอดี
+           ไม่ต้องรู้ล่วงหน้าว่าอะไรทำให้สูง รู้แค่ว่า "ยังเกินอยู่ไหม" ก็พอ
+
+           หยุดที่ 9px เพราะต่ำกว่านี้คนตรวจเอกสารการเงินอ่านไม่ไหว
+           ถ้าย่อจนสุดแล้วยังไม่พอ คืน false ให้ผู้เรียกไปเตือนผู้ใช้ */
+        const RC_FIT_STEPS = [13.5, 12.5, 11.5, 10.5, 10, 9.5, 9];
+
+        function fitCertificatePages(root) {
+            const pages = [...root.querySelectorAll('.pdf-page')]
+                .filter(p => p.querySelector('.rc-table'));
+            if (!pages.length) return { shrunk: 0, overflow: [] };
+
+            // ความสูงที่หนึ่งหน้า A4 รับได้ คิดจากความกว้างจริงของหน้าเอกสาร
+            const w = pages[0].getBoundingClientRect().width;
+            if (!w) return { shrunk: 0, overflow: [] };
+            const limit = (w / 190) * 287;          // 190mm x 287mm (เว้นขอบบนล่าง 5mm)
+
+            let shrunk = 0;
+            const overflow = [];
+            pages.forEach(function (page, idx) {
+                const tbl = page.querySelector('.rc-table');
+                const start = parseFloat(getComputedStyle(tbl).fontSize) || 13.5;
+                // เริ่มจากขั้นที่ไม่ใหญ่กว่าของเดิม จะได้ไม่ไปขยายใบที่ถูกตั้งค่าไว้แล้ว
+                let i = RC_FIT_STEPS.findIndex(s => s <= start + 0.01);
+                if (i < 0) i = 0;
+                while (page.getBoundingClientRect().height > limit && i < RC_FIT_STEPS.length - 1) {
+                    i++;
+                    tbl.style.fontSize = RC_FIT_STEPS[i] + 'px';
+                    shrunk++;
+                }
+                const h = page.getBoundingClientRect().height;
+                if (h > limit) overflow.push({ page: idx + 1, over: Math.round(h - limit) });
+            });
+            return { shrunk: shrunk, overflow: overflow };
+        }
+
         function freezeLineBreaks(root) {
             const targets = root.querySelectorAll('.free-text');
             let changed = 0;
@@ -1664,6 +1834,22 @@
 
             // ต้องทำหลังฟอนต์พร้อมเท่านั้น ไม่งั้นจุดตัดบรรทัดจะเป็นของฟอนต์สำรอง
             // แล้วพอฟอนต์จริงมาถึง ตำแหน่งจะเพี้ยนกว่าเดิม
+            /* ย่อใบรับรองให้พอดีหน้าก่อน แล้วค่อยตรึงจุดตัดบรรทัด
+               ลำดับนี้สำคัญ — ย่อทีหลังจะทำให้จุดตัดที่ตรึงไว้เป็นของขนาดเก่า
+               แล้วบรรทัดจะเขยิบผิดตำแหน่งตอนวาดลง PDF */
+            try {
+                const fit = fitCertificatePages(element);
+                if (fit.shrunk) console.log('[pdf] ย่อใบรับรองให้พอดีหน้า ' + fit.shrunk + ' ขั้น');
+                if (fit.overflow.length) {
+                    console.warn('[pdf] ใบรับรองยังเกินหน้า', fit.overflow);
+                    alert('เอกสารยาวเกินหนึ่งหน้า แม้ย่อจนเล็กที่สุดที่ยังอ่านออกแล้ว\n\n'
+                        + 'ใบรับรองค่าพาหนะจะถูกตัดไปหน้าถัดไป\n'
+                        + 'แนะนำให้ลดรายละเอียดกิจกรรมลง หรือแยกเป็นใบเบิกคนละใบ');
+                }
+            } catch (e) {
+                console.warn('[pdf] ย่อให้พอดีหน้าไม่สำเร็จ ใช้ขนาดเดิมต่อ', e);
+            }
+
             try {
                 const frozen = freezeLineBreaks(element);
                 if (frozen) console.log('[pdf] ตรึงการตัดบรรทัดไว้แล้ว ' + frozen + ' ก้อน');
