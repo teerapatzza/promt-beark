@@ -2250,6 +2250,10 @@
         load();
     </script>
     <script src="auth-guard.js"></script>
-    <script>initAuthGuard();</script>
+    <!-- โหลดยามไม่ได้ = กลับไปหน้าเข้าสู่ระบบ (เหตุผลเต็มอยู่ที่ expense.html) -->
+    <script>
+      if (typeof initAuthGuard === 'function') initAuthGuard();
+      else { console.error('[auth] โหลด auth-guard.js ไม่สำเร็จ'); location.replace('login.html'); }
+    </script>
 </body>
 </html>
