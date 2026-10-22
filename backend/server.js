@@ -1366,6 +1366,12 @@ app.get('/backup', requireAdmin, (_req, res) => {
 // ไม่งั้น nginx จะตอบ 404 ตั้งแต่ยังไม่ถึง backend
 app.use('/feedback', require('./feedback')({ db, requireAuth, requireAdmin }));
 
+// ── ช่องส่งข้อมูลให้ HA Data Warehouse ─────────────────────
+// อ่านอย่างเดียว ส่งออกเฉพาะยอดรวมรายหมวดรายเดือน ไม่มีข้อมูลส่วนบุคคล
+// ไม่ตั้ง DW_API_KEY = ปิดสนิท ตอบ 503 (ปลอดภัยไว้ก่อนเป็นค่าตั้งต้น)
+// เส้นทางนี้ต้องมีชื่อ "dw" ใน docker/nginx.conf ด้วย ไม่งั้นโดน 404 ก่อนถึงที่นี่
+app.use('/dw', require('./dw-export')({ db, apiKey: process.env.DW_API_KEY || '' }));
+
 // ── Health ────────────────────────────────────────────────
 
 app.get('/health', (_req, res) => res.type('text').send('ok'));

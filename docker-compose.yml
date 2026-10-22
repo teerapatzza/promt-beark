@@ -24,6 +24,9 @@ services:
       # ถ้าวันหน้า IT ตั้งช่อง Email ครบแล้ว ค่านี้จะกลายเป็นตัวสำรองที่ไม่ได้ถูกใช้
       - MS_PRIMARY_DOMAIN=${MS_PRIMARY_DOMAIN:-ha.or.th}
       - LONGDO_API_KEY=${LONGDO_API_KEY:-}
+      # กุญแจให้ HA Data Warehouse มาดึงยอดรวมรายหมวดรายเดือน
+      # ไม่ตั้ง = ช่องนั้นปิดสนิท ตอบ 503 ไม่ใช่เปิดให้ใครก็ได้ดึง
+      - DW_API_KEY=${DW_API_KEY:-}
 
   frontend:
     build:
