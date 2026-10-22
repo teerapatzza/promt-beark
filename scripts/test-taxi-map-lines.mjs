@@ -63,7 +63,11 @@ try {
     "    {status:200,headers:{'Content-Type':'application/json'}}));",
     "  if(s.indexOf('/budget-categories')>=0) return Promise.resolve(new Response(",
     "    JSON.stringify([{id:'TRAVEL002',name:'test',fuelRate:5,taxiMaxPerTrip:1200,",
-    "      pdfTemplates:['REPORT','TRANSPORT_RECEIPT'],attachmentRules:{},attachmentOrder:[]}]),",
+    // บังคับแนบแผนที่เหมือนหมวดที่ใช้งานจริง ไม่งั้นด่านตรวจหมุดไม่ทำงาน
+  // แล้วเทสต์จะเขียวทั้งที่ผู้ใช้จริงบันทึกไม่ได้ (เจอมาแล้วรอบหนึ่ง)
+  "      pdfTemplates:['REPORT','TRANSPORT_RECEIPT'],",
+  "      attachmentRules:{ LOCATION:{show:true,required:true,label:'แผนที่'} },",
+  "      attachmentOrder:['LOCATION']}]),",
     "    {status:200,headers:{'Content-Type':'application/json'}}));",
     "  if(s.indexOf('/expenses')>=0||s.indexOf('/profiles')>=0)",
     "    return Promise.resolve(new Response('[]',{status:200,headers:{'Content-Type':'application/json'}}));",
@@ -263,6 +267,12 @@ try {
   const blocked = (saveTry.alerts || []).some(a => /จุดที่รถไปส่ง/.test(a));
   ok('ไม่ถูกบล็อกด้วยข้อความ "ระบุจุดเริ่มต้นและจุดที่รถไปส่ง"',
      !blocked, (saveTry.alerts || []).join(' | ').slice(0, 120) || 'ไม่มีข้อความเตือน');
+  /* 21 ต.ค. 2569 — ด่านที่สองที่เจ้าของงานเจอ หลังผมแก้ด่านแรกไปแล้ว
+     "ยังปักหมุดไม่ครบทั้งสองจุด" ทั้งที่ปักหมุดทุกเที่ยวครบแล้ว
+     เทสต์เดิมจับไม่ได้เพราะหมวดทดสอบไม่ได้บังคับแนบแผนที่ ด่านจึงไม่ทำงาน */
+  const pinBlocked = (saveTry.alerts || []).some(a => /ปักหมุดไม่ครบ/.test(a));
+  ok('ไม่ถูกบล็อกด้วยข้อความ "ยังปักหมุดไม่ครบ" ทั้งที่เที่ยวมีหมุดครบ',
+     !pinBlocked, (saveTry.alerts || []).join(' | ').slice(0, 140) || 'ไม่มีข้อความเตือน');
   let sentObj = null;
   try { sentObj = JSON.parse(saveTry.body || 'null'); } catch (e) {}
   ok('ส่งข้อมูลออกไปได้จริง', !!sentObj,

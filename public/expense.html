@@ -5209,9 +5209,21 @@
         // แผนที่/เส้นทาง ใช้เฉพาะ "ใบรับรองค่าพาหนะ"
         if (locRule.show && locRule.required && needReceipt) {
             const useApp = document.getElementById('useAppMapImage')?.checked;
-            if (useApp && !(geoFrom && geoTo)) {
-                return alert('❌ ยังปักหมุดไม่ครบทั้งสองจุด\n\n' +
-                             'เลือกโปรไฟล์ผู้เดินทาง (จุดเริ่มต้นจะขึ้นเอง) และเลือกปลายทางก่อน\n' +
+            /* 21 ต.ค. 2569 — ด่านนี้เคยบังคับหมุดของ "เส้นทางหลัก" เสมอ
+               ใบที่เบิกเฉพาะ Taxi ไม่มีหมุดหลัก จึงบันทึกไม่ได้ ทั้งที่ปักหมุดทุกเที่ยวครบแล้ว
+               (เจ้าของงานเจอเอง: "ผมก็เลือกจุดหมายต้นทางปลายทางละนิ")
+
+               ตั้งแต่ 2.27.0 เอกสารวาดแผนที่จากหมุดของเที่ยว Taxi ได้แล้ว
+               คำถามที่ถูกจึงเป็น "มีหมุดพอจะวาดแผนที่ไหม" ไม่ใช่ "มีหมุดเส้นทางหลักไหม" */
+            const legPinsOk = [...document.querySelectorAll('.taxi-entry')].some(function (r) {
+                const f = r.querySelector('.taxi-from'), t = r.querySelector('.taxi-to');
+                return !!(f && t && f.dataset.lat && f.dataset.lng && t.dataset.lat && t.dataset.lng);
+            });
+            if (useApp && !(geoFrom && geoTo) && !legPinsOk) {
+                const NL3 = String.fromCharCode(10);
+                return alert('❌ ยังปักหมุดไม่ครบ ระบบจึงวาดแผนที่ให้ไม่ได้' + NL3 + NL3 +
+                             'เลือกโปรไฟล์ผู้เดินทาง (จุดเริ่มต้นจะขึ้นเอง) และเลือกปลายทางก่อน' + NL3 +
+                             'หรือถ้าเบิกเฉพาะค่า Taxi ให้เลือกสถานที่จากรายการในช่องของเที่ยวนั้น' + NL3 +
                              'หรือเอาติ๊ก "ใช้แผนที่จากระบบ" ออก แล้วอัปโหลดภาพเอง');
             }
             const manualInput = document.getElementById('mapManualUpload');
