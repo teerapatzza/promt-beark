@@ -5656,6 +5656,36 @@
                     if ((entry.to || '') && (entry.to || '') !== autoRoute.to)
                         tCell.dataset.touched = '1';
 
+                    /* ══════════ คืนหมุดของเที่ยวนี้ ══════════
+                       22 ต.ค. 2569 — เจ้าของงานส่งภาพหน้าจอมา กรอกครบ ปักหมุดครบ
+                       บันทึกผ่าน แต่พอกดแก้ไขจากหน้าประวัติ หมุดหายหมดทุกเที่ยว
+                       แล้วโดนด่าน "ยังปักหมุดไม่ครบ ระบบจึงวาดแผนที่ให้ไม่ได้"
+                         "ตอนแรกมันปกตินะ แต่พอผมกดแก้ไขในประวัติ หมุดหายหมดเลย"
+
+                       พังสองชั้นซ้อนกัน
+                         ชั้นที่ 1 โค้ดคืนแต่ "ชื่อสถานที่" ลงช่อง
+                                   fromGeo/toGeo ที่เก็บไว้ไม่เคยถูกเขียนกลับลง dataset
+                         ชั้นที่ 2 ต่อให้เขียนกลับ onTaxiDirChange() ข้างล่างเรียก
+                                   syncTaxiRoutes() ทันที แถวที่ยังไม่ติดธง touched
+                                   จะโดน setTaxiField() ซึ่ง "ลบ dataset.lat/lng ทิ้งก่อนเสมอ"
+                                   แล้วค่อยใส่หมุดเส้นทางหลักแทน
+                                   ใบที่เบิกเฉพาะ Taxi ไม่มีหมุดเส้นทางหลัก
+                                   = ลบทิ้งแล้วไม่มีอะไรมาคืน
+
+                       หมุดที่ผู้ใช้ยืนยันไว้ในใบคือข้อมูลจริง ติดธง touched ให้ด้วย
+                       เท่ากับประกาศว่าเส้นทางหลักห้ามมาเขียนทับ — หลักเดียวกับ setPoint() */
+                    const putTaxiPin = (el, g) => {
+                        if (!el || !g || g.lat == null || g.lng == null) return;
+                        el.dataset.lat = g.lat;
+                        el.dataset.lng = g.lng;
+                        el.dataset.touched = '1';
+                        if (typeof taxiPinHint === 'function')
+                            taxiPinHint(el, '<span class="text-emerald-700">ปักหมุดที่ <b>'
+                                + escHtml(el.value) + '</b> แล้ว</span>');
+                    };
+                    putTaxiPin(fCell, entry.fromGeo);
+                    putTaxiPin(tCell, entry.toGeo);
+
                     if (typeof attachTaxiPlaceSearch === 'function') {
                         attachTaxiPlaceSearch(fCell); attachTaxiPlaceSearch(tCell);
                     }
@@ -5670,6 +5700,18 @@
                     }
                 }
             }
+            /* หมุดกลับมาแล้ว เส้นบนแผนที่ต้องกลับมาด้วย ไม่งั้นเปิดใบมาแก้แล้วเห็นแผนที่เปล่า
+               หน่วงไว้ให้ตรงกับจังหวะที่คืนหมุดเส้นทางหลัก (บรรทัด ~5525)
+               เพราะ Leaflet วัดขนาดกล่องไม่ได้ถ้ากล่องยังไม่ถูกแสดง */
+            setTimeout(() => {
+                try {
+                    if (typeof drawTaxiLegLines === 'function')
+                        drawTaxiLegLines().then(() => {
+                            if (typeof fitRoute === 'function') fitRoute();
+                        });
+                } catch (e) { console.warn('วาดเส้นเที่ยว Taxi ตอนเปิดใบมาแก้ไม่สำเร็จ:', e); }
+            }, 400);
+
             // เปิดใบเดิมมาแก้ ต้องติ๊กการ์ดต่อขาให้ตรงกับที่บันทึกไว้
             // ตั้งค่าตรงๆ ไม่เรียก onLegModeChange เพราะฟังก์ชันนั้นจะล้างรายการที่เพิ่งกู้คืนมา
             syncLegCardsFromForm();
