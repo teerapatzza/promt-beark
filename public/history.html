@@ -32,20 +32,7 @@
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         
         /* ⭐️ เพิ่ม page-break-inside: avoid; บังคับไม่ให้ PDF หั่นครึ่งเนื้อหาในหน้านี้เด็ดขาด */
-        /* ── ขอบล่างต้องมีที่หายใจ ไม่งั้นบรรทัดสุดท้ายโดนเฉือน ──
-           25 ต.ค. 2569 — ผู้ใช้จริงโหลด PDF แล้วชื่อกับวันที่ใต้ลายเซ็นหายไป
-           เหลือแค่ "ลงชื่อ ______ ผู้เดินทาง" แล้วถูกตัดกลางบรรทัดถัดไป
-
-           วัดแล้วพบว่า ทุกใบ ทุกหน้า เหลือที่ว่างใต้ตัวอักษรล่างสุดแค่ 8-11 px
-           ซึ่งมาจาก padding ล่าง 6px ของกล่องนี้ บรรทัดสุดท้ายจึงแนบติดขอบ
-           พอ html2canvas ปัดเศษความสูงลง บวกกับเมตริกฟอนต์ต่างเครื่องนิดเดียว
-           ที่ว่างก็หมด ตัวอักษรหายทันที (ใบ id=211 ภาพที่ได้ขาดไป 3 px พอดี)
-
-           เพิ่มเป็น 22px ให้เหลือราว 25px ซึ่งเผื่อไว้สามเท่าของเดิม
-           หน้าเอกสารยังห่างเพดาน A4 อยู่มาก การเพิ่มนี้จึงไม่ดันใบตกหน้า
-           และถ้าใบไหนแน่นจริง fitCertificatePages() จะย่อให้พอดีเองอยู่แล้ว
-           เกณฑ์ขั้นต่ำถูกล็อกไว้ใน scripts/test-pdf-bottom-room.mjs */
-        .pdf-page { width: 190mm; box-sizing: border-box; padding: 6px 20px 22px; position: relative; font-family: 'Sarabun', sans-serif; background: white; font-size: 13.5px; color: black; page-break-inside: avoid; }
+        .pdf-page { width: 190mm; box-sizing: border-box; padding: 6px 20px; position: relative; font-family: 'Sarabun', sans-serif; background: white; font-size: 13.5px; color: black; page-break-inside: avoid; }
         .html2pdf__page-break { page-break-before: always; }
 
         /* ── ตัวอย่างเอกสารในกล่องตรวจสอบ ──
