@@ -594,8 +594,27 @@
             /* เอกสารแต่ละใบตั้งวันที่ของตัวเองได้ เผื่อกรณีที่วันบนสองใบไม่ตรงกัน
                ไม่ได้ตั้งก็ใช้วันที่หลักเหมือนเดิม ใบเก่าที่ไม่มีค่านี้จึงออกมาเท่าเดิมทุกประการ */
             const _docDates = (data.inputMetadata || {})._docDates || {};
+
+            /* ── วันใต้ลายเซ็นของใบรับรองแทนใบเสร็จ (FM-SAM-003-06) ──
+               26 ต.ค. 2569 — ผู้ใช้กรอกวันเข้าพัก 07/10 ในตาราง แต่ใต้ลายเซ็นพิมพ์ 09/10
+               ซึ่งเป็น "วันที่เบิก" คนละช่องกัน เจ้าของงานยืนยันว่าใบนี้ต้องลงวันตามตาราง
+               ใบเบิกจริงส่วนใหญ่เป็นแบบนี้ (ตรวจ 7 จาก 8 ใบที่ออกใบนี้ วันไม่ตรงกัน)
+
+               ลำดับความสำคัญ: ผู้ใช้ตั้งวันแยกเอกสารเอง > วันหลังสุดในตาราง > วันที่เบิก
+               ผู้ใช้ตั้งเองต้องชนะเสมอ เพราะนั่นคือการตั้งใจ
+               ตารางว่างหรือไม่มีแถวไหนกรอกวัน ถอยไปใช้วันที่เบิกเหมือนเดิม
+               หลายแถวคนละวันใช้ "วันหลังสุด" — ยังไม่มีใบจริงแบบนี้เลย (ตรวจแล้ว 0 ใบ)
+               เลือกวันหลังสุดเพราะใบรับรองลงนามหลังจ่ายครบทุกรายการ */
+            const grLastRowDate = (() => {
+                const rows = (data.inputMetadata || {})._generalReceiptItems;
+                if (!Array.isArray(rows)) return '';
+                const ds = rows.map(r => r && r.date).filter(d => d && /^\d{4}-\d{2}-\d{2}/.test(d))
+                               .map(d => String(d).slice(0, 10)).sort();
+                return ds.length ? ds[ds.length - 1] : '';
+            })();
             const dateStrFor = t => {
-                const v = _docDates[t];
+                let v = _docDates[t];
+                if (!v && t === 'GENERAL_RECEIPT') v = grLastRowDate;
                 return v ? formatDateDisplay(new Date(v + 'T00:00:00')) : dateStr;
             };
             const formatAmt = data.amount.toLocaleString(undefined, {minimumFractionDigits: 2});

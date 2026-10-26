@@ -981,7 +981,7 @@
                     </h3>
                     <p class="text-xs text-slate-500 mb-4">ช่องนี้ตรงกับแถว "ที่อยู่" และ "กิจกรรม" ด้านล่างของตารางในเอกสาร PDF</p>
 
-                    <div class="mb-4 bg-white p-3 rounded-lg border border-slate-200">
+                    <div id="extraAddrRow" class="mb-4 bg-white p-3 rounded-lg border border-slate-200">
                         <label class="block text-xs font-bold text-slate-700 mb-1.5">ที่อยู่ <span class="text-slate-400 font-normal">(แถวที่อยู่ท้ายตาราง)</span></label>
                         <input type="text" id="extraAddrLine" placeholder="เว้นว่างได้ ระบุเฉพาะกรณีที่ต้องการ" class="w-full border border-slate-200 p-2.5 rounded-lg text-sm outline-none focus:border-blue-400" oninput="markExtraAddrAsUserEdited()">
                     </div>
@@ -1144,7 +1144,7 @@
         NORMAL:            { label: 'บันทึกข้อความ',            color: 'bg-slate-100 text-slate-700 border-slate-200' },
         REPORT:            { label: 'ใบรายงานการเดินทาง',       color: 'bg-blue-50 text-blue-700 border-blue-200' },
         TRANSPORT_RECEIPT: { label: 'ใบรับรองค่าพาหนะ',         color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-        GENERAL_RECEIPT:   { label: 'ใบรับรองทั่วไป (เงินสด)', color: 'bg-amber-50 text-amber-700 border-amber-200' }
+        GENERAL_RECEIPT:   { label: 'ใบรับรองแทนใบเสร็จรับเงิน', color: 'bg-amber-50 text-amber-700 border-amber-200' }
     };
     let categories = [];
     let taxiMaxPerTrip = Infinity;
@@ -3100,7 +3100,7 @@
     const DOC_LABELS = {
         REPORT:           'ใบรายงานการเดินทาง',
         TRANSPORT_RECEIPT:'ใบรับรองค่าพาหนะ',
-        GENERAL_RECEIPT:  'ใบสำคัญรับเงิน',
+        GENERAL_RECEIPT:  'ใบรับรองแทนใบเสร็จรับเงิน',
         NORMAL:           'ใบขออนุมัติเบิกจ่าย'
     };
     let docDateSplitOpen = false;
@@ -3229,7 +3229,7 @@
         const spots = [];
         if (hasReport)  spots.push('ใบรายงานการเดินทาง: มุมบนขวา และวันที่ลงนาม');
         if (hasReceipt) spots.push('ใบรับรองค่าพาหนะ: ช่อง “วัน เดือน ปี” และวันที่ลงนาม');
-        if (hasGeneral) spots.push('ใบสำคัญรับเงิน: วันที่บนใบและวันที่ลงนาม');
+        if (hasGeneral) spots.push('ใบรับรองแทนใบเสร็จรับเงิน: วันที่ลงนาม (ตามวันในตาราง ถ้าไม่ตั้งแยก)');
 
         // สร้างช่องวันที่แยก เฉพาะชนิดเอกสารที่หมวดนี้ออกจริง
         const active = [];
@@ -4260,7 +4260,15 @@
         show('travelDetailsBox', hasReceipt);            // แผนที่ · ระยะทาง · ประเภทรถ
         // ตั้งหน้าตาให้ตรงกับเคสที่เลือกอยู่ตั้งแต่แรก ไม่ใช่รอให้ผู้ใช้ไปกดสลับก่อน
         if (typeof onTripModeChange === 'function') onTripModeChange();
-        show('extraEntriesBox',  hasReceipt);            // กิจกรรมเพิ่มเติม
+        /* 26 ต.ค. 2569 — ช่องกิจกรรมท้ายตารางหายไปในหมวดเบิกค่าที่พัก (บิลเงินสด)
+           เอกสาร FM-SAM-003-06 ยังพิมพ์แถว "กิจกรรม" แต่กรอกไม่ได้
+           ต้นเหตุ: เงื่อนไขเดิมดูแค่ "มีใบรับรองค่าพาหนะไหม" (hasReceipt)
+           ทั้งที่แถวกิจกรรมพิมพ์ในสองใบ คือใบรับรองค่าพาหนะและใบรับรองแทนใบเสร็จ
+             กิจกรรม : พิมพ์ทั้งสองใบ    -> เห็นเมื่อ hasReceipt || hasGeneral
+             ที่อยู่  : พิมพ์เฉพาะใบรับรองค่าพาหนะ (ใบทั่วไปไม่มีบรรทัดที่อยู่)
+                       -> เห็นเมื่อ hasReceipt เท่านั้น ไม่งั้นกรอกแล้วหายเงียบ */
+        show('extraEntriesBox',  hasReceipt || hasGeneral);   // กิจกรรมเพิ่มเติม
+        show('extraAddrRow',     hasReceipt);                 // ที่อยู่ท้ายตาราง
         describeDocDate(hasReport, hasReceipt, hasGeneral);
         // กล่องหัวข้อตามเลขข้อใน PDF — แสดงเมื่อมีอะไรอยู่ข้างในให้กรอกจริง
         show('secHotel',   hasReport);                   // 1. ค่าที่พัก (มีเฉพาะใบรายงาน)
@@ -5292,7 +5300,7 @@
 
         let descForRecord = descriptionValue;
         if (hasTravel) descForRecord = "เบิกค่าเดินทางไปปฏิบัติงาน";
-        else if (hasGeneral && !hasNormal) descForRecord = "เบิกค่าใช้จ่าย (ใบรับรองทั่วไป)";
+        else if (hasGeneral && !hasNormal) descForRecord = "เบิกค่าใช้จ่าย (ใบรับรองแทนใบเสร็จรับเงิน)";
 
         const payload = {
             projectId: null,
