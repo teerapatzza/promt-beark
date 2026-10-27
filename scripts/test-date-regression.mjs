@@ -149,6 +149,11 @@ try {
       /* คืนมาเป็น { html, dateObj } ไม่ใช่สตริง — เผลอใช้ทั้งก้อนจะได้ '[object Object]' */
       "const built = await buildDocumentHtml(REC, function(){});",
       "window.__html = (built && built.html) ? built.html : String(built);",
+      /* 27 ต.ค. 2569 — หน้าแผนที่แยกรายขา และแต่ละหน้าพิมพ์วันที่กับยอดของขานั้น
+         ตัดหน้าแผนที่ออกก่อนดึงค่า ชุดนี้ล็อกวันที่และยอดของใบรายงาน/ใบรับรองเท่านั้น
+         วันที่และยอดบนหน้าแผนที่ล็อกไว้ใน test-leg-maps.mjs */
+      "{ const box = document.createElement('div'); box.innerHTML = window.__html;",
+      "  box.querySelectorAll('[data-map-leg]').forEach(n => n.remove()); window.__html = box.innerHTML; }",
       EXTRACT
     ].join(NL));
     got['id' + fx.id] = snap;

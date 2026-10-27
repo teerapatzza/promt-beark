@@ -680,9 +680,6 @@
             const hasNormal   = templates.includes('NORMAL');
 
             let templateHtml = '';
-            /* ใบนี้เบิกขากลับของเส้นทางหลักไหม — ส่งให้แผนที่วาดเส้นขากลับเฉพาะใบที่เบิกจริง
-               ใช้กฎเดียวกับติ๊ก "ขากลับ / ไป-กลับ" ในใบรับรองค่าพาหนะ ด้านล่าง */
-            let mapReturnClaimed = false;
 
             if (hasTravel) {
                 const tr = meta._travel || {};
@@ -764,25 +761,8 @@
 
                    ต้นเหตุ: ของเดิมหยิบมาแค่เที่ยวแรกของแต่ละทิศ (firstTaxiOut/firstTaxiRet)
                    แต่บวกเงินจากทุกเที่ยว สองอย่างนี้จึงไม่ตรงกันมาตลอด */
-                const taxiLegRows = [];
-                taxiEntries.forEach(e => {
-                    if (e.direction === 'ไป-กลับ') {
-                        const out = parseFloat(e.amountOut), ret = parseFloat(e.amountRet);
-                        const split = !isNaN(out) && !isNaN(ret) && (out > 0 || ret > 0);
-                        taxiLegRows.push({ date: e.date, from: e.from, to: e.to,
-                                           amount: split ? (out || 0) : (parseFloat(e.amount) || 0) });
-                        /* ขากลับของเที่ยวไป-กลับ คือเส้นทางเดิมกลับหัว
-                           ต้องขึ้นบรรทัดเสมอ แม้กรอกยอดมาก้อนเดียวไม่ได้แยกขา
-                           เพราะติ๊กด้านบนบอกว่า "ไป-กลับ" ถ้าพิมพ์ขาเดียว
-                           เอกสารจะขัดกันเอง (ของเดิมก็พิมพ์สองบรรทัดแบบนี้) */
-                        taxiLegRows.push({ date: e.date, from: e.to, to: e.from,
-                                           amount: split ? (ret || 0) : 0 });
-                    } else {
-                        taxiLegRows.push({ date: e.date, from: e.from, to: e.to,
-                                           amount: parseFloat(e.amount) || 0 });
-                    }
-                });
-                
+                const taxiLegRows = taxiLegRowsOf(taxiEntries);
+
                 let fuelDist = 0;
                 if(carType === 'ขาไป') fuelDist = distOut;
                 else if(carType === 'ขากลับ') fuelDist = distRet;
@@ -905,7 +885,6 @@
                                       : (carType === 'ขาไป'   || carType === 'ไป-กลับ');
                 const rcFuelHasRet  = flatInfo ? (flatByCar && !!flatRet)
                                       : (carType === 'ขากลับ' || carType === 'ไป-กลับ');
-                mapReturnClaimed = !!(rcFuelHasRet || rcTaxiHasRet);
                 const rcFuelOutAmt  = flatInfo ? (flatByCar ? ((flatOut || {}).amount || 0) : 0) : fuelOut;
                 const rcFuelRetAmt  = flatInfo ? (flatByCar ? ((flatRet || {}).amount || 0) : 0) : fuelRet;
 
@@ -1672,30 +1651,25 @@
                ใบเก่าที่ไม่มีค่านี้ถือว่าใช้แผนที่ระบบเหมือนเดิม จะได้ไม่เปลี่ยนหน้าตา
                ภาพที่ผู้ใช้แนบเองอยู่ในไฟล์แนบอยู่แล้ว จึงพิมพ์ออกมาตามปกติ */
             const _useAppMap = !_tr || _tr.useAppMap !== false;
-            /* 21 ต.ค. 2569 — ใบที่เบิกเฉพาะ Taxi ไม่มีหมุดเส้นทางหลัก
-               ของเดิมจึงไม่มีหน้าแผนที่เลย ทั้งที่ทุกเที่ยวปักหมุดไว้ครบ
-               ตอนนี้มีเที่ยวที่ปักหมุดแล้วก็พอ วาดให้เหมือนที่เห็นตอนกรอก */
-            const _taxiLegs = taxiLegsWithPins(data.inputMetadata || {});
-            const _hasMainPins = !!(_tr && _tr.fromGeo && _tr.toGeo);
-            if (_useAppMap && (_hasMainPins || _taxiLegs.length)) {
-                // ใบเบิกเก่าไม่มี useAppMap แต่มีพิกัดครบ ก็วาดแผนที่ให้ด้วย
-                say('⏳ กำลังวาดแผนที่...');
-                const km = (_tr && (_tr.distOut || (_tr.route && _tr.route.km))) || '-';
-                try {
-                    const _mapOpts = { returnClaimed: mapReturnClaimed };
-                    const img = await renderRouteMapImage(_tr, _taxiLegs, _mapOpts);
-                    if (img) {
-                        mapPageHtml = buildMapPageHtml(img, _tr, km, _taxiLegs, _mapOpts);
-                    } else {
-                        // วาดไม่ได้ต้องบอก ไม่ใช่เงียบแล้วเอกสารขาดหน้าไปเฉยๆ
-                        alert('หมายเหตุ: วาดแผนที่ลงเอกสารไม่สำเร็จ\n\n' +
-                              'เอกสารส่วนอื่นจะออกตามปกติ แต่จะไม่มีหน้าแผนที่\n' +
-                              'สาเหตุที่พบบ่อย: อินเทอร์เน็ตช้าจนโหลดแผนที่ไม่ทัน — ลองกดออก PDF ใหม่อีกครั้ง');
-                    }
-                } catch (e) {
-                    console.warn('ข้ามหน้าแผนที่:', e);
-                    alert('หมายเหตุ: วาดแผนที่ลงเอกสารไม่สำเร็จ (' + (e.message || 'ไม่ทราบสาเหตุ') + ')\n\n' +
-                          'เอกสารส่วนอื่นจะออกตามปกติ');
+            /* หนึ่งขาที่เบิก = แผนที่หนึ่งหน้า (กฎอยู่ที่ mapLegsOf) */
+            const _legs = _useAppMap ? mapLegsOf(data.inputMetadata || {}) : [];
+            if (_legs.length) {
+                const _pages = [], _missing = [];
+                for (let i = 0; i < _legs.length; i++) {
+                    say('⏳ กำลังวาดแผนที่ ' + (i + 1) + '/' + _legs.length + '...');
+                    let img = null;
+                    try { img = await renderRouteMapImage(_legs[i]); }
+                    catch (e) { console.warn('วาดแผนที่ไม่สำเร็จ:', e); }
+                    if (img) _pages.push(buildLegMapPageHtml(img, _legs[i], i + 1, _legs.length));
+                    else _missing.push('- ' + legMapTitle(_legs[i], i + 1, _legs.length));
+                }
+                mapPageHtml = _pages.join('<div class="html2pdf__page-break"></div>');
+                // วาดไม่ได้ต้องบอกว่าขาไหนขาด ไม่ใช่เงียบแล้วเอกสารขาดหน้าไปเฉยๆ
+                if (_missing.length) {
+                    alert('หมายเหตุ: วาดแผนที่ไม่สำเร็จ ' + _missing.length + ' จาก ' + _legs.length + ' หน้า\n\n' +
+                          _missing.join('\n') + '\n\n' +
+                          'เอกสารส่วนอื่นจะออกตามปกติ แต่จะขาดหน้าแผนที่ข้างบน\n' +
+                          'สาเหตุที่พบบ่อย: อินเทอร์เน็ตช้าจนโหลดแผนที่ไม่ทัน — ลองกดออก PDF ใหม่อีกครั้ง');
                 }
             }
 
@@ -1870,8 +1844,10 @@
            ระหว่างล็อก: ขึ้นกล่อง "กำลังสร้าง PDF" ทับทั้งจอ ปิดล้อเมาส์ ปัดนิ้ว
            ปุ่มเลื่อนบนคีย์บอร์ด และแถบเลื่อน ถ้ายังมีอะไรเลื่อนหน้าได้ก็ดึงกลับบนสุดทันที
            เสร็จหรือล้มเหลวก็ปลดล็อกและคืนตำแหน่งเดิมให้ผู้ใช้
-           กันค้าง: ถ้าผ่านไป 3 นาทียังไม่ปลด จะปลดเอง ผู้ใช้ไม่ติดอยู่หน้าจอทึบตลอดไป */
-        function lockScreenForPdf() {
+           กันค้าง: ถ้าไม่มีความคืบหน้าเกิน 3 นาที จะปลดเอง ผู้ใช้ไม่ติดอยู่หน้าจอทึบตลอดไป
+           นับจากความคืบหน้าล่าสุด ไม่ใช่จากตอนเริ่ม — ใบที่มีแผนที่หลายขาใช้เวลารวมเกิน 3 นาทีได้
+           ถ้าปลดกลางทาง ผู้ใช้จะเลื่อนหน้าได้ระหว่างถ่ายภาพ แล้ว PDF หน้าตกแบบเดิม */
+        function lockScreenForPdf(idleMs) {
             const keepX = window.scrollX, keepY = window.scrollY;
             const root = document.documentElement;
             const keepOverflow = root.style.overflow;
@@ -1900,6 +1876,7 @@
             window.addEventListener('scroll', pin);
 
             let released = false;
+            let safety = null;
             const release = () => {
                 if (released) return;
                 released = true;
@@ -1912,8 +1889,14 @@
                 root.style.overflow = keepOverflow;
                 try { window.scrollTo(keepX, keepY); } catch (e) {}
             };
-            const safety = setTimeout(release, 180000);
-            const say = t => { const el = veil.querySelector('[data-say]'); if (el) el.innerHTML = t; };
+            const IDLE = idleMs || 180000;
+            safety = setTimeout(release, IDLE);
+            const say = t => {
+                const el = veil.querySelector('[data-say]'); if (el) el.innerHTML = t;
+                if (released) return;
+                clearTimeout(safety);
+                safety = setTimeout(release, IDLE);
+            };
             return { release, say };
         }
 
@@ -2024,52 +2007,135 @@
             }, 1000); 
         }
         
-        /* ══════════ วาดแผนที่เส้นทางลงเอกสาร ══════════
-           ระบบไม่เก็บรูปแผนที่ในฐานข้อมูล (จะกิน ~149 KB ต่อใบ)
-           เก็บแค่พิกัดกับเส้นทางแบบย่อ (~3 KB) แล้ววาดใหม่ตอนพิมพ์
-           ข้อดี: ประหยัดพื้นที่ ~50 เท่า และถ้าแก้หมุดภายหลัง เอกสารจะถูกต้องเสมอ */
+        /* ══════════ หนึ่งขาที่เบิก = แผนที่หนึ่งรูป = หนึ่งหน้า ══════════
+           27 ต.ค. 2569 — ผู้ตรวจเอกสารไม่รับแผนที่ที่รวมขาไปกับขากลับไว้ในรูปเดียว
+           ไปหนึ่งเที่ยวได้หนึ่งแผนที่ ไป-กลับแยกเป็นสองแผนที่ หลายเที่ยวก็เที่ยวละแผนที่
+           ทั้งค่าน้ำมัน ค่า Taxi และค่าพาหนะเหมาจ่าย  ล็อกไว้ใน scripts/test-leg-maps.mjs */
 
-        /** วาดแผนที่จากพิกัดที่บันทึกไว้ คืนค่าเป็น dataURL (คืน null ถ้าวาดไม่ได้) */
-        /* สีของเที่ยว Taxi บนแผนที่ — ต้องตรงกับหน้ากรอก (TAXI_COLORS ใน expense.html)
-           ไม่งั้นผู้ใช้เห็นเส้นสีหนึ่งตอนกรอก แล้วได้อีกสีตอนพิมพ์ จะงงว่าเส้นไหนของเที่ยวไหน */
-        const DOC_TAXI_COLORS = [
-            { line: '#ea580c', from: '#f97316', to: '#9a3412' },
-            { line: '#0d9488', from: '#14b8a6', to: '#115e59' },
-            { line: '#c026d3', from: '#d946ef', to: '#86198f' },
-            { line: '#ca8a04', from: '#eab308', to: '#854d0e' },
-            { line: '#0369a1', from: '#0ea5e9', to: '#075985' },
-            { line: '#be123c', from: '#f43f5e', to: '#881337' }
-        ];
+        const isMapGeo = g => !!(g && isFinite(g.lat) && isFinite(g.lng));
+        // ใบเก่าบางใบเก็บชื่อสถานที่เป็นวัตถุ กันไม่ให้หน้าแผนที่พิมพ์ "[object Object]"
+        const mapText = v => typeof v === 'string' ? v.trim()
+            : (v && typeof v === 'object') ? String(v.label || v.name || '').trim() : '';
+        const LEG_KIND_LABEL = { fuel: 'ค่าน้ำมันเชื้อเพลิง', flat: 'ค่าพาหนะเหมาจ่าย', taxi: 'ค่า Taxi' };
 
-        /** เที่ยว Taxi ที่ปักหมุดครบ พร้อมวาดลงแผนที่ */
-        function taxiLegsWithPins(meta) {
-            const list = ((meta && meta._costs && meta._costs.taxiEntries) || []);
-            return list.filter(e => e && e.fromGeo && e.toGeo
-                && isFinite(e.fromGeo.lat) && isFinite(e.toGeo.lat));
+        /** แตกแถว Taxi เป็นรายขา — บรรทัด จาก/ถึง ในใบรับรองกับหน้าแผนที่ใช้ตัวนี้ตัวเดียว
+            จาก ถึง ยอด ของแต่ละขาจึงตรงกันทั้งสองที่ */
+        function taxiLegRowsOf(entries) {
+            const rows = [];
+            entries.forEach(e => {
+                if (e.direction === 'ไป-กลับ') {
+                    const out = parseFloat(e.amountOut), ret = parseFloat(e.amountRet);
+                    const split = !isNaN(out) && !isNaN(ret) && (out > 0 || ret > 0);
+                    rows.push({ dir: 'ขาไป', date: e.date, from: e.from, to: e.to,
+                                fromGeo: e.fromGeo, toGeo: e.toGeo,
+                                amount: split ? (out || 0) : (parseFloat(e.amount) || 0) });
+                    /* ขากลับของเที่ยวไป-กลับ คือเส้นทางเดิมกลับหัว
+                       ต้องขึ้นบรรทัดเสมอ แม้กรอกยอดมาก้อนเดียวไม่ได้แยกขา
+                       เพราะติ๊กด้านบนบอกว่า "ไป-กลับ" ถ้าพิมพ์ขาเดียว
+                       เอกสารจะขัดกันเอง (ของเดิมก็พิมพ์สองบรรทัดแบบนี้) */
+                    rows.push({ dir: 'ขากลับ', date: e.date, from: e.to, to: e.from,
+                                fromGeo: e.toGeo, toGeo: e.fromGeo,
+                                amount: split ? (ret || 0) : 0 });
+                } else {
+                    rows.push({ dir: e.direction === 'ขากลับ' ? 'ขากลับ' : 'ขาไป', date: e.date,
+                                from: e.from, to: e.to, fromGeo: e.fromGeo, toGeo: e.toGeo,
+                                amount: parseFloat(e.amount) || 0 });
+                }
+            });
+            return rows;
         }
 
-        /** เส้นขากลับของเส้นทางหลักบนแผนที่เป็นแบบไหน
-            'different' = ขากลับออกจากที่อื่น หรือไปจบที่อื่น มีหมุดของตัวเอง
-            'same'      = กลับทางเดิม และใบนี้เบิกขากลับจริง (ตามกฎเดียวกับติ๊ก ไป-กลับ ในใบรับรอง)
-            ''          = ไม่มีเส้นขากลับ เช่นเบิกขาไปอย่างเดียว
-            ตัววาดแผนที่กับตารางใต้หัวแผนที่ต้องเรียกตัวนี้ตัวเดียวกัน จะได้ไม่เล่าคนละเรื่อง */
-        function returnLineKind(tr, opts) {
-            if (!tr || !tr.fromGeo || !tr.toGeo) return '';
-            if (tr.returnDifferent && (tr.returnGeo || tr.returnFromGeo)) return 'different';
-            return (opts && opts.returnClaimed) ? 'same' : '';
+        /** รายการขาที่ต้องมีแผนที่ เรียงตามที่เดินทางจริง
+            - เหมาจ่าย: ขาจาก _flatRate.legs บนเส้นทางหลัก
+              แถว Taxi ในใบเหมาจ่ายห้ามวาด หน้ากรอกซ่อนส่วนนั้นและไม่คิดเงิน
+              ตามประกาศที่ห้ามเบิกสองวิธีกับการเดินทางช่วงเดียวกัน (เคยวาดผิดในใบ 202 210 216 224)
+            - คิดตามระยะ: ขาไป/ขากลับตาม _carType แบบเดียวกับติ๊กในใบรับรอง
+              Taxi ทุกขาที่ปักหมุด
+            - ไม่มีขาไหนวาดได้แต่มีหมุดเส้นทางหลัก ยังได้แผนที่เส้นทางหลักหนึ่งหน้า
+              (เช่นใบ 133 ที่ Taxi ไม่ได้ปักหมุด ห้ามเสียแผนที่ที่เคยมี) */
+        function mapLegsOf(meta) {
+            const m = meta || {};
+            const tr = m._travel || null;
+            const main = !!(tr && isMapGeo(tr.fromGeo) && isMapGeo(tr.toGeo));
+            const pathOf = p => (Array.isArray(p) && p.length > 1)
+                ? p.filter(q => Array.isArray(q) && q.length >= 2) : null;
+            const legs = [];
+
+            let A = null, B = null;
+            if (main) {
+                // ที่อยู่จุดเริ่มต้น: แยก เลขที่ / ซอย / ถนน ให้อ่านออก
+                const a = tr.fromAddr || null;
+                const fromLabel = (a && (a.no || a.soi || a.road))
+                    ? [a.no || '', a.soi ? 'ซอย' + a.soi : '', a.road ? 'ถนน' + a.road : ''].filter(Boolean).join(' ')
+                    : (mapText(tr.fromGeo.label) || mapText(tr.from));
+                A = { label: fromLabel, geo: tr.fromGeo };
+                B = { label: mapText(tr.toGeo.label) || mapText(tr.to), geo: tr.toGeo };
+            }
+            const dist = { src: tr && tr.distanceSource, reason: tr && tr.manualReason };
+
+            const flat = (m._fuelMethod === 'flat' && m._flatRate) ? m._flatRate : null;
+            const car = m._carType || 'ไม่ระบุ';
+            const flatLeg = d => (flat && Array.isArray(flat.legs)) ? (flat.legs.find(l => l.dir === d) || null) : null;
+            const outOn = flat ? !!flatLeg('ขาไป')   : (car === 'ขาไป'   || car === 'ไป-กลับ');
+            const retOn = flat ? !!flatLeg('ขากลับ') : (car === 'ขากลับ' || car === 'ไป-กลับ');
+            const kind = flat ? 'flat' : 'fuel';
+
+            if (main && outOn) {
+                const f = flatLeg('ขาไป');
+                legs.push({ kind, dir: 'ขาไป', date: tr.startDate || '', rank: 0,
+                            from: A, to: B, path: pathOf(tr.routePath),
+                            km: f ? f.km : tr.distOut, amount: f ? f.amount : null,
+                            band: f ? f.label : '', dist });
+            }
+            if (main && retOn) {
+                /* ปลายทางขากลับว่าง = กลับจุดเริ่มต้น จุดเริ่มขากลับว่าง = ออกจากจุดหมายขาไป
+                   ตรงกับที่หน้ากรอกใช้ขอเส้นทางและคิดระยะขากลับ */
+                const rd = !!tr.returnDifferent;
+                const rf = rd && isMapGeo(tr.returnFromGeo) ? tr.returnFromGeo : null;
+                const rt = rd && isMapGeo(tr.returnGeo) ? tr.returnGeo : null;
+                const outPath = pathOf(tr.routePath);
+                const path = (rf || rt) ? pathOf(tr.returnPath) : (outPath ? outPath.slice().reverse() : null);
+                const f = flatLeg('ขากลับ');
+                legs.push({ kind, dir: 'ขากลับ', date: tr.endDate || tr.startDate || '', rank: 2,
+                            from: rf ? { label: mapText(rf.label) || mapText(tr.returnFrom), geo: rf } : B,
+                            to:   rt ? { label: mapText(rt.label) || mapText(tr.returnTo),   geo: rt } : A,
+                            path, km: f ? f.km : tr.distRet, amount: f ? f.amount : null,
+                            band: f ? f.label : '', dist });
+            }
+            if (!flat) {
+                const tx = ((m._costs || {}).taxiEntries) || [];
+                taxiLegRowsOf(Array.isArray(tx) ? tx : []).forEach(r => {
+                    if (!isMapGeo(r.fromGeo) || !isMapGeo(r.toGeo)) return;
+                    legs.push({ kind: 'taxi', dir: r.dir, date: r.date || '', rank: 1,
+                                from: { label: mapText(r.from) || mapText(r.fromGeo.label), geo: r.fromGeo },
+                                to:   { label: mapText(r.to)   || mapText(r.toGeo.label),   geo: r.toGeo },
+                                path: null, km: null, amount: r.amount });
+                });
+            }
+
+            if (!legs.length && main) {
+                return [{ kind: 'route', dir: 'ขาไป', date: tr.startDate || '', rank: 0,
+                          from: A, to: B, path: pathOf(tr.routePath), km: tr.distOut, amount: null, dist }];
+            }
+
+            /* เรียงตามวันที่ วันเดียวกัน: ขาไปของเส้นทางหลัก -> Taxi ตามลำดับที่กรอก -> ขากลับ
+               ใบเก่าที่ไม่มีวันเดินทาง: ขาไปไว้หน้าแรก ขากลับไว้หน้าสุดท้าย */
+            const keyOf = l => l.date ? String(l.date).slice(0, 10) : (l.rank === 2 ? '￿' : '');
+            return legs.map((l, i) => ({ l, i, k: keyOf(l) }))
+                .sort((x, y) => (x.k < y.k ? -1 : x.k > y.k ? 1 : 0) || (x.l.rank - y.l.rank) || (x.i - y.i))
+                .map(x => x.l);
         }
 
-        /** ระยะที่เส้นขากลับเยื้องจากถนน หน่วยพิกเซลของแผนที่ (ก่อนขยาย)
-            8 พิกเซลบนภาพกว้าง 960 ≈ 1.6 มม. บนกระดาษ พอให้เห็นสองเส้นแยกกัน */
-        const RETURN_SHIFT = 8;
+        function legMapTitle(leg, no, total) {
+            return leg.kind === 'route' ? 'แผนที่เส้นทางการเดินทาง'
+                : 'เที่ยวที่ ' + no + ' จาก ' + total + ' · ' + leg.dir + ' · ' + (LEG_KIND_LABEL[leg.kind] || '');
+        }
 
-        async function renderRouteMapImage(tr, taxiLegs, opts) {
-            const legs = Array.isArray(taxiLegs) ? taxiLegs : [];
-            /* 21 ต.ค. 2569 — เจ้าของงานกรอก Taxi 5 เที่ยว เห็นครบ 5 เส้นบนหน้ากรอก
-               แต่แผนที่ในเอกสารมีเส้นเดียว เพราะตัวนี้รู้จักแต่เส้นทางหลัก
-               และใบที่เบิกเฉพาะ Taxi ยังไม่มีหมุดหลักเลย จึงไม่มีหน้าแผนที่ด้วยซ้ำ */
-            const hasMain = !!(tr && tr.fromGeo && tr.toGeo);
-            if (!hasMain && !legs.length) return null;
+        /** วาดแผนที่ของหนึ่งขา คืนค่าเป็น dataURL (คืน null ถ้าวาดไม่ได้)
+            ระบบไม่เก็บรูปแผนที่ในฐานข้อมูล (จะกิน ~149 KB ต่อใบ)
+            เก็บแค่พิกัดกับเส้นทางแบบย่อ (~3 KB) แล้ววาดใหม่ตอนพิมพ์ */
+        async function renderRouteMapImage(leg) {
+            if (!leg || !leg.from || !leg.to || !isMapGeo(leg.from.geo) || !isMapGeo(leg.to.geo)) return null;
             if (typeof L === 'undefined' || typeof html2canvas !== 'function') return null;
 
             const host = document.createElement('div');
@@ -2096,53 +2162,10 @@
                     attribution: '&copy; OpenStreetMap contributors'
                 }).addTo(map);
 
-                const from = hasMain ? L.latLng(tr.fromGeo.lat, tr.fromGeo.lng) : null;
-                const to   = hasMain ? L.latLng(tr.toGeo.lat,   tr.toGeo.lng)   : null;
-                const hasPath = hasMain && Array.isArray(tr.routePath) && tr.routePath.length > 1;
-                const pts = !hasMain ? []
-                    : hasPath
-                    ? tr.routePath.filter(p => Array.isArray(p) && p.length >= 2)
-                                  .map(p => L.latLng(p[0], p[1]))
-                    : [from, to];
-
-                // จุดของทุกเที่ยว Taxi ที่ปักหมุดไว้
-                const legPts = legs.map(e => ({
-                    a: L.latLng(e.fromGeo.lat, e.fromGeo.lng),
-                    b: L.latLng(e.toGeo.lat,   e.toGeo.lng)
-                }));
-
-                // ขากลับไปคนละที่: ต้องเห็นทั้งสองขาบนแผนที่ ไม่งั้นเอกสารเล่าไม่ครบ
-                const rg = tr.returnDifferent && tr.returnGeo ? tr.returnGeo : null;
-                const ret = rg ? L.latLng(rg.lat, rg.lng) : null;
-                // ขากลับอาจออกจากที่อื่น ไม่ใช่จุดหมายขาไป เช่น ไปพักโรงแรม
-                // แล้ววันรุ่งขึ้นออกจากโรงพยาบาลกลับบ้าน
-                // ใบเก่าไม่มีคีย์นี้ จึงถอยไปใช้จุดหมายขาไปเหมือนเดิม
-                const rgf = tr.returnDifferent && tr.returnFromGeo ? tr.returnFromGeo : null;
-                const retStart = rgf ? L.latLng(rgf.lat, rgf.lng) : to;
-                /* ปลายทางขากลับเว้นว่าง = กลับจุดเริ่มต้น (หน้ากรอกเขียนไว้แบบนั้นและคิดระยะแบบนั้น)
-                   27 ต.ค. 2569 — ของเดิมวาดเส้นขากลับเฉพาะเมื่อ "ปลายทางขากลับ" เป็นที่อื่น
-                   เพราะเขียนไว้ก่อนมีช่อง "จุดเริ่มต้นขากลับ" ใครออกจากที่อื่นแล้วกลับบ้าน
-                   เส้นขากลับที่บันทึกไว้ครบจึงไม่ถูกวาด ผู้ตรวจตีกลับว่าแผนที่มีเส้นเดียว
-                   ล็อกไว้ใน scripts/test-return-map.mjs */
-                const retEnd = ret || (rgf ? from : null);
-                const kind = returnLineKind(tr, opts);
-                const hasRetPath = Array.isArray(tr.returnPath) && tr.returnPath.length > 1;
-                /* 'same' = กลับทางเดิม: ใช้เส้นขาไปย้อนกลับ ซึ่งเป็นถนนจริงเส้นเดียวกับที่คิดระยะ
-                   (หน้ากรอกคิดระยะขากลับเท่าขาไปในกรณีนี้ ไม่ได้ขอเส้นทางใหม่) */
-                const retPts = kind === 'different'
-                    ? (hasRetPath
-                        ? tr.returnPath.filter(p => Array.isArray(p) && p.length >= 2)
-                                       .map(p => L.latLng(p[0], p[1]))
-                        : [retStart, retEnd])
-                    : kind === 'same' ? pts.slice().reverse()
-                    : [];
-                const retSolid = kind === 'different' ? hasRetPath : hasPath;
-
-                const allPts = pts.concat(retPts,
-                    hasMain ? [from, to] : [],
-                    ret ? [ret] : [], (rgf && retStart) ? [retStart] : [],
-                    legPts.reduce((acc, l) => acc.concat([l.a, l.b]), []));
-                map.fitBounds(L.latLngBounds(allPts),
+                const a = L.latLng(leg.from.geo.lat, leg.from.geo.lng);
+                const b = L.latLng(leg.to.geo.lat, leg.to.geo.lng);
+                const pts = leg.path ? leg.path.map(p => L.latLng(p[0], p[1])) : [a, b];
+                map.fitBounds(L.latLngBounds(pts.concat([a, b])),
                               { padding: [46, 46], maxZoom: 15, animate: false });
 
                 // รอ tile โหลดครบจริงๆ ไม่ใช่เดาเวลา
@@ -2175,21 +2198,7 @@
                     return [q.x * SCALE, q.y * SCALE];
                 };
 
-                /* เลื่อนเส้นไปทางซ้ายของทิศที่เดินทาง d พิกเซล
-                   ขาไปกับขากลับมักวิ่งถนนเดียวกัน วาดตรงตำแหน่งจริงทั้งคู่เส้นหลังจะทับเส้นแรกมิด
-                   ผู้ตรวจเห็นเส้นเดียวแล้วตีกลับ (27 ต.ค. 2569) จึงเยื้องเส้นขากลับออกข้างเล็กน้อย
-                   ทิศของแต่ละจุดใช้จุดก่อนและหลัง เส้นที่ได้จึงขนานไปตามโค้งของถนน */
-                const shiftLeft = (xy, d) => {
-                    if (!d || xy.length < 2) return xy;
-                    return xy.map((q, i) => {
-                        const a = xy[Math.max(0, i - 1)], b = xy[Math.min(xy.length - 1, i + 1)];
-                        const dx = b[0] - a[0], dy = b[1] - a[1];
-                        const len = Math.hypot(dx, dy) || 1;
-                        return [q[0] + (dy / len) * d, q[1] - (dx / len) * d];
-                    });
-                };
-                /* ลูกศรบอกทิศบนเส้น มีเมื่อแผนที่มีทั้งขาไปและขากลับ
-                   ผู้อ่านจะได้รู้ว่าเส้นไหนไป เส้นไหนกลับ โดยไม่ต้องดูสีอย่างเดียว */
+                // ลูกศรบอกทิศบนเส้น ผู้อ่านรู้ว่าเดินทางจากหมุดไหนไปหมุดไหนโดยไม่ต้องอ่านตาราง
                 const drawArrows = (xy, color) => {
                     const seg = [];
                     let total = 0;
@@ -2201,9 +2210,9 @@
                     [0.3, 0.55, 0.8].forEach(f => {
                         let want = total * f, i = 0;
                         while (i < seg.length - 1 && want > seg[i]) { want -= seg[i]; i++; }
-                        const a = xy[i], b = xy[i + 1], t = seg[i] ? want / seg[i] : 0;
-                        const x = a[0] + (b[0] - a[0]) * t, y = a[1] + (b[1] - a[1]) * t;
-                        const ang = Math.atan2(b[1] - a[1], b[0] - a[0]);
+                        const p = xy[i], q = xy[i + 1], t = seg[i] ? want / seg[i] : 0;
+                        const x = p[0] + (q[0] - p[0]) * t, y = p[1] + (q[1] - p[1]) * t;
+                        const ang = Math.atan2(q[1] - p[1], q[0] - p[0]);
                         const s = 7 * SCALE;
                         ctx.save();
                         ctx.translate(x, y);
@@ -2219,36 +2228,35 @@
                         ctx.restore();
                     });
                 };
-                // ขอบขาวใต้เส้น ทำให้เส้นเด่นบนแผนที่ที่มีถนนสีใกล้เคียงกัน
-                const drawLine = (list, color, solid, shift, arrows) => {
-                    if (!list || list.length < 2) return;
-                    const xy = shiftLeft(list.map(P), shift || 0);
-                    ctx.lineJoin = 'round';
-                    ctx.lineCap  = 'round';
-                    [['#ffffff', 9 * SCALE, []],
-                     [color,     5 * SCALE, solid ? [] : [10 * SCALE, 7 * SCALE]]]
-                        .forEach(([c, width, dash]) => {
-                            ctx.beginPath();
-                            ctx.setLineDash(dash);
-                            ctx.strokeStyle = c;
-                            ctx.lineWidth = width;
-                            xy.forEach(([x, y], i) => {
-                                if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-                            });
-                            ctx.stroke();
-                        });
-                    ctx.setLineDash([]);
-                    if (arrows) drawArrows(xy, color);
-                };
-                const hasReturnLine = retPts.length > 1;
-                if (hasMain) drawLine(pts, '#2563eb', hasPath, 0, hasReturnLine);
 
-                const drawPin = (ll, color, letter) => {
+                /* ขาไปสีน้ำเงิน ขากลับสีม่วง
+                   เส้นทึบ = เส้นทางถนนจริงที่บันทึกไว้ · เส้นประ = ลากตรงระหว่างหมุด (ไม่มีเส้นทางถนน เช่น Taxi)
+                   ขอบขาวใต้เส้น ทำให้เส้นเด่นบนแผนที่ที่มีถนนสีใกล้เคียงกัน */
+                const color = leg.dir === 'ขากลับ' ? '#7c3aed' : '#2563eb';
+                const xy = pts.map(P);
+                ctx.lineJoin = 'round';
+                ctx.lineCap  = 'round';
+                [['#ffffff', 9 * SCALE, []],
+                 [color,     5 * SCALE, leg.path ? [] : [10 * SCALE, 7 * SCALE]]]
+                    .forEach(([c, width, dash]) => {
+                        ctx.beginPath();
+                        ctx.setLineDash(dash);
+                        ctx.strokeStyle = c;
+                        ctx.lineWidth = width;
+                        xy.forEach(([x, y], i) => {
+                            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                        });
+                        ctx.stroke();
+                    });
+                ctx.setLineDash([]);
+                drawArrows(xy, color);
+
+                const drawPin = (ll, pinColor, letter) => {
                     const [x, y] = P(ll);
                     const r = 13 * SCALE;
                     ctx.beginPath();
                     ctx.arc(x, y, r, 0, Math.PI * 2);
-                    ctx.fillStyle = color;
+                    ctx.fillStyle = pinColor;
                     ctx.fill();
                     ctx.lineWidth = 3 * SCALE;
                     ctx.strokeStyle = '#ffffff';
@@ -2259,29 +2267,8 @@
                     ctx.textBaseline = 'middle';
                     ctx.fillText(letter, x, y + SCALE * 0.5);
                 };
-                if (hasReturnLine) drawLine(retPts, '#7c3aed', retSolid, RETURN_SHIFT * SCALE, true);
-
-                /* เส้นของเที่ยว Taxi — เส้นประเสมอ เพราะเราไม่ได้เก็บเส้นทางถนนจริงของเที่ยว
-                   ลากตรงระหว่างสองหมุด เส้นประบอกผู้อ่านเองว่าไม่ใช่เส้นทางที่รถวิ่งจริง
-                   หมายเลขบนหมุดตรงกับลำดับเที่ยวในใบรับรอง จะได้ไล่ดูทีละเที่ยวได้ */
-                legPts.forEach(function (l, i) {
-                    const col = DOC_TAXI_COLORS[i % DOC_TAXI_COLORS.length];
-                    drawLine([l.a, l.b], col.line, false);
-                });
-
-                if (hasMain) {
-                    drawPin(from, '#059669', 'A');
-                    drawPin(to,   '#e11d48', 'B');
-                }
-                // จุดเริ่มต้นขากลับได้หมุดของตัวเองเฉพาะเมื่อไม่ใช่จุดหมายขาไป
-                if (rgf) drawPin(retStart, '#a855f7', 'C');
-                if (ret) drawPin(ret, '#7c3aed', rgf ? 'D' : 'C');
-
-                legPts.forEach(function (l, i) {
-                    const col = DOC_TAXI_COLORS[i % DOC_TAXI_COLORS.length];
-                    drawPin(l.a, col.from, String(i + 1));
-                    drawPin(l.b, col.to,   String(i + 1));
-                });
+                drawPin(a, '#059669', 'A');
+                drawPin(b, '#e11d48', 'B');
 
                 return out.toDataURL('image/jpeg', 0.9);
             } catch (e) {
@@ -2293,6 +2280,73 @@
             }
         }
 
+        /** หน้าแผนที่ของหนึ่งขา สำหรับแทรกในเอกสาร */
+        function buildLegMapPageHtml(imgData, leg, no, total) {
+            if (!imgData) return '';
+            const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g,
+                c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+            const lvl = { exact: 'ตำแหน่งยืนยันโดยผู้ใช้', search: 'ค้นหาจากชื่อสถานที่',
+                          subdistrict: 'ระดับตำบล (±1-3 กม.)', district: 'ระดับอำเภอ (±5 กม.)',
+                          province: 'ระดับจังหวัด', manual: 'พิกัดจากโปรไฟล์',
+                          road: 'ระดับถนน (±500 ม.)', soi: 'ระดับซอย (±500 ม.)' };
+            const p = g => lvl[(g && g.precision) || ''] || 'ไม่ระบุที่มา';
+            const route = leg.kind === 'route';
+            const iso = leg.date ? String(leg.date).slice(0, 10) : '';
+            const d = iso ? new Date(iso + 'T00:00:00') : null;
+            const dateTxt = (d && !isNaN(d.getTime())) ? formatDateDisplay(d) : '';
+
+            const TD_H = 'border:1px solid #cbd5e1;padding:7px 10px;background:#f8fafc;width:20%;';
+            const TD = 'border:1px solid #cbd5e1;padding:7px 10px;';
+            const row = (head, body) => `
+                    <tr><td style="${TD_H}">${head}</td><td style="${TD}">${body}</td></tr>`;
+            // Taxi ไม่มีที่มาของพิกัดเก็บไว้ จึงไม่เขียนระดับความแม่นยำ
+            const place = pt => esc(pt.label || '-') + (leg.kind === 'taxi' ? ''
+                : ` <span style="color:#64748b;">— ${esc(p(pt.geo))}</span>`);
+            const distNote = leg.dist && leg.dist.src === 'manual'
+                ? 'ผู้ใช้กรอกเอง' + (leg.dist.reason ? ' (' + esc(leg.dist.reason) + ')' : '')
+                : 'คำนวณจากเส้นทางถนนจริง';
+            const money = n => formatNumber(Number(n) || 0);
+
+            let last = '';
+            if (leg.kind === 'taxi') {
+                last = row('ค่าโดยสาร', (Number(leg.amount) || 0) > 0
+                    ? `<b>${money(leg.amount)}</b> บาท`
+                    : 'รวมอยู่ในยอดขาไปของเที่ยวนี้');
+            } else if (leg.kind === 'flat') {
+                last = row('ระยะทาง', `<b>${esc(leg.km)}</b> กม. · เหมาจ่าย <b>${money(leg.amount)}</b> บาท`
+                    + (leg.band ? ` (${esc(leg.band)})` : '')
+                    + ` <span style="color:#64748b;">— ${distNote}</span>`);
+            } else {
+                last = row('ระยะทาง', `<b>${esc(leg.km || '-')}</b> กม. <span style="color:#64748b;">— ${distNote}</span>`);
+            }
+
+            return `
+            <div class="pdf-page avoid-break" data-map-leg="${no}" data-kind="${esc(leg.kind)}" data-dir="${esc(leg.dir)}" data-date="${esc(iso)}" style="padding-top: 20px;">
+                <div style="font-size:1.25rem;font-weight:bold;margin-bottom:${route ? 16 : 4}px;${route ? 'border-bottom:2px solid #334155;padding-bottom:10px;' : ''}">
+                    ${route ? 'แผนที่เส้นทางการเดินทาง' : `แผนที่การเดินทาง — เที่ยวที่ ${no} จาก ${total}`}
+                </div>
+                ${route ? '' : `
+                <div style="font-size:14px;color:#334155;margin-bottom:16px;border-bottom:2px solid #334155;padding-bottom:10px;">
+                    <b style="color:${leg.dir === 'ขากลับ' ? '#7c3aed' : '#2563eb'};">${esc(leg.dir)}</b> · ${esc(LEG_KIND_LABEL[leg.kind] || '')}
+                </div>`}
+                <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:14px;">
+                    ${dateTxt ? row('วันที่', esc(dateTxt)) : ''}
+                    ${row('<b style="color:#059669;">A</b> จุดเริ่มต้น', place(leg.from))}
+                    ${row('<b style="color:#e11d48;">B</b> ปลายทาง', place(leg.to))}
+                    ${last}
+                </table>
+                <div style="width:100%;text-align:center;">
+                    <img src="${imgData}" style="max-width:100%;max-height:170mm;object-fit:contain;border:1px solid #cbd5e1;border-radius:6px;" />
+                </div>
+                ${leg.path ? '' : `
+                <p style="font-size:11px;color:#64748b;margin-top:8px;">
+                    เส้นประลากตรงระหว่างหมุด A กับ B ไม่ได้แสดงเส้นทางที่รถวิ่งจริง
+                </p>`}
+                <p style="font-size:11px;color:#64748b;margin-top:8px;">
+                    แผนที่สร้างจากพิกัดที่บันทึกไว้ในระบบ · ข้อมูลแผนที่ &copy; OpenStreetMap contributors
+                </p>
+            </div>`;
+        }
 
         /* ตัดข้อความยาวเป็นบรรทัดเอง แล้วส่งเป็น <br> ให้เอกสาร
            เหตุผลเดียวกับที่แถวที่อยู่ทำไว้แล้ว: ข้อความไทยยาวๆ ที่ปล่อยให้เบราว์เซอร์
@@ -2319,113 +2373,6 @@
             });
             if (line) out.push(line);
             return out.map(esc).join('<br>');
-        }
-
-        /** สร้างหน้าแผนที่สำหรับแทรกในเอกสาร */
-        function buildMapPageHtml(imgData, tr, km, taxiLegs, opts) {
-            if (!imgData) return '';
-            const kind = returnLineKind(tr, opts);
-            const legs = Array.isArray(taxiLegs) ? taxiLegs : [];
-            const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g,
-                c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
-            const lvl = { exact: 'ตำแหน่งยืนยันโดยผู้ใช้', search: 'ค้นหาจากชื่อสถานที่',
-                          subdistrict: 'ระดับตำบล (±1-3 กม.)', district: 'ระดับอำเภอ (±5 กม.)',
-                          province: 'ระดับจังหวัด', manual: 'พิกัดจากโปรไฟล์',
-                          road: 'ระดับถนน (±500 ม.)', soi: 'ระดับซอย (±500 ม.)' };
-            const p = g => lvl[(g && g.precision) || ''] || 'ไม่ระบุที่มา';
-
-            // ที่อยู่จุดเริ่มต้น: แยก เลขที่ / ซอย / ถนน ให้อ่านออก
-            // เดิมต่อกันเป็น "141/36 สุขสวัสดิ์ 55 สุขสวัสดิ์" ซึ่งดูไม่ออกว่าอันไหนซอยอันไหนถนน
-            const fromLabel = (function () {
-                const a = tr.fromAddr || null;
-                if (a && (a.no || a.soi || a.road)) {
-                    return [a.no ? esc(a.no) : '',
-                            a.soi ? 'ซอย' + esc(a.soi) : '',
-                            a.road ? 'ถนน' + esc(a.road) : ''].filter(Boolean).join(' ');
-                }
-                return esc((tr.fromGeo && tr.fromGeo.label) || tr.from || '-');
-            })();
-
-            /* หมุด C บนแผนที่ = จุดเริ่มต้นขากลับ เมื่อออกจากที่อื่น (ปลายทางขากลับจึงเลื่อนเป็น D)
-               ตารางต้องใช้ตัวอักษรเดียวกับหมุดเสมอ ของเดิมมีหมุด C แต่ไม่มีบรรทัดอธิบาย
-               และเรียกปลายทางขากลับว่า C ทั้งที่หมุดเขียน D */
-            const retFromRow = !!(tr.returnDifferent && tr.returnFromGeo);
-
-            return `
-            <div class="pdf-page avoid-break" style="padding-top: 20px;">
-                <div style="font-size:1.25rem;font-weight:bold;margin-bottom:16px;border-bottom:2px solid #334155;padding-bottom:10px;">
-                    แผนที่และเส้นทางการเดินทาง
-                </div>
-                <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:14px;">
-                    <tr>
-                        <td style="border:1px solid #cbd5e1;padding:7px 10px;background:#f8fafc;width:20%;">
-                            <b style="color:#059669;">A</b> จุดเริ่มต้น</td>
-                        <td style="border:1px solid #cbd5e1;padding:7px 10px;">${fromLabel}
-                            <span style="color:#64748b;">— ${esc(p(tr.fromGeo))}</span></td>
-                    </tr>
-                    <tr>
-                        <td style="border:1px solid #cbd5e1;padding:7px 10px;background:#f8fafc;">
-                            <b style="color:#e11d48;">B</b> ปลายทาง</td>
-                        <td style="border:1px solid #cbd5e1;padding:7px 10px;">${esc((tr.toGeo && tr.toGeo.label) || tr.to || '-')}
-                            <span style="color:#64748b;">— ${esc(p(tr.toGeo))}</span></td>
-                    </tr>
-                    ${legs.map(function (e, i) {
-                        /* 21 ต.ค. 2569 — หมุดของเที่ยว Taxi มีเลขกำกับบนแผนที่
-                           ต้องมีบรรทัดบอกว่าเลขไหนคือเที่ยวไหน ไม่งั้นดูแผนที่แล้วเดาไม่ออก
-                           สีตรงกับหมุดบนแผนที่และกับที่เห็นตอนกรอก */
-                        const col = DOC_TAXI_COLORS[i % DOC_TAXI_COLORS.length];
-                        const a = (e.from || (e.fromGeo && e.fromGeo.label) || '-');
-                        const b = (e.to   || (e.toGeo   && e.toGeo.label)   || '-');
-                        return `
-                    <tr>
-                        <td style="border:1px solid #cbd5e1;padding:7px 10px;background:#f8fafc;">
-                            <b style="color:${col.line};">${i + 1}</b> เที่ยว Taxi</td>
-                        <td style="border:1px solid #cbd5e1;padding:7px 10px;">${esc(a)} → ${esc(b)}
-                            <span style="color:#64748b;">— ${esc(e.direction || '')}</span></td>
-                    </tr>`;
-                    }).join('')}
-                    ${retFromRow ? `
-                    <tr>
-                        <td style="border:1px solid #cbd5e1;padding:7px 10px;background:#f8fafc;">
-                            <b style="color:#a855f7;">C</b> จุดเริ่มต้นขากลับ</td>
-                        <td style="border:1px solid #cbd5e1;padding:7px 10px;">${esc(tr.returnFromGeo.label || tr.returnFrom || '-')}
-                            <span style="color:#64748b;">— ${esc(p(tr.returnFromGeo))}</span></td>
-                    </tr>` : ''}
-                    ${(tr.returnDifferent && (tr.returnTo || (tr.returnGeo && tr.returnGeo.label))) ? `
-                    <tr>
-                        <td style="border:1px solid #cbd5e1;padding:7px 10px;background:#f8fafc;">
-                            <b style="color:#7c3aed;">${retFromRow ? 'D' : 'C'}</b> ปลายทางขากลับ</td>
-                        <td style="border:1px solid #cbd5e1;padding:7px 10px;">${esc((tr.returnGeo && tr.returnGeo.label) || tr.returnTo)}
-                            <span style="color:#64748b;">— ขากลับไม่ได้กลับที่จุดเริ่มต้น</span></td>
-                    </tr>` : ''}
-                    <tr>
-                        <td style="border:1px solid #cbd5e1;padding:7px 10px;background:#f8fafc;">ระยะทาง</td>
-                        <td style="border:1px solid #cbd5e1;padding:7px 10px;">${
-                            (tr.returnDifferent && (tr.returnGeo || tr.returnFromGeo))
-                              ? `ขาไป <b>${esc(tr.distOut || km)}</b> กม. · ขากลับ <b>${esc(tr.distRet || '-')}</b> กม.`
-                              : `<b>${esc(km)}</b> กิโลเมตรต่อเที่ยว`}
-                            <span style="color:#64748b;">— ${tr.distanceSource === 'manual'
-                                ? 'ผู้ใช้กรอกเอง' + (tr.manualReason ? ' (' + esc(tr.manualReason) + ')' : '')
-                                : 'คำนวณจากเส้นทางถนนจริง'}</span></td>
-                    </tr>
-                </table>
-                <div style="width:100%;text-align:center;">
-                    <img src="${imgData}" style="max-width:100%;max-height:170mm;object-fit:contain;border:1px solid #cbd5e1;border-radius:6px;" />
-                </div>
-                ${kind ? `
-                <p style="font-size:12px;color:#334155;margin-top:8px;">
-                    <span style="display:inline-block;width:26px;height:5px;background:#2563eb;vertical-align:middle;border-radius:3px;"></span>
-                    ขาไป &nbsp;&nbsp;
-                    <span style="display:inline-block;width:26px;height:5px;background:#7c3aed;vertical-align:middle;border-radius:3px;"></span>
-                    ขากลับ &nbsp;·&nbsp; ลูกศรบอกทิศทางการเดินทาง
-                </p>
-                <p style="font-size:11px;color:#64748b;margin-top:2px;">
-                    เส้นขากลับวาดเยื้องจากถนนเล็กน้อยเพื่อให้เห็นทั้งสองเส้น ระยะทางคิดจากเส้นทางถนนจริง
-                </p>` : ''}
-                <p style="font-size:11px;color:#64748b;margin-top:8px;">
-                    แผนที่สร้างจากพิกัดที่บันทึกไว้ในระบบ · ข้อมูลแผนที่ &copy; OpenStreetMap contributors
-                </p>
-            </div>`;
         }
 
         /** อ่านเหตุผลจริงจากเซิร์ฟเวอร์ แล้วเขียนเป็นข้อความที่บอกได้ว่าทำอะไรต่อ */
