@@ -1856,12 +1856,97 @@
                 && document.fonts.check('700 13.5px Sarabun', 'ก');
         }
 
+        /* ══════════ ล็อกหน้าจอระหว่างสร้าง PDF ══════════
+           ตัวแปลง (html2pdf) เอาระยะที่หน้าเว็บถูกเลื่อนไปเป็นระยะเยื้องของภาพ
+           หน้าเว็บจึงต้อง "อยู่บนสุดและห้ามขยับ" ตลอดเวลาที่สร้าง ไม่ใช่แค่ตอนเริ่ม
+           พิสูจน์แล้ว: เลื่อนขึ้นบนสุดตอนเริ่มอย่างเดียว ถ้าผู้ใช้เลื่อนหน้าระหว่างรอ
+           หน้าแรกยังว่างได้ (ภาพหน้าแรกเหลือ 20 KB จากปกติ 417 KB)
+
+           ระหว่างล็อก: ขึ้นกล่อง "กำลังสร้าง PDF" ทับทั้งจอ ปิดล้อเมาส์ ปัดนิ้ว
+           ปุ่มเลื่อนบนคีย์บอร์ด และแถบเลื่อน ถ้ายังมีอะไรเลื่อนหน้าได้ก็ดึงกลับบนสุดทันที
+           เสร็จหรือล้มเหลวก็ปลดล็อกและคืนตำแหน่งเดิมให้ผู้ใช้
+           กันค้าง: ถ้าผ่านไป 3 นาทียังไม่ปลด จะปลดเอง ผู้ใช้ไม่ติดอยู่หน้าจอทึบตลอดไป */
+        function lockScreenForPdf() {
+            const keepX = window.scrollX, keepY = window.scrollY;
+            const root = document.documentElement;
+            const keepOverflow = root.style.overflow;
+
+            const veil = document.createElement('div');
+            veil.setAttribute('data-html2canvas-ignore', 'true');
+            veil.setAttribute('role', 'alert');
+            veil.style.cssText = 'position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;'
+                + 'justify-content:center;background:rgba(15,23,42,.45);touch-action:none;';
+            veil.innerHTML = '<div style="background:#fff;color:#0f172a;border-radius:12px;padding:20px 28px;'
+                + 'max-width:320px;margin:0 16px;text-align:center;line-height:1.6;box-shadow:0 10px 30px rgba(0,0,0,.25)">'
+                + '<div data-say style="font-size:15px;font-weight:600">⏳ กำลังสร้าง PDF...</div>'
+                + '<div style="font-size:13px;color:#475569;margin-top:6px">กรุณารอสักครู่ เสร็จแล้วจะดาวน์โหลดให้เอง</div></div>';
+
+            const KEYS = [' ', 'PageUp', 'PageDown', 'Home', 'End', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+            const stop = e => { e.preventDefault(); };
+            const stopKey = e => { if (KEYS.includes(e.key)) e.preventDefault(); };
+            const pin = () => { if (window.scrollX || window.scrollY) window.scrollTo(0, 0); };
+
+            window.scrollTo(0, 0);
+            root.style.overflow = 'hidden';
+            document.body.appendChild(veil);
+            window.addEventListener('wheel', stop, { passive: false });
+            window.addEventListener('touchmove', stop, { passive: false });
+            window.addEventListener('keydown', stopKey, true);
+            window.addEventListener('scroll', pin);
+
+            let released = false;
+            const release = () => {
+                if (released) return;
+                released = true;
+                clearTimeout(safety);
+                window.removeEventListener('wheel', stop, { passive: false });
+                window.removeEventListener('touchmove', stop, { passive: false });
+                window.removeEventListener('keydown', stopKey, true);
+                window.removeEventListener('scroll', pin);
+                veil.remove();
+                root.style.overflow = keepOverflow;
+                try { window.scrollTo(keepX, keepY); } catch (e) {}
+            };
+            const safety = setTimeout(release, 180000);
+            const say = t => { const el = veil.querySelector('[data-say]'); if (el) el.innerHTML = t; };
+            return { release, say };
+        }
+
         async function exportPDF(data) {
             const btn = event.currentTarget;
             const originalText = btn.innerHTML;
             btn.disabled = true;
 
-            const built = await buildDocumentHtml(data, t => { btn.innerHTML = t; });
+            /* ══════════ ล็อกหน้าจอไว้บนสุดตลอดการสร้าง PDF แล้วคืนที่เดิมหลังเสร็จ ══════════
+               27 ต.ค. 2569 — ผู้ใช้หลายคนได้ PDF "หน้าตก" หน้าแรกว่างทั้งหน้า เนื้อหาเลื่อนลง
+               ท้ายเอกสารล้นไปหัวหน้าถัดไป แผนที่ถูกตัดครึ่ง (ใบ 223 และอีกหลายใบ)
+               ขณะที่เจ้าของงานกดใบเดียวกันแล้วปกติ จึงดูเหมือนสุ่ม
+
+               ต้นเหตุ: html2pdf แปลงเอกสารทั้งชุดเป็นภาพยาวภาพเดียวแล้วหั่นเป็นหน้า A4
+               ถ้าหน้าเว็บถูกเลื่อนลงอยู่ ตัวแปลงเอาระยะที่เลื่อนไปเป็นระยะเยื้องของภาพ
+               เอกสารทั้งชุดจึงเลื่อนลงตามระยะนั้น รอยหั่นหน้าผิดที่ทุกหน้า
+               ขึ้นกับว่าผู้ใช้เลื่อนรายการลงไปกดแถวที่เท่าไหร่ ใบท้ายรายการจึงโดนหนักสุด
+               วัดจากการกดปุ่มจริง: เลื่อน 600 px เนื้อหาหาย 59% · 1,500 px หาย 95%
+
+               ลองส่ง scrollX/scrollY: 0 ให้ html2canvas แล้ว ไม่มีผลกับ html2pdf 0.10.1 ที่ใช้อยู่
+               จึงตัดต้นเหตุตรง ๆ คือทำให้หน้าเว็บไม่ถูกเลื่อนตลอดการแปลง (ดู lockScreenForPdf)
+               ต้องล็อกก่อน buildDocumentHtml เพราะตัวนั้นวาดภาพแผนที่ด้วยตัวแปลงเดียวกัน
+               ล็อกไว้ใน scripts/test-pdf-scroll.mjs ซึ่งกดปุ่ม PDF จริงหลังเลื่อนหน้าหลายระยะ
+               และหมุนล้อเมาส์ไปมาระหว่างที่กำลังสร้าง */
+            const lock = lockScreenForPdf();
+            const status = t => { btn.innerHTML = t; lock.say(t); };
+            const finish = () => {
+                btn.innerHTML = originalText; btn.disabled = false;
+                lock.release();
+            };
+
+            let built;
+            try {
+                built = await buildDocumentHtml(data, status);
+            } catch (e) {
+                finish();
+                throw e;
+            }
             const docHtml = built.html;
             const dateObj = built.dateObj;
 
@@ -1873,7 +1958,7 @@
             `;
 
             const element = document.getElementById('formal-doc');
-            btn.innerHTML = '⏳ กำลังเตรียมเอกสาร...';
+            status('⏳ กำลังเตรียมเอกสาร...');
 
             // ต้องรอฟอนต์ให้ครบ "ทุกชุดอักษร" ก่อน ไม่ใช่แค่ชุดละติน
             // ดูคำอธิบายเต็มที่ waitForDocumentFonts()
@@ -1905,7 +1990,9 @@
             }
 
             setTimeout(() => {
-                btn.innerHTML = '⏳ กำลังสร้าง PDF...';
+              // ห้ามปล่อยให้หลุดโดยไม่ปลดล็อก ไม่งั้นหน้าจอทึบค้าง
+              try {
+                status('⏳ กำลังสร้าง PDF...');
                 // ⭐️ เพิ่มโหมด pagebreak: css เข้าไปเพื่อให้ html2pdf ทำตามคำสั่ง avoid-break ที่เขียนไว้ใน CSS
                 const opt = {
                     margin:       [5, 5, 5, 5], 
@@ -1917,13 +2004,18 @@
                 };
 
                 html2pdf().set(opt).from(element).save().then(() => {
-                    btn.innerHTML = originalText; btn.disabled = false;
                     container.innerHTML = ''; 
+                    finish();
                 }).catch(() => {
-                    alert("เกิดข้อผิดพลาดในการสร้าง PDF");
-                    btn.innerHTML = originalText; btn.disabled = false;
                     container.innerHTML = ''; 
+                    finish();
+                    alert("เกิดข้อผิดพลาดในการสร้าง PDF");
                 });
+              } catch (e) {
+                container.innerHTML = '';
+                finish();
+                alert("เกิดข้อผิดพลาดในการสร้าง PDF");
+              }
             }, 1000); 
         }
         
