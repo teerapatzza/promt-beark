@@ -47,6 +47,29 @@ function ageOn(birth, today) {
     return age;
 }
 
+/* ลำดับฟิลด์สำหรับตัวจับคู่ของ DW
+   28 ต.ค. 2569 — ตัวจับคู่อัตโนมัติของ DW เลือกฟิลด์ต้นทางตัวแรกในรายการที่ชื่อ "อยู่ข้างใน" ชื่อปลายทาง
+   DATA_EMAIL_SARABAN จึงได้ email, DATA_WORK_PROVINCE ได้ province และแก้ด้วยมือแล้วบันทึกไม่ติด
+   เลื่อนฟิลด์ที่ชื่อมีชื่อฟิลด์อื่นซ้อนอยู่ไปไว้ก่อนตัวนั้น ตัวจับคู่จะเจอตัวที่ตรงก่อน
+   ชื่อและค่าไม่เปลี่ยน เปลี่ยนแค่ลำดับ */
+function dwKeyOrder(keys) {
+    const out = keys.slice();
+    let moved = true;
+    while (moved) {
+        moved = false;
+        for (let i = 0; i < out.length && !moved; i++) {
+            const k = out[i];
+            const j = out.findIndex(o => o !== k && k.includes(o));
+            if (j !== -1 && j < i) {
+                out.splice(i, 1);
+                out.splice(j, 0, k);
+                moved = true;
+            }
+        }
+    }
+    return out;
+}
+
 module.exports = ({ apiKey, file }) => {
     const router = express.Router();
     const key = String(apiKey || '').trim();
@@ -85,7 +108,12 @@ module.exports = ({ apiKey, file }) => {
        แบบเดียวกับที่ DS ของ HA ส่งออก  ไม่ใส่พารามิเตอร์ = รูปแบบเดิมทุกไบต์ */
     const send = (req, res, rows) => {
         const generatedAt = new Date().toISOString();
-        const out = rows.map(r => Object.assign({}, r, { generated_at: generatedAt }));
+        const order = dwKeyOrder(Object.keys(Object.assign({}, rows[0] || {}, { generated_at: '' })));
+        const out = rows.map(r => {
+            const o = {};
+            order.forEach(k => { o[k] = k === 'generated_at' ? generatedAt : r[k]; });
+            return o;
+        });
         if (req.query.format === 'data') {
             return res.json({ data: out, meta: { total_count: out.length, generated_at: generatedAt } });
         }

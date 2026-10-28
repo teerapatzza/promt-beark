@@ -203,6 +203,27 @@ try {
      wrapped.every((w, i) => JSON.stringify(w.body.data.map(r => Object.assign({}, r, { generated_at: 0 })))
        === JSON.stringify(counts[i].body.map(r => Object.assign({}, r, { generated_at: 0 })))));
   ok('?format=data ไม่มีกุญแจยังได้ 401', (await get(port, '/dw/surveyors?format=data')).status === 401);
+  /* ตัวจับคู่ของ DW เลือกฟิลด์ตัวแรกที่ชื่ออยู่ข้างในชื่อปลายทาง (DATA_EMAIL_SARABAN ได้ email)
+     ฟิลด์ชื่อยาวต้องมาก่อนฟิลด์ชื่อสั้นที่ซ้อนอยู่ข้างใน ไม่งั้นแก้ใน DW ด้วยมือแล้วบันทึกไม่ติด */
+  const badOrder = [], pairs = [];
+  [...counts, ...wrapped].forEach((x, i) => {
+    const keys = Object.keys((Array.isArray(x.body) ? x.body : x.body.data)[0]);
+    keys.forEach(a => keys.forEach(b => {
+      if (a !== b && b.includes(a)) {
+        pairs.push(P[i % 4] + ':' + b + '>' + a);
+        if (keys.indexOf(b) > keys.indexOf(a)) badOrder.push(P[i % 4] + ' ' + b + ' อยู่หลัง ' + a);
+      }
+    }));
+  });
+  ok('มีคู่ชื่อซ้อนให้ตรวจจริง (email_saraban/email, work_province/province, role_name/role ...)',
+     ['email_saraban>email', 'work_province>province', 'note_affiliation>affiliation', 'profession_group>profession',
+      'role_name>role', 'track_name>track'].every(p => pairs.some(x => x.endsWith(':' + p))), pairs.length + ' คู่');
+  ok('ทุกตาราง ฟิลด์ชื่อยาวมาก่อนฟิลด์ชื่อสั้นที่ซ้อนอยู่ข้างใน', badOrder.length === 0, badOrder.slice(0, 4).join(' | '));
+  const sameValues = counts.every((x, i) => {
+    const want = [d.surveyors, d.visits, d.trainings, d.registrations][i];
+    return x.body.every((row, n) => Object.entries(want[n]).every(([k, v]) => JSON.stringify(row[k]) === JSON.stringify(v)));
+  });
+  ok('เรียงใหม่แล้วชื่อและค่าทุกช่องยังตรงกับไฟล์', sameValues);
   const sv = counts[0].body.find(s => s.surveyor_id === 'S901') || {};
   const svB = counts[0].body.find(s => s.surveyor_id === 'S902') || {};
   const today = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
