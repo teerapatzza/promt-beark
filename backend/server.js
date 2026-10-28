@@ -1370,6 +1370,12 @@ app.use('/feedback', require('./feedback')({ db, requireAuth, requireAdmin }));
 // อ่านอย่างเดียว ส่งออกเฉพาะยอดรวมรายหมวดรายเดือน ไม่มีข้อมูลส่วนบุคคล
 // ไม่ตั้ง DW_API_KEY = ปิดสนิท ตอบ 503 (ปลอดภัยไว้ก่อนเป็นค่าตั้งต้น)
 // เส้นทางนี้ต้องมีชื่อ "dw" ใน docker/nginx.conf ด้วย ไม่งั้นโดน 404 ก่อนถึงที่นี่
+// ทะเบียนผู้เยี่ยมสำรวจ (มีข้อมูลส่วนบุคคล) ใช้กุญแจแยก ต้องอยู่ก่อน dw-export
+// เพราะตัวนั้นตรวจกุญแจของตัวเองกับทุกเส้นทางใต้ /dw
+app.use('/dw', require('./dw-surveyors')({
+    apiKey: process.env.DW_SURVEYOR_KEY || '',
+    file: process.env.DW_SURVEYOR_FILE || '/app/data/dw/surveyors.json'
+}));
 app.use('/dw', require('./dw-export')({ db, apiKey: process.env.DW_API_KEY || '' }));
 
 // ── Health ────────────────────────────────────────────────
