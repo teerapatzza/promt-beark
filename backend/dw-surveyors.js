@@ -80,9 +80,16 @@ module.exports = ({ apiKey, file }) => {
         next();
     };
 
-    const send = (res, rows) => {
+    /* 28 ต.ค. 2569 — Pipeline ของ DW อ่านรายการชั้นนอกสุดได้ตอนแสดงตัวอย่าง (199 RECORDS)
+       แต่ตอนเขียนจริงได้แถวว่างแถวเดียว จึงเพิ่ม ?format=data ห่อเป็น { data, meta }
+       แบบเดียวกับที่ DS ของ HA ส่งออก  ไม่ใส่พารามิเตอร์ = รูปแบบเดิมทุกไบต์ */
+    const send = (req, res, rows) => {
         const generatedAt = new Date().toISOString();
-        res.json(rows.map(r => Object.assign({}, r, { generated_at: generatedAt })));
+        const out = rows.map(r => Object.assign({}, r, { generated_at: generatedAt }));
+        if (req.query.format === 'data') {
+            return res.json({ data: out, meta: { total_count: out.length, generated_at: generatedAt } });
+        }
+        res.json(out);
     };
 
     /* ข้อมูลรายคน + สถานะคำนวณ ณ วันที่ดึง
@@ -91,16 +98,16 @@ module.exports = ({ apiKey, file }) => {
     router.get('/surveyors', guard, (req, res) => {
         const today = todayBangkok(new Date());
         const act = d => (d ? d >= today : false);
-        send(res, (req.surveyorData.surveyors || []).map(s => Object.assign({}, s, {
+        send(req, res, (req.surveyorData.surveyors || []).map(s => Object.assign({}, s, {
             age: ageOn(s.birth_date, today),
             surveyor_active: act(s.surveyor_expire_date),
             team_leader_active: act(s.team_leader_expire_date),
             trainer_active: act(s.trainer_expire_date)
         })));
     });
-    router.get('/surveyor-visits', guard, (req, res) => send(res, req.surveyorData.visits || []));
-    router.get('/surveyor-trainings', guard, (req, res) => send(res, req.surveyorData.trainings || []));
-    router.get('/surveyor-registrations', guard, (req, res) => send(res, req.surveyorData.registrations || []));
+    router.get('/surveyor-visits', guard, (req, res) => send(req, res, req.surveyorData.visits || []));
+    router.get('/surveyor-trainings', guard, (req, res) => send(req, res, req.surveyorData.trainings || []));
+    router.get('/surveyor-registrations', guard, (req, res) => send(req, res, req.surveyorData.registrations || []));
 
     return router;
 };

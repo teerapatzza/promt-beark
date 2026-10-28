@@ -193,6 +193,16 @@ try {
   ok('จำนวนแถวตรงกับไฟล์ทุกตาราง', counts.map(x => x.body.length).join(',') ===
      [d.surveyors.length, d.visits.length, d.trainings.length, d.registrations.length].join(','),
      counts.map(x => x.body.length).join(','));
+  /* ?format=data ห่อเป็น { data, meta } ให้ตัวเขียนของ DW (ไม่ใส่ = รายการชั้นนอกสุดแบบเดิม) */
+  const wrapped = await Promise.all(P.map(p => get(port, p + '?format=data', SK)));
+  ok('?format=data: ทุกตารางได้ { data: [...], meta } จำนวนแถวเท่ารูปแบบเดิม',
+     wrapped.every((w, i) => w.status === 200 && Array.isArray(w.body.data)
+       && w.body.data.length === counts[i].body.length && w.body.meta.total_count === counts[i].body.length),
+     wrapped.map(w => w.status + ':' + (w.body && w.body.data ? w.body.data.length : '-')).join(','));
+  ok('?format=data: แถวข้างในเหมือนรูปแบบเดิมทุกช่อง (ยกเว้นเวลา generated_at)',
+     wrapped.every((w, i) => JSON.stringify(w.body.data.map(r => Object.assign({}, r, { generated_at: 0 })))
+       === JSON.stringify(counts[i].body.map(r => Object.assign({}, r, { generated_at: 0 })))));
+  ok('?format=data ไม่มีกุญแจยังได้ 401', (await get(port, '/dw/surveyors?format=data')).status === 401);
   const sv = counts[0].body.find(s => s.surveyor_id === 'S901') || {};
   const svB = counts[0].body.find(s => s.surveyor_id === 'S902') || {};
   const today = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
