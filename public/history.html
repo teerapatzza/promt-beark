@@ -1795,6 +1795,77 @@
                 el.classList.add('lines-frozen');
                 changed++;
             });
+
+            /* ── ข้อความอื่นที่ยาวเกินบรรทัด ──
+               29 ต.ค. 2569 ใบเหมาจ่ายเบิก 2 ขา แถว "เหมาจ่ายตามช่วงระยะทาง ... (เหมาจ่ายนอกเขต กทม.ปริมณฑล)"
+               ยาวเกินบรรทัด แล้วบรรทัดที่สองพิมพ์ทับกันใน PDF — ต้นเหตุเดียวกับข้างบน
+               แต่ข้างบนตรึงไว้แค่ .free-text แถวอื่นจึงยังโดน (รายการยาวในใบรับรองทั่วไปก็เป็น)
+               รอบนี้ไล่ทุกข้อความที่เบราว์เซอร์ตัดบรรทัดไว้ แล้วใส่ <br> ตรงจุดเดิมของเบราว์เซอร์
+               แถวที่จะเพิ่มในอนาคตจึงได้รับการป้องกันไปด้วย ไม่ต้องตามแก้ทีละแถว
+
+               ด่านกันพัง: ตัวอักษรต้องครบ และช่องกับทั้งเอกสารต้องสูงเท่าเดิม
+               ถ้าไม่เท่าให้คืนข้อความก้อนนั้นเป็นแบบเดิม ยอมเสี่ยงทับ ดีกว่าทำหน้าตาเพี้ยน */
+            const rngAll = document.createRange();
+            const lineCount = n => {
+                rngAll.selectNodeContents(n);
+                return new Set([...rngAll.getClientRects()]
+                    .filter(r => r.height > 0 && r.width > 0)
+                    .map(r => Math.round(r.top))).size;
+            };
+            const loose = [];
+            const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+            for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+                if (!n.nodeValue.trim() || !n.parentElement) continue;
+                if (n.parentElement.closest('.lines-frozen, svg')) continue;
+                if (lineCount(n) > 1) loose.push(n);
+            }
+
+            loose.forEach(function (node) {
+                const text = node.nodeValue;
+                const breaks = [];
+                let prevTop = null;
+                for (let i = 0; i < text.length; i++) {
+                    rngAll.setStart(node, i);
+                    rngAll.setEnd(node, i + 1);
+                    const r = rngAll.getBoundingClientRect();
+                    if (r.height === 0) continue;       // ช่องว่างท้ายบรรทัด
+                    if (prevTop !== null && r.top - prevTop > 1) breaks.push(i);
+                    prevTop = r.top;
+                }
+                if (!breaks.length) return;
+
+                const lines = [];
+                let from = 0;
+                breaks.forEach(function (at) { lines.push(text.slice(from, at)); from = at; });
+                lines.push(text.slice(from));
+                const strip = s => s.replace(/\s+/g, '');
+                if (strip(lines.join('')) !== strip(text)) return;
+
+                const holder = node.parentElement.closest('td, .pdf-page') || node.parentElement;
+                const hHolder = holder.getBoundingClientRect().height;
+                const hRoot = root.getBoundingClientRect().height;
+
+                // ตัดเฉพาะช่องว่างธรรมดาหน้าบรรทัดที่เบราว์เซอร์กลืนไปแล้ว
+                // &nbsp; หน้าบรรทัดเบราว์เซอร์ยังแสดงอยู่ ถ้าตัดทิ้งบรรทัดจะเขยิบซ้าย
+                const parts = [];
+                lines.forEach(function (ln, i) {
+                    if (i) parts.push(document.createElement('br'));
+                    parts.push(document.createTextNode(i ? ln.replace(/^[ \t\n\r\f]+/, '') : ln));
+                });
+                const parent = node.parentNode;
+                parts.forEach(p => parent.insertBefore(p, node));
+                parent.removeChild(node);
+
+                const same = Math.abs(holder.getBoundingClientRect().height - hHolder) < 0.5
+                          && Math.abs(root.getBoundingClientRect().height - hRoot) < 0.5
+                          && parts.every(p => p.nodeType !== 3 || !p.nodeValue.trim() || lineCount(p) === 1);
+                if (!same) {
+                    parent.insertBefore(node, parts[0]);
+                    parts.forEach(p => parent.removeChild(p));
+                    return;
+                }
+                changed++;
+            });
             return changed;
         }
 
