@@ -42,6 +42,9 @@ const SAVED = {
     _extraAddr: '', _carType: 'ขาไป',
     _travel: {
       startDate: '2025-10-20', endDate: '2025-10-22',
+      // 30 ต.ค. 2569 — ตั้งแต่แยกวันที่จัดกิจกรรมออกจากวันเดินทาง ใบในหมวดที่ออก
+      // ใบรายงานต้องมีค่านี้เสมอ ไม่งั้นด่านตอนบันทึกจะตีกลับก่อนถึงสิ่งที่ไฟล์นี้ตรวจ
+      periodStart: '2025-10-21', periodEnd: '2025-10-22',
       from: 'บ้าน', to: 'โรงแรมดุสิต',
       fromGeo: { lat: 13.65, lng: 100.49, label: 'บ้าน', precision: 'exact', source: 'user' },
       toGeo:   { lat: 13.75, lng: 100.53, label: 'โรงแรมดุสิต', precision: 'exact', source: 'user' },

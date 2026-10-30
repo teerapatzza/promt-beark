@@ -138,6 +138,9 @@ try {
       "const ds=document.getElementById('dateStart'), de=document.getElementById('dateEnd');",
       "if(ds){ ds.value='2026-10-22'; ds.dispatchEvent(new Event('change',{bubbles:true})); }",
       "if(de){ de.value='2026-10-23'; de.dispatchEvent(new Event('change',{bubbles:true})); }",
+      // วันที่จัดกิจกรรมเป็นช่องบังคับตั้งแต่ 30 ต.ค. 2569 (ออกล่วงหน้า 1 วัน จบวันเดียวกับวันกลับ)
+      "const pS=document.getElementById('periodStart'), pE=document.getElementById('periodEnd');",
+      "if(pS){ pS.value='2026-10-23'; } if(pE){ pE.value='2026-10-23'; }",
       "await new Promise(r=>setTimeout(r,600));",
       "window.routeLeg = async () => ({ km: 42.5, meters: 42500, coords: [] });",
       "return 1;"

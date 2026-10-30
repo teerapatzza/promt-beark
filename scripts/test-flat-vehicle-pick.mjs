@@ -87,6 +87,9 @@ try {
     "const ds=document.getElementById('dateStart'), de=document.getElementById('dateEnd');",
     "ds.value='2026-10-19'; ds.dispatchEvent(new Event('change',{bubbles:true}));",
     "de.value='2026-10-19'; de.dispatchEvent(new Event('change',{bubbles:true}));",
+    // วันที่จัดกิจกรรมเป็นช่องบังคับตั้งแต่ 30 ต.ค. 2569 (ทริปวันเดียว จึงเท่ากับวันเดินทาง)
+    "const pS=document.getElementById('periodStart'), pE=document.getElementById('periodEnd');",
+    "if(pS){ pS.value='2026-10-19'; } if(pE){ pE.value='2026-10-19'; }",
     "await new Promise(r=>setTimeout(r,400));",
     "window.routeLeg = async () => ({ km: 15.5, meters: 15500, coords: [] });",
     "geoFrom={lat:13.80,lng:100.60,precision:'exact',label:'บ้าน'};",

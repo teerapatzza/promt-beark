@@ -57,6 +57,8 @@ const SAVED = {
     _extraAddr: '141/36 ซอยสุขสวัสดิ์ 55 ถนนสุขสวัสดิ์ สมุทรปราการ 10290',
     _travel: {
       startDate: '2026-10-21', endDate: '2026-10-23',
+      // วันที่จัดกิจกรรมเป็นช่องบังคับตั้งแต่ 30 ต.ค. 2569 (หมวดที่ออกใบรายงาน)
+      periodStart: '2026-10-22', periodEnd: '2026-10-23',
       from: 'บ้าน', to: 'สนามบินดอนเมือง',
       fromGeo: { lat: 13.60, lng: 100.53, precision: 'exact', label: 'บ้าน' },
       toGeo:   { lat: 13.91, lng: 100.60, precision: 'exact', label: 'สนามบินดอนเมือง' },

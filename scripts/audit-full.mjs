@@ -60,6 +60,8 @@ const BASE = [
   "set('addrNo','1'); set('addrSub','บางรัก'); set('addrDist','บางรัก');",
   "set('addrProv','กรุงเทพมหานคร'); set('addrZip','10500');",
   "set('dateStart','2025-10-20'); set('dateEnd','2025-10-22');",
+  // วันที่จัดกิจกรรมเป็นช่องบังคับตั้งแต่ 30 ต.ค. 2569 ในหมวดที่ออกใบรายงาน
+  "set('periodStart','2025-10-21'); set('periodEnd','2025-10-22');",
   "set('targetProv','กรุงเทพมหานคร');"
 ].join('\n');
 
