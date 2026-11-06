@@ -809,6 +809,31 @@ const PLACE_ABBR = [
   ['สนง.', 'สำนักงาน'],   ['อบต.', 'องค์การบริหารส่วนตำบล'], ['ทต.', 'เทศบาลตำบล']
 ];
 
+/* คำที่คนเรียกคนละอย่างกับชื่อทางการในแผนที่
+   "สนามบินพิษณุโลก" หาไม่เจอ เพราะในแผนที่ชื่อ "ท่าอากาศยานพิษณุโลก" */
+const PLACE_SYNONYM = [
+  ['สนามบิน', 'ท่าอากาศยาน'], ['ท่าอากาศยาน', 'สนามบิน'],
+  ['บขส.', 'สถานีขนส่งผู้โดยสาร'], ['บขส', 'สถานีขนส่งผู้โดยสาร'],
+  ['สถานีขนส่ง', 'บขส.'],
+  ['ร.พ.', 'โรงพยาบาล']
+];
+
+/* คำนำหน้าเขตปกครอง ผู้ให้บริการค้นหาไม่ต้องการ ตัดออกแล้วค้นเจอง่ายกว่า */
+const ADMIN_PREFIX = /^(ตำบล|ต\.|แขวง|อำเภอ|อ\.|เขต|จังหวัด|จ\.|ถนน|ถ\.|ซอย|ซ\.)/;
+
+/* ที่อยู่ทางไปรษณีย์เต็มรูปแบบค้นไม่เจอทั้งก้อน ต้องตัดให้สั้นลงทีละชั้น
+   "ถนนตลาดใหม่ ตำบลตลาด อำเภอเมืองสุราษฎร์ธานี จังหวัดสุราษฎร์ธานี"
+   -> "ตลาดใหม่ สุราษฎร์ธานี" ซึ่งเป็นรูปแบบที่ทั้ง Longdo และ OSM ชอบที่สุด */
+function addressVariants(q) {
+  const toks = String(q || '').split(/\s+/).filter(Boolean);
+  if (toks.length < 2) return [];
+  const bare = toks.map(t => t.replace(ADMIN_PREFIX, '')).filter(t => t.length >= 2);
+  if (bare.length < 2) return [];
+  const out = [bare[0] + ' ' + bare[bare.length - 1]];
+  for (let n = bare.length - 1; n >= 1; n--) out.push(bare.slice(0, n).join(' '));
+  return out;
+}
+
 function expandQuery(q) {
   const out = [], seen = new Set();
   const add = s => {
@@ -821,6 +846,16 @@ function expandQuery(q) {
   let base = q;
   for (const [ab, full] of PLACE_ABBR) {
     if (q.startsWith(ab)) { base = full + ' ' + q.slice(ab.length); add(base); break; }
+  }
+
+  // ตัวย่อที่อยู่กลางประโยคก็ต้องขยาย เช่น "ตลาดหน้า รพ.สวรรค์ประชารักษ์"
+  for (const [ab, full] of PLACE_ABBR) {
+    if (q.includes(ab) && !q.startsWith(ab)) add(q.split(ab).join(full + ' '));
+  }
+
+  // คำพ้อง ใช้ได้ทุกตำแหน่งในประโยค
+  for (const [a, b] of PLACE_SYNONYM) {
+    if (a !== b && q.includes(a)) add(q.split(a).join(b));
   }
 
   add(base.replace(/\./g, ' '));   // จุด -> เว้นวรรค  (ท่าที่ Longdo ชอบ)
@@ -839,7 +874,12 @@ function expandQuery(q) {
       break;
     }
   }
-  return out.slice(0, 8);
+
+  // ที่อยู่ยาว ๆ ต้องตัดให้สั้นลงทีละชั้น ไว้ท้ายสุดเพราะเป็นทางเลือกสุดท้าย
+  // ลำดับสำคัญ — ตัวที่ตรงที่สุดต้องถูกลองก่อน ไม่งั้นจะได้หมุดกว้างเกินจริง
+  addressVariants(q).forEach(add);
+
+  return out.slice(0, 12);
 }
 
 /* ── เทียบความคล้ายของข้อความ (สำหรับกรณีพิมพ์ผิด) ────────── */
