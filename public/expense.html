@@ -2932,10 +2932,15 @@
         // ใส่คำนำหน้า ซอย/ถนน ให้ชัด ไม่งั้นจะอ่านเป็น "141/36 สุขสวัสดิ์ 55 สุขสวัสดิ์"
         // ซึ่งดูไม่ออกว่าอันไหนซอยอันไหนถนน
         const isBkk = /กรุงเทพ/.test(p.prov || '');
+        // ที่อยู่บางรายการเก็บคำว่า "ซอย"/"ถนน" มาในตัวข้อความแล้ว เติมซ้ำจะได้ "ซอยซอย..."
+        const withPfx = (word, v) => {
+            const t = String(v || '').trim();
+            return !t ? '' : (t.startsWith(word) ? t : word + t);
+        };
         const label = [
             p.no   ? p.no : '',
-            p.soi  ? 'ซอย' + p.soi : '',
-            p.road ? 'ถนน' + p.road : ''
+            withPfx('ซอย', p.soi),
+            withPfx('ถนน', p.road)
         ].filter(Boolean).join(' ') || [
             p.sub  ? (isBkk ? 'แขวง' : 'ตำบล') + p.sub  : '',
             p.dist ? (isBkk ? 'เขต'  : 'อำเภอ') + p.dist : '',
@@ -4927,6 +4932,9 @@
                 dist: document.getElementById('addrDist')?.value || '', prov: document.getElementById('addrProv')?.value || '',
                 zip: document.getElementById('addrZip')?.value || ''
             };
+            /* ต้องจำไว้ว่าใบนี้ใช้ที่อยู่เฉพาะกิจ ไม่งั้นเปิดมาแก้รอบหน้าช่องติ๊กจะว่าง
+               แล้วที่อยู่ที่ตั้งไว้จะถูก restoreProfileAddr() เขียนทับด้วยที่อยู่โปรไฟล์ */
+            metadata._addrOverride = !!document.getElementById('addrOverride')?.checked;
             metadata._travel = {
                 startFromType: document.getElementById('startFromType')?.value || '',
                 startFromLocation: document.getElementById('startFromLocation')?.value || '',
@@ -5503,6 +5511,15 @@
             document.getElementById('addrDist').value  = addr.dist || '';
             document.getElementById('addrProv').value  = addr.prov || '';
             document.getElementById('addrZip').value   = addr.zip  || '';
+
+            /* ใบที่ใช้ที่อยู่เฉพาะกิจต้องกลับมาพร้อมโหมดแก้เปิดอยู่ ไม่งั้นช่องจะล็อก
+               และที่อยู่จะถูกเขียนทับด้วยที่อยู่โปรไฟล์ทันทีที่มีการ apply โปรไฟล์ */
+            const ovChk = document.getElementById('addrOverride');
+            if (ovChk && meta._addrOverride) {
+                ovChk.checked = true;
+                // เป็นฟังก์ชัน async ที่ไปโหลดไฟล์ทะเบียนตำบล ถ้าโหลดไม่สำเร็จห้ามให้พังทั้งหน้า
+                Promise.resolve(toggleAddrOverride()).catch(() => {});
+            }
 
             document.getElementById('startFromType').value = tr.startFromType || 'ที่พัก';
             onStartFromTypeChange();

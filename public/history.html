@@ -2087,6 +2087,15 @@
         // ใบเก่าบางใบเก็บชื่อสถานที่เป็นวัตถุ กันไม่ให้หน้าแผนที่พิมพ์ "[object Object]"
         const mapText = v => typeof v === 'string' ? v.trim()
             : (v && typeof v === 'object') ? String(v.label || v.name || '').trim() : '';
+        /* ที่อยู่ในโปรไฟล์บางรายการมีคำว่า "ซอย"/"ถนน" อยู่ในตัวข้อความแล้ว เติมคำนำหน้าซ้ำ
+           จะได้ "ซอยซอยโรงเรียนบ้านทุ่งงาย" ซึ่งหลุดไปอยู่ในเอกสารที่ส่งการเงินแล้ว
+           ใบเก่าเก็บข้อความซ้ำไว้ในฐานข้อมูล จึงต้องล้างตอนแสดงผล ไม่ใช่แค่ตอนกรอก */
+        const withPfx = (word, v) => {
+            const t = String(v || '').trim();
+            return !t ? '' : (t.startsWith(word) ? t : word + t);
+        };
+        const dedupPfx = s => String(s || '')
+            .replace(/ซอย(?=ซอย)/g, '').replace(/ถนน(?=ถนน)/g, '').trim();
         const LEG_KIND_LABEL = { fuel: 'ค่าน้ำมันเชื้อเพลิง', flat: 'ค่าพาหนะเหมาจ่าย', taxi: 'ค่า Taxi' };
 
         /** แตกแถว Taxi เป็นรายขา — บรรทัด จาก/ถึง ในใบรับรองกับหน้าแผนที่ใช้ตัวนี้ตัวเดียว
@@ -2135,10 +2144,16 @@
             let A = null, B = null;
             if (main) {
                 // ที่อยู่จุดเริ่มต้น: แยก เลขที่ / ซอย / ถนน ให้อ่านออก
+                /* ข้อความที่ผู้ใช้พิมพ์ในช่องจุดเริ่มต้นต้องมาก่อน ของเดิมเอาที่อยู่จากโปรไฟล์
+                   มาพิมพ์ทับเสมอ ใบที่ผู้ใช้แก้จุดเริ่มต้นเองจึงได้ที่อยู่ผิดติดไปในเอกสาร */
                 const a = tr.fromAddr || null;
-                const fromLabel = (a && (a.no || a.soi || a.road))
-                    ? [a.no || '', a.soi ? 'ซอย' + a.soi : '', a.road ? 'ถนน' + a.road : ''].filter(Boolean).join(' ')
-                    : (mapText(tr.fromGeo.label) || mapText(tr.from));
+                const fromProfile = a
+                    ? [a.no || '', withPfx('ซอย', a.soi), withPfx('ถนน', a.road)].filter(Boolean).join(' ')
+                    : '';
+                /* ชื่อจากหมุดมาก่อน เพราะหมุดคือตัวที่ใช้คิดระยะทางและเงินจริง
+                   ถ้าพิมพ์ข้อความลอย ๆ มาก่อน เอกสารจะอ้างจุดเริ่มต้นที่ไม่ตรงกับระยะทางที่เบิก */
+                const fromLabel = dedupPfx(
+                    mapText(tr.fromGeo.label) || mapText(tr.from) || fromProfile);
                 A = { label: fromLabel, geo: tr.fromGeo };
                 B = { label: mapText(tr.toGeo.label) || mapText(tr.to), geo: tr.toGeo };
             }
