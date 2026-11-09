@@ -1353,20 +1353,32 @@ async function runBackup(tag) {
   try {
     fs.mkdirSync(BACKUP_DIR, { recursive: true });
     const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    const file = path.join(BACKUP_DIR, `prompt-berk-${stamp}${tag ? '-' + tag : ''}.db`);
+    const name = `prompt-berk-${stamp}${tag ? '-' + tag : ''}.db`;
+    const file = path.join(BACKUP_DIR, name);
     await db.backup(file);
 
-    // ลบชุดเก่าเกินจำนวนที่เก็บ
-    const all = fs.readdirSync(BACKUP_DIR)
+    /* เรียงตามเวลาแก้ไขไฟล์ ไม่ใช่ตามชื่อ — ชุดอัตโนมัติตั้งชื่อขึ้นต้นด้วยปี ส่วนชุด
+       predeploy ขึ้นต้นด้วยตัวอักษร เรียงตามชื่อแล้วชุดที่เพิ่งสร้างจะกลายเป็นตัวแรก
+       แล้วโดนลบทิ้งทันที (6 พ.ย. 2569 พบว่าชุดอัตโนมัติไม่เคยเหลือรอดเลยสักชุด) */
+    const rotatable = fs.readdirSync(BACKUP_DIR)
       .filter(f => f.startsWith('prompt-berk-') && f.endsWith('.db'))
-      .sort();
-    while (all.length > BACKUP_KEEP) {
-      const old = all.shift();
-      try { fs.unlinkSync(path.join(BACKUP_DIR, old)); } catch (_) {}
+      .filter(f => !f.startsWith('prompt-berk-predeploy-'))  // จุดย้อนกลับก่อนขึ้นเวอร์ชัน เก็บไว้เสมอ
+      .filter(f => f !== name)                               // ชุดที่เพิ่งสร้าง ห้ามลบ
+      .map(f => ({ f, t: fs.statSync(path.join(BACKUP_DIR, f)).mtimeMs }))
+      .sort((a, b) => b.t - a.t);
+
+    // ชุดที่เพิ่งสร้างนับเป็นหนึ่งในโควตาแล้ว ที่เหลือจึงเก็บได้อีก BACKUP_KEEP - 1
+    for (const { f } of rotatable.slice(Math.max(0, BACKUP_KEEP - 1))) {
+      // ไฟล์คู่ของ SQLite ต้องไปพร้อมกัน ไม่งั้นจะค้างเป็นขยะ
+      for (const ext of ['', '-shm', '-wal']) {
+        try { fs.unlinkSync(path.join(BACKUP_DIR, f + ext)); } catch (_) {}
+      }
     }
+
+    const kept = Math.min(rotatable.length, Math.max(0, BACKUP_KEEP - 1)) + 1;
     const kb = Math.round(fs.statSync(file).size / 1024);
-    console.log(`[backup] ${path.basename(file)} (${kb} KB) — เก็บไว้ ${all.length} ชุด`);
-    return { file: path.basename(file), sizeKb: kb, kept: all.length };
+    console.log(`[backup] ${name} (${kb} KB) — เก็บชุดอัตโนมัติไว้ ${kept} ชุด`);
+    return { file: name, sizeKb: kb, kept };
   } catch (e) {
     console.error('[backup] ล้มเหลว:', e.message);
     return { error: e.message };
