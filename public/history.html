@@ -2,6 +2,8 @@
 <html lang="th">
 <head>
     <script src="api-fetch.js"></script>
+    <!-- ขาเดินทางของใบเบิก ใช้ไฟล์เดียวกับฝั่งผู้เบิกและ backend จะได้ไม่มีกติกาสองชุด -->
+    <script src="travel-legs.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ประวัติการเบิก — พร้อมเบิก</title>
@@ -764,7 +766,12 @@
                 const taxiLegRows = taxiLegRowsOf(taxiEntries);
 
                 let fuelDist = 0;
-                if(carType === 'ขาไป') fuelDist = distOut;
+                /* ใบที่เก็บขาเดินทางไว้เอง (เบิกหลายวันในใบเดียว) ระยะรวมต้องมาจากทุกขา
+                   distOut/distRet เก็บได้แค่สองขา ถ้าอ่านจากตรงนั้นจะได้ 0
+                   แล้วใบจะพิมพ์ยอดรายขาครบแต่ "รวมทั้งสิ้น" ว่าง + "ศูนย์บาทถ้วน"
+                   เจอตอนเปิด PDF ดูด้วยตา 10 พ.ย. 2569 เทสต์ชุดแรกจับไม่ได้ */
+                if (Array.isArray(tr.legs) && tr.legs.length) fuelDist = TravelLegs.totalKm(tr);
+                else if(carType === 'ขาไป') fuelDist = distOut;
                 else if(carType === 'ขากลับ') fuelDist = distRet;
                 else if(carType === 'ไป-กลับ') fuelDist = distOut + distRet;
                 /* ใบที่เลือกเหมาจ่าย ต้องใช้ยอดก้อนที่เก็บไว้ตอนกรอก ไม่ใช่คำนวณใหม่จากระยะ
@@ -1307,13 +1314,67 @@
                          8 เที่ยว 11.5px เหลือ 18px  ·  11 เที่ยว 10px เหลือ 4px
                        ต่ำกว่า 10px ไม่ลงแล้ว เอกสารการเงินต้องอ่านออก
                        เกิน 11 เที่ยวจึงใส่หน้าเดียวไม่ได้จริง ไม่ว่าจะย่อแค่ไหน — ฟอร์มเตือนแทน */
+                    /* ขาเดินทางของใบนี้ — ว่างไว้ถ้าเป็นใบเก่า
+                       ใบเก่าต้องเดินทางเดิมทุกบรรทัด เพราะกติกาชื่อจุดขากลับของใบรับรอง
+                       (retFrom/retTo) กับของหน้าแผนที่ (mapLegsOf) ไม่เหมือนกันมาแต่ไหนแต่ไร
+                       ถ้าดึงมาใช้ตัวแปลงตัวเดียวกัน ใบที่พิมพ์ส่งการเงินไปแล้วจะเปลี่ยนหน้าตา */
+                    const rcFuelLegList = (Array.isArray(tr.legs) && tr.legs.length)
+                        ? TravelLegs.legsOf(tr) : [];
+
+                    /* 10 พ.ย. 2569 — ใบเบิกเก็บขาเดินทางได้มากกว่า 2 ขาแล้ว
+                       (เช่น 9 ไป-กลับ, 10 ไป-กลับ ในใบเดียว) ค่าน้ำมัน 1 ขากิน 2 แถว
+                       ของเดิมนับเฉพาะแถว Taxi แถวค่าน้ำมันที่เพิ่มมาจึงมองไม่เห็นเลย
+                       แล้วใบจะล้นหน้าเงียบ ๆ โดยไม่มีใครรู้
+                       ฐานเดิมคือ 2 ขา = 4 แถว จึงหักออก ใบเก่าได้ขนาดเท่าเดิมทุกประการ */
+                    const rcFuelExtraRows = Math.max(0, rcFuelLegList.length * 2 - 4);
                     const rcTableSize = (function () {
-                        const n = taxiLegRows.length;
+                        const n = taxiLegRows.length + rcFuelExtraRows;
                         if (n <= 4) return 13.5;   // ใบส่วนใหญ่ — หน้าตาเท่าเดิมทุกประการ
                         if (n <= 6) return 12.5;
                         if (n <= 8) return 11.5;
                         return 10;
                     })();
+
+                /* ── แถวค่าน้ำมันเชื้อเพลิง ──
+                   ใบเก่า (ไม่มี _travel.legs) เดินทางเดิมทุกบรรทัด 4 แถวตายตัว
+                   ใบใหม่กางแถวตามจำนวนขาที่เบิกจริง แบบเดียวกับที่รายการ Taxi
+                   ทำมาตั้งแต่ 21 ต.ค. 2569 เจ้าของงานสั่งให้สองส่วนนี้ใช้แนวเดียวกัน
+                   ผู้ใช้จะได้เห็นรูปแบบเดียวทั้งหน้า ไม่ต้องเรียนรู้สองแบบ */
+                const rcFuelDetailRows = (function () {
+                    /* ของเดิมแต่ละแถวเขียนเป็น ${...} คนละบรรทัดโดยมีบรรทัดว่างคั่น
+                       ช่องว่างนั้นติดไปใน HTML ด้วย (บรรทัดว่าง 2 ตัว + เว้น 32 ช่อง = 34 ตัวอักษร)
+                       ถ้าต่อแถวชนกันเฉย ๆ ใบเก่าทุกใบจะหดลง 102 ตัวอักษร ซึ่งวัดได้จริงเมื่อ 10 พ.ย. 2569
+                       เนื้อหาไม่เปลี่ยน แต่ต้องให้เหมือนเดิมทุกตัวอักษร จะได้แยกออกทันที
+                       ว่าการแก้ครั้งหลัง ๆ ทำใบเก่าเพี้ยนจริงหรือเป็นแค่ช่องว่าง */
+                    const GAP = '\n\n' + ' '.repeat(32);
+                    if (!rcFuelLegList.length) {
+                        // ── ทางเดิม ห้ามแก้ ใบที่ส่งการเงินไปแล้วต้องพิมพ์ออกมาเหมือนเดิมเป๊ะ ──
+                        return [
+                            rcRow(rcFuelHasOut ? dateGo : '',
+                                  rcFromTo(rcFuelHasOut ? tr.from : '', rcFuelHasOut ? tr.to : ''), ''),
+                            rcRow('', rcDist(rcFuelHasOut ? distOut : 0),
+                                  rcFuelOutAmt > 0 ? formatNumber(rcFuelOutAmt) : ''),
+                            rcRow(rcFuelHasRet ? dateBack : '',
+                                  rcFromTo(rcFuelHasRet ? retFrom : '', rcFuelHasRet ? retTo : ''), ''),
+                            rcRow('', rcDist(rcFuelHasRet ? distRet : 0),
+                                  rcFuelRetAmt > 0 ? formatNumber(rcFuelRetAmt) : '')
+                        ].join(GAP);
+                    }
+                    /* ยอดของแต่ละขา — เหมาจ่ายต้องใช้ยอดที่ผู้ใช้กดยืนยันไว้ ห้ามคิดใหม่
+                       ถ้าคิดใหม่ตอนพิมพ์ แล้วแอดมินแก้ตารางทีหลัง ใบเก่าจะเปลี่ยนยอดเอง */
+                    const amtOf = L => {
+                        if (!flatInfo) return L.km * fRate;
+                        const hit = (flatInfo.legs || []).find(function (f) {
+                            return f.dir === L.dir
+                                && Math.abs((Number(f.km) || 0) - (Number(L.km) || 0)) < 0.005; });
+                        return (hit && hit.amount) || 0;
+                    };
+                    return rcFuelLegList.map(function (L) {
+                        const amt = amtOf(L);
+                        return rcRow(legDateText(L.date), rcFromTo(L.from, L.to), '')
+                             + GAP + rcRow('', rcDist(L.km), amt > 0 ? formatNumber(amt) : '');
+                    }).join(GAP);
+                })();
 
                 const rcTaxiDetailRows = (function () {
                     if (flatInfo) {
@@ -1382,17 +1443,7 @@
                                         + rcCircle(rcFuelHasRet && !rcFuelHasOut) + ' ขากลับ &nbsp;&nbsp;&nbsp;&nbsp;'
                                         + rcCircle(rcFuelHasOut && rcFuelHasRet)  + ' ไป-กลับ', '')}
 
-                                ${rcRow(rcFuelHasOut ? dateGo : '',
-                                        rcFromTo(rcFuelHasOut ? tr.from : '', rcFuelHasOut ? tr.to : ''), '')}
-
-                                ${rcRow('', rcDist(rcFuelHasOut ? distOut : 0),
-                                        rcFuelOutAmt > 0 ? formatNumber(rcFuelOutAmt) : '')}
-
-                                ${rcRow(rcFuelHasRet ? dateBack : '',
-                                        rcFromTo(rcFuelHasRet ? retFrom : '', rcFuelHasRet ? retTo : ''), '')}
-
-                                ${rcRow('', rcDist(rcFuelHasRet ? distRet : 0),
-                                        rcFuelRetAmt > 0 ? formatNumber(rcFuelRetAmt) : '')}
+                                ${rcFuelDetailRows}
 
                                 ${rcRow('', rcSquare(tollTotal > 0)    + ' ค่าทางด่วน',  tollTotal > 0 ? formatNumber(tollTotal) : '')}
                                 ${rcRow('', rcSquare(parkingTotal > 0) + ' ค่าที่จอดรถ', parkingTotal > 0 ? formatNumber(parkingTotal) : '')}
