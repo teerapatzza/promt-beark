@@ -2217,14 +2217,38 @@
             const retOn = flat ? !!flatLeg('ขากลับ') : (car === 'ขากลับ' || car === 'ไป-กลับ');
             const kind = flat ? 'flat' : 'fuel';
 
-            if (main && outOn) {
+            /* ── ใบที่เก็บขาเดินทางไว้เอง (เบิกหลายวันในใบเดียว) ──
+               หนึ่งขาหนึ่งหน้าแผนที่ ขาไหนยังไม่ปักหมุดก็ไม่มีหน้าของมัน
+               ไม่ผูกกับ main เพราะหมุดอยู่ที่ตัวขาเอง ไม่ใช่ที่ระดับใบ
+
+               ขาแรกยังใช้ A/B เพราะ A ถือกติกาชื่อจุดเริ่มต้นที่แก้ไว้เมื่อ 9 พ.ย. 2569
+               (หมุดมาก่อน -> ข้อความที่พิมพ์ -> ที่อยู่โปรไฟล์ พร้อมล้าง "ซอยซอย")
+               ถ้าเปลี่ยนไปใช้ L.from ทั้งหมด เอกสารจะกลับไปแสดงที่อยู่ผิดแบบเดิม */
+            const legList = (Array.isArray(tr.legs) && tr.legs.length)
+                ? TravelLegs.legsOf(tr) : null;
+            if (legList) {
+                legList.forEach(function (L, i) {
+                    if (!isMapGeo(L.fromGeo) || !isMapGeo(L.toGeo)) return;
+                    const f = flatLeg(L.dir);
+                    const isRet = L.dir === 'ขากลับ';
+                    legs.push({ kind, dir: L.dir, date: L.date || '', rank: isRet ? 2 : 0,
+                                from: (i === 0 && main) ? A
+                                      : { label: mapText(L.from) || mapText(L.fromGeo.label), geo: L.fromGeo },
+                                to:   (i === 0 && main) ? B
+                                      : { label: mapText(L.to) || mapText(L.toGeo.label), geo: L.toGeo },
+                                path: pathOf(L.path),
+                                km: f ? f.km : L.km, amount: f ? f.amount : null,
+                                band: f ? f.label : '', dist });
+                });
+            }
+            if (!legList && main && outOn) {
                 const f = flatLeg('ขาไป');
                 legs.push({ kind, dir: 'ขาไป', date: tr.startDate || '', rank: 0,
                             from: A, to: B, path: pathOf(tr.routePath),
                             km: f ? f.km : tr.distOut, amount: f ? f.amount : null,
                             band: f ? f.label : '', dist });
             }
-            if (main && retOn) {
+            if (!legList && main && retOn) {
                 /* ปลายทางขากลับว่าง = กลับจุดเริ่มต้น จุดเริ่มขากลับว่าง = ออกจากจุดหมายขาไป
                    ตรงกับที่หน้ากรอกใช้ขอเส้นทางและคิดระยะขากลับ */
                 const rd = !!tr.returnDifferent;

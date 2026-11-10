@@ -181,6 +181,37 @@ try {
      (String(four.html).match(/ศูนย์บาทถ้วน/) ? 'ได้ ศูนย์บาทถ้วน' : 'หา 240.00 ไม่เจอ'));
   ok('ไม่มีคำว่า "ศูนย์บาทถ้วน"', !/ศูนย์บาทถ้วน/.test(four.html));
   ok('ใบ 8 ขาไม่ตกหน้า A4 (ถ้าตก = เจอเพดานแล้ว)', heavy.h > 0 && heavy.h <= 1085, heavy.h + 'px');
+  /* ── หน้าแผนที่: หนึ่งขาหนึ่งหน้า ──
+     27 ต.ค. 2569 ผู้ตรวจเอกสารไม่รับแผนที่ที่รวมหลายขาไว้รูปเดียว
+     ใบ 4 ขาจึงต้องได้ 4 หน้า เรียง 9 ไป -> 9 กลับ -> 10 ไป -> 10 กลับ */
+  const GEO = { home: { lat: 13.66, lng: 100.49, label: 'บ้าน' },
+                hosp: { lat: 7.00,  lng: 100.50, label: RP } };
+  const FOURPIN = mk({
+    startDate: '2026-11-09', endDate: '2026-11-10',
+    from: 'บ้าน', to: RP, fromGeo: GEO.home, toGeo: GEO.hosp,
+    legs: [
+      { dir: 'ขาไป',   date: '2026-11-09', from: 'บ้าน', to: RP, fromGeo: GEO.home, toGeo: GEO.hosp, km: 12 },
+      { dir: 'ขากลับ', date: '2026-11-09', from: RP, to: 'บ้าน', fromGeo: GEO.hosp, toGeo: GEO.home, km: 12 },
+      { dir: 'ขาไป',   date: '2026-11-10', from: 'บ้าน', to: RP, fromGeo: GEO.home, toGeo: GEO.hosp, km: 12 },
+      { dir: 'ขากลับ', date: '2026-11-10', from: RP, to: 'บ้าน', fromGeo: GEO.hosp, toGeo: GEO.home, km: 12 }
+    ]
+  });
+  const mapped = await ev('return mapLegsOf(' + JSON.stringify(FOURPIN.inputMetadata)
+    + ').map(function (l) { return l.dir + "@" + (l.date || "-"); });');
+  ok('ใบ 4 ขาได้ 4 หน้าแผนที่', mapped.length === 4, JSON.stringify(mapped));
+  ok('หน้าแผนที่เรียงตามวันถูก',
+     JSON.stringify(mapped) === JSON.stringify(
+       ['ขาไป@2026-11-09', 'ขากลับ@2026-11-09', 'ขาไป@2026-11-10', 'ขากลับ@2026-11-10']),
+     JSON.stringify(mapped));
+
+  /* ใบเก่ายังต้องได้ 2 หน้าเหมือนเดิม */
+  const mappedOld = await ev('return mapLegsOf(' + JSON.stringify(
+    mk({ startDate: '2026-11-09', endDate: '2026-11-09', from: 'บ้าน', to: RP,
+         fromGeo: GEO.home, toGeo: GEO.hosp, distOut: '12', distRet: '12' }).inputMetadata)
+    + ').map(function (l) { return l.dir; });');
+  ok('ใบเก่ายังได้ 2 หน้าแผนที่เท่าเดิม',
+     JSON.stringify(mappedOld) === JSON.stringify(['ขาไป', 'ขากลับ']), JSON.stringify(mappedOld));
+
   ok('ไม่มี error ในหน้าเว็บ', pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '));
 } catch (e) {
   console.error('  ตก    ' + e.message);
