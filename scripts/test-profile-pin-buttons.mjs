@@ -140,6 +140,82 @@ try {
     + '"returnFromSuggest","returnToSuggest"].filter(id => !document.getElementById(id));');
   ok('ช่องกรอกและกล่องผลค้นหาเดิมอยู่ครบ ไม่หายสักตัว', kept.length === 0, JSON.stringify(kept));
 
+  /* ══════════ 8. ของเดิมต้องทำงานเหมือนเดิมทุกประการ ══════════
+     10 พ.ย. 2569 เจ้าของงานกำชับว่าปุ่มเป็น "ทางเลือกที่เพิ่มเข้ามา"
+     คนที่เคยใช้แบบเว้นว่างไว้ ต้องใช้ได้เหมือนเดิม ห้ามงง ห้ามพัง
+     พฤติกรรมเดิมคือ เว้นว่างทั้งสองช่อง = กลับทางเดิม ระยะขากลับเท่าขาไป */
+  await ev('applyProfileDataFromObj(' + JSON.stringify(P) + ');'
+    + ' const c=document.getElementById("categorySelect");'
+    + ' if (c) { c.value="TRAVEL002"; c.dispatchEvent(new Event("change",{bubbles:true})); }'
+    + ' return 1;');
+  await sleep(1200);
+  // ล้างช่องขากลับให้กลับสู่สภาพเริ่มต้น เหมือนผู้ใช้ที่ไม่เคยแตะปุ่มเลย
+  await ev('["travelReturnTo","travelReturnFrom"].forEach(function(i){'
+    + ' const e=document.getElementById(i); if(e){ e.value=""; e.dispatchEvent(new Event("input",{bubbles:true})); }});'
+    + ' if (typeof syncReturnDiff === "function") syncReturnDiff();'
+    + ' if (typeof updateReturnPlaceholders === "function") updateReturnPlaceholders();'
+    + ' return 1;');
+
+  const base = await ev('return {'
+    + ' retVal: document.getElementById("travelReturnTo").value,'
+    + ' diff: (typeof returnIsDifferent === "function") ? returnIsDifferent() : null,'
+    + ' ph: document.getElementById("travelReturnTo").placeholder,'
+    + ' hint: (document.getElementById("returnToHint")||{}).textContent || "",'
+    + ' geo: getGeo("ret") ? "มีหมุดค้าง" : "ไม่มีหมุด" };');
+
+  ok('ไม่กดปุ่ม ช่องขากลับยังว่างเหมือนเดิม', base.retVal === '', JSON.stringify(base.retVal));
+  ok('ช่องว่าง = ยังถือว่ากลับทางเดิม (ไม่ใช่ไปคนละที่)', base.diff === false, String(base.diff));
+  ok('ข้อความ "ว่าง = กลับที่ ..." ยังขึ้นเหมือนเดิม',
+     /^ว่าง = กลับที่ /.test(base.ph), base.ph);
+  ok('คำอธิบายใต้ช่องยังบอกว่าไปกลับเส้นทางเดิม',
+     /ไปกลับเส้นทางเดิม/.test(base.hint), base.hint);
+  ok('ช่องว่างแล้วต้องไม่มีหมุดค้างอยู่', base.geo === 'ไม่มีหมุด', base.geo);
+
+  /* กดปุ่มแล้วเปลี่ยนใจ ลบข้อความทิ้ง ต้องกลับไปเป็นพฤติกรรมเดิมได้สนิท
+     ไม่ใช่ค้างเป็น "ไปคนละที่" ทั้งที่ช่องว่างแล้ว ซึ่งจะทำให้ระยะขากลับเพี้ยน */
+  /* 8ก. อยู่ "เคสปกติ" (การ์ดขากลับซ่อนอยู่) กดปุ่มแล้วต้อง **ไม่** เปลี่ยนโหมด
+     กติกาคือ want = backCar && (rf || rt) — ไม่ติ๊กรถขากลับก็ไม่นับ
+     ข้อนี้คือเกราะกันไม่ให้ปุ่มใหม่ไปรบกวนคนที่ใช้แบบเดิมอยู่ */
+  await ev('return usePlaceFromProfile("ret");');
+  const pressNormal = await ev('return { v: document.getElementById("travelReturnTo").value,'
+    + ' diff: returnIsDifferent() };');
+  ok('เคสปกติ: กดปุ่มแล้วยังถือว่ากลับทางเดิม ไม่ถูกเปลี่ยนโหมดให้',
+     pressNormal.diff === false, JSON.stringify(pressNormal));
+
+  /* 8ข. กรณีพิเศษ + ติ๊กรถขากลับ = ช่องนี้ใช้งานจริง ปุ่มต้องมีผล */
+  await ev('const e=document.getElementById("travelReturnTo"); e.value="";'
+    + ' const sp=document.getElementById("tripModeSpecial");'
+    + ' if (sp) { sp.checked=true; sp.dispatchEvent(new Event("change",{bubbles:true})); }'
+    + ' const lb=document.getElementById("legBackCar");'
+    + ' if (lb) { lb.checked=true; lb.dispatchEvent(new Event("change",{bubbles:true})); }'
+    + ' return 1;');
+  await sleep(900);
+  await ev('return usePlaceFromProfile("ret");');
+  const pressSpecial = await ev('return { v: document.getElementById("travelReturnTo").value,'
+    + ' diff: returnIsDifferent(), geo: getGeo("ret") ? "มีหมุด" : "ไม่มีหมุด" };');
+  ok('กรณีพิเศษ: กดปุ่มแล้วช่องมีค่าและระบบรับรู้ว่าระบุปลายทางเอง',
+     pressSpecial.v !== '' && pressSpecial.diff === true, JSON.stringify(pressSpecial));
+  ok('กรณีพิเศษ: กดปุ่มแล้วได้หมุดจริง', pressSpecial.geo === 'มีหมุด', pressSpecial.geo);
+
+  // กลับสู่เคสปกติก่อนทดสอบการลบข้อความ ให้ตรงกับที่ผู้ใช้ส่วนใหญ่ใช้
+  await ev('const sp=document.getElementById("tripModeSpecial");'
+    + ' if (sp) { sp.checked=false; sp.dispatchEvent(new Event("change",{bubbles:true})); } return 1;');
+  await sleep(700);
+
+  await ev('const e=document.getElementById("travelReturnTo"); e.value="";'
+    + ' e.dispatchEvent(new Event("input",{bubbles:true}));'
+    + ' if (typeof syncReturnDiff === "function") syncReturnDiff();'
+    + ' if (typeof updateReturnPlaceholders === "function") updateReturnPlaceholders(); return 1;');
+  const afterClear = await ev('return { v: document.getElementById("travelReturnTo").value,'
+    + ' diff: returnIsDifferent(), geo: getGeo("ret") ? "มีหมุดค้าง" : "ไม่มีหมุด",'
+    + ' ph: document.getElementById("travelReturnTo").placeholder };');
+  ok('ลบข้อความทิ้งแล้วกลับไปเป็นกลับทางเดิมได้สนิท',
+     afterClear.v === '' && afterClear.diff === false, JSON.stringify(afterClear));
+  ok('ลบข้อความทิ้งแล้วหมุดต้องหายไปด้วย ไม่ค้างคิดระยะผิด',
+     afterClear.geo === 'ไม่มีหมุด', afterClear.geo);
+  ok('ข้อความ "ว่าง = กลับที่ ..." กลับมาเหมือนเดิม',
+     /^ว่าง = กลับที่ /.test(afterClear.ph), afterClear.ph);
+
   ok('ไม่มี error ในหน้าเว็บ', pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '));
 } catch (e) {
   console.error('  ตก    ' + e.message);
