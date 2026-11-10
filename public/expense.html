@@ -3060,6 +3060,24 @@
          2. หมวดที่ออกใบรายงานด้วย — ใบรายงานพิมพ์ "กลับถึงที่พักวันที่ __"
             และ "รวมเป็นเวลา __ วัน __ ชั่วโมง" ซึ่งคิดจากช่วงต่อเนื่อง
             เคสกลับบ้านทุกวันจะได้เวลาเกินจริง และเวลานั้นผูกกับเบี้ยเลี้ยง */
+    /* ── ใบรับรองค่าพาหนะใส่ได้หน้าเดียว ต้องรู้ว่ากี่แถวถึงจะล้น ──
+       วัดจากใบจริง 10 พ.ย. 2569 (หน้า A4 = 1085px)
+         ขา 2 Taxi 0 = 18 แถว  902px      ขา 8 Taxi 0 = 30 แถว 1019px
+         ขา 4 Taxi 0 = 22 แถว 1015px      ขา 8 Taxi 6 = 33 แถว 1083px  <- เพดาน
+         ขา 6 Taxi 8 = 31 แถว 1041px      ขา 8 Taxi 8 = 35 แถว 1126px  ล้น 41
+         ขา10 Taxi 0 = 34 แถว 1103px ล้น 18
+       ตารางย่อฟอนต์เองได้ถึง 10px แล้วลงต่ำกว่านั้นไม่ได้ เอกสารการเงินต้องอ่านออก
+       ถ้าเลย์เอาต์ตารางเปลี่ยน ต้องวัดใหม่ ห้ามเดาตัวเลขเอง */
+    var RECEIPT_MAX_ROWS = 33;
+
+    /** จำนวนแถวในตารางใบรับรอง เมื่อมีขาค่าน้ำมัน legs ขา และเที่ยว Taxi taxi เที่ยว
+     *  ฐาน 18 แถวคือใบปกติ 2 ขา และ Taxi กางอย่างน้อย 3 แถวเสมอแม้ไม่มีเที่ยวเลย */
+    function receiptRowEstimate(legs, taxi) {
+        var l = Math.max(0, parseInt(legs, 10) || 0);
+        var t = Math.max(0, parseInt(taxi, 10) || 0);
+        return 18 + Math.max(0, l - 2) * 2 + Math.max(0, t - 3);
+    }
+
     function checkExtraDayLimits() {
         var btn  = document.getElementById('addExtraDayBtn');
         var note = document.getElementById('extraDaysNote');
@@ -3067,6 +3085,15 @@
         if (!btn || !note) return true;
 
         var blocked = '';
+
+        /* ใบจะเกินหนึ่งหน้าหรือยัง — ต้องเตือนตั้งแต่ตอนกรอก
+           ปล่อยให้บันทึกแล้วไปเจอตอนพิมพ์ = ผู้ใช้เสียเวลากรอกใหม่ทั้งใบ */
+        var legsNow = (typeof buildTravelLegs === 'function' && buildTravelLegs());
+        var nLegs = legsNow ? legsNow.length : 2;
+        var nTaxi = (typeof collectTaxiEntries === 'function') ? collectTaxiEntries().length : 0;
+        var rowsNow  = receiptRowEstimate(nLegs, nTaxi);
+        var rowsNext = receiptRowEstimate(nLegs + 2, nTaxi);   // ถ้าเพิ่มอีกหนึ่งวัน
+        var overflow = rowsNow > RECEIPT_MAX_ROWS;
         if (typeof flatMethodOn === 'function' && flatMethodOn()) {
             blocked = 'ใบที่เลือก <b>เหมาจ่าย</b> ยังเพิ่มวันเดินทางไม่ได้ '
                     + 'เพราะอัตราเหมาจ่ายคิดได้ครั้งละหนึ่งเที่ยวไป-กลับ '
@@ -3078,18 +3105,40 @@
                     + 'ถ้ากลับบ้านทุกวัน ตัวเลขนั้นจะเกินจริง — ให้แยกเป็นคนละใบ';
         }
 
-        btn.disabled = !!blocked;
-        btn.classList.toggle('opacity-40', !!blocked);
-        btn.classList.toggle('cursor-not-allowed', !!blocked);
-        btn.title = blocked ? btn.textContent.trim() + ' — ' + 'ยังใช้กับใบนี้ไม่ได้' : '';
+        /* เกินเพดานแล้ว = บันทึกไม่ได้ ต้องลดวันลง
+           ยังไม่เกินแต่เพิ่มอีกวันจะเกิน = ปิดปุ่มไว้ก่อน แต่ยังบันทึกใบนี้ได้ */
+        var okToSave = !blocked || rows === 0;
+        if (!blocked && overflow) {
+            blocked = 'ใบรับรองค่าพาหนะใส่ได้<b>หน้าเดียว</b> ตอนนี้ต้องใช้ ' + rowsNow
+                    + ' บรรทัด เกินที่ใส่ได้ (' + RECEIPT_MAX_ROWS + ' บรรทัด) '
+                    + '— ลดวันเดินทางหรือเที่ยว Taxi ลง หรือแยกเป็นคนละใบ';
+            okToSave = false;
+        }
 
-        var msg = blocked;
-        // มีแถวค้างอยู่แล้วแต่เพิ่งมาติดด่าน ต้องบอกให้ชัดว่าต้องเอาออกก่อน
-        if (blocked && rows > 0)
-            msg += '<br><b>ตอนนี้มีวันที่เพิ่มไว้ ' + rows + ' วัน — ต้องลบออกก่อนจึงจะบันทึกได้</b>';
-        note.innerHTML = msg;
-        note.classList.toggle('hidden', !msg);
-        return !blocked || rows === 0;
+        // ยังไม่เกิน แต่กดเพิ่มอีกวันแล้วจะเกิน — ปิดปุ่มพร้อมบอกว่าเหลือเท่าไร
+        var nearFull = !blocked && rowsNext > RECEIPT_MAX_ROWS;
+        if (nearFull) {
+            note.innerHTML = 'ใบนี้ใช้ไปแล้ว ' + rowsNow + ' จาก ' + RECEIPT_MAX_ROWS
+                + ' บรรทัดของใบรับรอง <b>เพิ่มอีกวันจะเกินหนึ่งหน้า</b> '
+                + '— ถ้าต้องเบิกเพิ่ม ให้แยกเป็นคนละใบ';
+            note.classList.remove('hidden');
+        }
+
+        var off = !!blocked || nearFull;
+        btn.disabled = off;
+        btn.classList.toggle('opacity-40', off);
+        btn.classList.toggle('cursor-not-allowed', off);
+        btn.title = off ? 'ยังเพิ่มวันเดินทางให้ใบนี้ไม่ได้' : '';
+
+        if (!nearFull) {
+            var msg = blocked;
+            // มีแถวค้างอยู่แล้วแต่เพิ่งมาติดด่าน ต้องบอกให้ชัดว่าต้องเอาออกก่อน
+            if (blocked && rows > 0 && !overflow)
+                msg += '<br><b>ตอนนี้มีวันที่เพิ่มไว้ ' + rows + ' วัน — ต้องลบออกก่อนจึงจะบันทึกได้</b>';
+            note.innerHTML = msg;
+            note.classList.toggle('hidden', !msg);
+        }
+        return okToSave;
     }
 
     /**

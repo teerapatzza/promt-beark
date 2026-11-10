@@ -188,6 +188,77 @@ try {
     ok('หมวดทดสอบนี้ไม่มีตัวเลือกเหมาจ่าย จึงข้ามด่านนี้', true, flatOn);
   }
 
+  /* ══════════ 8. ด่านกันใบล้นหน้า ══════════
+     วัดจากใบจริง 10 พ.ย. 2569 (หน้า A4 = 1085px) ได้ตารางนี้
+       ขา  Taxi -> แถว -> สูง
+        2   0     18     902   ลง        8   0     30    1019  ลง
+        4   0     22    1015   ลง        8   4     31    1040  ลง
+        6   0     26    1015   ลง        8   6     33    1083  ลง  <- เพดาน
+        6   8     31    1041   ลง        8   8     35    1126  ล้น 41
+       10   0     34    1103   ล้น 18   10   8     39    1210  ล้น 125
+     สูตรที่ได้  แถว = 18 + (ขา-2)x2 + max(0, Taxi-3)   เพดาน 33 แถว
+     ตัวเลขพวกนี้ต้องมาจากการวัด ไม่ใช่เดา ถ้าเลย์เอาต์เปลี่ยนต้องวัดใหม่ */
+  const GRID = [
+    [2,0,18],[2,2,18],[2,4,19],[2,6,21],[2,8,23],
+    [4,0,22],[4,2,22],[4,4,23],[4,6,25],[4,8,27],
+    [6,0,26],[6,2,26],[6,4,27],[6,6,29],[6,8,31],
+    [8,0,30],[8,2,30],[8,4,31],[8,6,33],[8,8,35],
+    [10,0,34],[10,2,34],[10,4,35],[10,6,37],[10,8,39]
+  ];
+  const wrong = [];
+  for (const [L, T, want] of GRID) {
+    const got = await ev('return receiptRowEstimate(' + L + ',' + T + ');');
+    if (got !== want) wrong.push(L + 'ขา/' + T + 'Taxi: ควร ' + want + ' ได้ ' + got);
+  }
+  ok('สูตรนับแถวตรงกับที่วัดจากใบจริงครบ 25 ชุด', wrong.length === 0, wrong.join(' | '));
+  ok('รู้ว่าเพดานคือ 33 แถว', (await ev('return RECEIPT_MAX_ROWS;')) === 33, '');
+
+  /* เพิ่มวันจนถึงเพดาน แล้ววันถัดไปต้องกดไม่ได้
+     0 Taxi: 4 วัน = 8 ขา = 30 แถว ลง · 5 วัน = 10 ขา = 34 แถว ล้น */
+  const state = () => ev('const b=document.getElementById("addExtraDayBtn");'
+    + ' const n=document.getElementById("extraDaysNote");'
+    + ' const L=buildTravelLegs(); return { days: extraDayDates().length,'
+    + ' legs: L?L.length:2, rows: receiptRowEstimate(L?L.length:2, 0),'
+    + ' disabled: !!(b && b.disabled), save: checkExtraDayLimits(),'
+    + ' note: (n && !n.classList.contains("hidden")) ? n.textContent.trim() : "" };');
+
+  // 3 วัน (6 ขา 26 แถว) — เพิ่มอีกวันได้ 30 แถว ยังลง จึงต้องกดได้
+  await ev('document.querySelectorAll("#extraDaysList .extra-day").forEach(function(r){r.remove();});'
+    + ' addExtraDay("2026-11-10"); addExtraDay("2026-11-11"); onExtraDaysChange(); return 1;');
+  await sleep(500);
+  const at3 = await state();
+  ok('เดินทาง 3 วัน (6 ขา 26 แถว) ยังกดเพิ่มได้',
+     at3.legs === 6 && at3.rows === 26 && at3.disabled === false && at3.save === true, JSON.stringify(at3));
+
+  /* 4 วัน (8 ขา 30 แถว) — ใบนี้ยังลงหน้าเดียว บันทึกได้
+     แต่กดเพิ่มอีกวันจะเป็น 34 แถว ซึ่งล้น จึงต้องปิดปุ่มไว้ก่อน
+     เจ้าของงานสั่งว่า "ถ้าไม่ได้ก็ไม่ควรให้เขากดได้" ไม่ใช่ปล่อยให้กดแล้วค่อยบอกว่าผิด */
+  await ev('addExtraDay("2026-11-12"); onExtraDaysChange(); return 1;');
+  await sleep(500);
+  const at4 = await state();
+  ok('เดินทาง 4 วัน (8 ขา 30 แถว) ยังบันทึกได้', at4.save === true, JSON.stringify(at4));
+  ok('แต่ปุ่มถูกปิด เพราะเพิ่มอีกวันจะล้น', at4.disabled === true, JSON.stringify(at4));
+  ok('และบอกว่าเหลืออีกกี่บรรทัด', /30 จาก 33/.test(at4.note), at4.note);
+
+  // ฝืนเพิ่มวันที่ 5 ด้วยการเรียกฟังก์ชันตรง ๆ (จำลองแถวค้างจากใบที่โหลดมา)
+  await ev('addExtraDay("2026-11-13"); onExtraDaysChange(); return 1;');
+  await sleep(500);
+  const at5 = await ev('const b=document.getElementById("addExtraDayBtn");'
+    + ' const n=document.getElementById("extraDaysNote");'
+    + ' return { days: extraDayDates().length, rows: receiptRowEstimate(buildTravelLegs().length, 0),'
+    + '          disabled: !!(b && b.disabled),'
+    + '          note: (n && !n.classList.contains("hidden")) ? n.textContent.trim() : "" };');
+  ok('เกินเพดานแล้วปุ่มต้องกดไม่ได้', at5.disabled === true, JSON.stringify(at5));
+  ok('และบอกว่าใบจะเกินหนึ่งหน้า', /เกิน|หน้าเดียว|ล้น/.test(at5.note), at5.note);
+  ok('บันทึกไม่ได้จนกว่าจะลดวันลง', (await ev('return checkExtraDayLimits();')) === false, '');
+
+  // ลดกลับมาให้พอดี ต้องกลับมาใช้งานได้
+  await ev('const rs=document.querySelectorAll("#extraDaysList .extra-day");'
+    + ' rs[rs.length-1].remove(); onExtraDaysChange(); return 1;');
+  await sleep(500);
+  ok('ลดวันลงแล้วกลับมาบันทึกได้',
+     (await ev('return checkExtraDayLimits();')) === true, '');
+
   ok('ไม่มี error ในหน้าเว็บ', pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '));
 } catch (e) {
   console.error('  ตก    ' + e.message);
