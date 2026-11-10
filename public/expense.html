@@ -896,6 +896,25 @@
                         ขากลับใช้เส้นทางเดิม กลับที่จุดเริ่มต้น — ไม่ต้องกรอกอะไรเพิ่ม
                     </p>
 
+                    <!-- ══════════ ไปกลับเส้นทางเดิมอีกวัน ══════════
+                         10 พ.ย. 2569 — เจ้าของงานต้องการเบิกในใบเดียวว่า
+                           9 พ.ย.  บ้าน -> รพ. -> บ้าน
+                           10 พ.ย. บ้าน -> รพ. -> บ้าน
+                         กดเพิ่มการ์ดแล้วกรอกแค่วันที่ เส้นทางใช้ของเดิม
+                         ทำแนวเดียวกับรายการเที่ยว Taxi ที่กดเพิ่มแถวได้
+                         ผู้ใช้จะได้เห็นรูปแบบเดียวทั้งหน้า ไม่ต้องเรียนรู้สองแบบ -->
+                    <div id="extraDaysBox" class="mb-3">
+                        <div class="flex items-center flex-wrap gap-2 mb-1.5">
+                            <span class="text-sm font-bold text-slate-800">ไปกลับเส้นทางเดิมอีกวัน</span>
+                            <span class="text-xs text-slate-400" id="extraDaysHint">ไม่มี — ใบนี้เดินทางวันเดียว</span>
+                        </div>
+                        <div id="extraDaysList" class="space-y-2"></div>
+                        <button type="button" id="addExtraDayBtn" onclick="addExtraDay()"
+                            class="mt-2 text-xs font-bold text-blue-600 hover:text-blue-800">+ เพิ่มวันเดินทาง</button>
+                        <div id="extraDaysNote" class="hidden mt-2 text-[11px] px-2.5 py-1.5 rounded-md
+                             bg-amber-50 border border-amber-200 text-amber-900"></div>
+                    </div>
+
 
                     <p class="text-[11px] text-slate-500 mb-3" id="fuelRateNote">
                         ค่าน้ำมัน <b id="fuelRateLabel">—</b> บาท/กม. — อัตรานี้กำหนดโดยผู้ดูแลระบบ แก้ไขไม่ได้
@@ -1944,6 +1963,9 @@
     function onFuelMethodChange() {
         const flat = flatMethodOn();
         applyFlatLayout();
+        /* สลับมาเหมาจ่ายแล้วปุ่มเพิ่มวันต้องกดไม่ได้ทันที
+           ไม่ใช่รอให้กดบันทึกแล้วค่อยตีกลับ ซึ่งผู้ใช้จะกรอกไปแล้วทั้งหน้า */
+        if (typeof checkExtraDayLimits === 'function') checkExtraDayLimits();
 
 
         /* อัตราเหมาจ่ายรวมค่าทางด่วนแล้ว ถ้าปล่อยให้กรอกอีกจะเป็นการเบิกซ้ำ
@@ -2968,6 +2990,150 @@
      * ถ้าโปรไฟล์มีพิกัดที่ยืนยันไว้แล้ว ใช้เลย (แม่นที่สุด)
      * ถ้ายังไม่มี ค้นหาจากที่อยู่แบบไล่ลำดับ ซอย -> ถนน -> ตำบล
      */
+    /* ══════════ ไปกลับเส้นทางเดิมอีกวัน ══════════
+       10 พ.ย. 2569 — เบิกในใบเดียวว่า 9 พ.ย. ไป-กลับ และ 10 พ.ย. ไป-กลับ
+       แต่ละวันใช้เส้นทางเดิม ต่างกันแค่วันที่
+
+       ตั้งใจให้ "ไม่เพิ่มวันเลย" แปลว่าไม่มีอะไรเปลี่ยนเลย — buildTravelLegs()
+       คืน null แล้วตอนบันทึกจะไม่ใส่คีย์ legs ลงไป ใบจึงหน้าตาเหมือนใบเก่าทุกประการ
+       ใบเก่าทั้งระบบเป็นแบบนั้น ถ้าใส่คีย์ใหม่ให้ทุกใบจะแยกไม่ออกว่าใบไหนเปลี่ยนจริง */
+
+    /** วันที่ของวันเดินทางที่เพิ่มเข้ามา เรียงจากน้อยไปมาก ไม่ซ้ำ ไม่มีค่าว่าง */
+    function extraDayDates() {
+        var seen = {};
+        return Array.from(document.querySelectorAll('#extraDaysList .extra-day-date'))
+            .map(function (el) { return (el.value || '').trim(); })
+            .filter(function (d) {
+                if (!d || seen[d]) return false;
+                seen[d] = 1; return true;
+            })
+            .sort();
+    }
+
+    /** เพิ่มแถววันเดินทาง — เว้นว่างได้ ผู้ใช้กรอกเอง */
+    function addExtraDay(preset) {
+        var list = document.getElementById('extraDaysList');
+        if (!list) return;
+        var row = document.createElement('div');
+        row.className = 'extra-day flex items-center flex-wrap gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2';
+        row.innerHTML =
+            '<span class="text-xs font-bold text-slate-600">วันที่</span>'
+          + '<input type="date" class="extra-day-date fld" style="width:170px"'
+          + ' onchange="onExtraDaysChange()">'
+          + '<span class="extra-day-route text-xs text-slate-500"></span>'
+          + '<button type="button" class="ml-auto text-xs text-rose-600 hover:text-rose-800 font-bold"'
+          + ' onclick="this.closest(\'.extra-day\').remove(); onExtraDaysChange();">ลบ</button>';
+        list.appendChild(row);
+        var inp = row.querySelector('.extra-day-date');
+        if (preset) inp.value = preset;
+        onExtraDaysChange();
+    }
+
+    /** เรียกทุกครั้งที่แถววันเปลี่ยน — อัปเดตคำอธิบายและคิดเงินใหม่ */
+    function onExtraDaysChange() {
+        var days = extraDayDates();
+        var km = parseFloat(document.getElementById('distOutbound')?.value) || 0;
+        var from = (document.getElementById('travelFrom')?.value || '').trim();
+        var to   = (document.getElementById('travelTo')?.value   || '').trim();
+        var hint = document.getElementById('extraDaysHint');
+        if (hint) hint.textContent = days.length
+            ? 'เพิ่มอีก ' + days.length + ' วัน — รวมเดินทาง ' + (days.length + 1) + ' วัน'
+            : 'ไม่มี — ใบนี้เดินทางวันเดียว';
+        // บอกเส้นทางที่แถวนั้นจะใช้ ให้เห็นชัดว่าไม่ได้ต้องกรอกเส้นทางซ้ำ
+        document.querySelectorAll('#extraDaysList .extra-day').forEach(function (r) {
+            var el = r.querySelector('.extra-day-route');
+            if (el) el.textContent = (from && to)
+                ? 'ไป-กลับ ' + from + ' ↔ ' + to + (km ? '  (' + km + ' กม./เที่ยว)' : '')
+                : 'ใช้เส้นทางเดิมของใบนี้';
+        });
+        if (typeof checkExtraDayLimits === 'function') checkExtraDayLimits();
+        if (typeof calculateTravelTotal === 'function') calculateTravelTotal();
+    }
+
+    /* ══════════ ด่านกัน — อะไรที่ยังใช้ร่วมกันไม่ได้ ต้องกดไม่ได้ ══════════
+       เจ้าของงานสั่ง 10 พ.ย. 2569 ว่า "ถ้าไม่ได้ก็ไม่ควรให้เขากดได้"
+       เตือนอย่างเดียวแล้วปล่อยให้กดต่อ = มีคนกดแน่นอน แล้วเงินผิด
+
+       ข้อที่ยังรองรับไม่ได้
+         1. เหมาจ่าย (บัญชี ๘ ข้อ ๕) — flat-rate.js คิดจาก distOut/distRet
+            ซึ่งเก็บได้แค่สองขา ใบหลายวันจะได้ยอดของวันเดียว ผู้เบิกเสียเงิน
+         2. หมวดที่ออกใบรายงานด้วย — ใบรายงานพิมพ์ "กลับถึงที่พักวันที่ __"
+            และ "รวมเป็นเวลา __ วัน __ ชั่วโมง" ซึ่งคิดจากช่วงต่อเนื่อง
+            เคสกลับบ้านทุกวันจะได้เวลาเกินจริง และเวลานั้นผูกกับเบี้ยเลี้ยง */
+    function checkExtraDayLimits() {
+        var btn  = document.getElementById('addExtraDayBtn');
+        var note = document.getElementById('extraDaysNote');
+        var rows = document.querySelectorAll('#extraDaysList .extra-day').length;
+        if (!btn || !note) return true;
+
+        var blocked = '';
+        if (typeof flatMethodOn === 'function' && flatMethodOn()) {
+            blocked = 'ใบที่เลือก <b>เหมาจ่าย</b> ยังเพิ่มวันเดินทางไม่ได้ '
+                    + 'เพราะอัตราเหมาจ่ายคิดได้ครั้งละหนึ่งเที่ยวไป-กลับ '
+                    + 'ถ้าต้องเบิกหลายวัน ให้เลือก “คิดค่าน้ำมันตามระยะทางจริง” หรือแยกเป็นคนละใบ';
+        } else if (Array.isArray(window.__activeTemplates)
+                   && window.__activeTemplates.indexOf('REPORT') >= 0) {
+            blocked = 'หมวดนี้ออก <b>ใบรายงานการเดินทาง</b> ด้วย ซึ่งพิมพ์ “กลับถึงที่พักวันที่…” '
+                    + 'และ “รวมเป็นเวลา…” จากช่วงวันต่อเนื่อง '
+                    + 'ถ้ากลับบ้านทุกวัน ตัวเลขนั้นจะเกินจริง — ให้แยกเป็นคนละใบ';
+        }
+
+        btn.disabled = !!blocked;
+        btn.classList.toggle('opacity-40', !!blocked);
+        btn.classList.toggle('cursor-not-allowed', !!blocked);
+        btn.title = blocked ? btn.textContent.trim() + ' — ' + 'ยังใช้กับใบนี้ไม่ได้' : '';
+
+        var msg = blocked;
+        // มีแถวค้างอยู่แล้วแต่เพิ่งมาติดด่าน ต้องบอกให้ชัดว่าต้องเอาออกก่อน
+        if (blocked && rows > 0)
+            msg += '<br><b>ตอนนี้มีวันที่เพิ่มไว้ ' + rows + ' วัน — ต้องลบออกก่อนจึงจะบันทึกได้</b>';
+        note.innerHTML = msg;
+        note.classList.toggle('hidden', !msg);
+        return !blocked || rows === 0;
+    }
+
+    /**
+     * ขาเดินทางทั้งหมดของใบนี้ สำหรับเก็บลง _travel.legs
+     * @returns {Array|null} null = ไม่ได้เพิ่มวันเลย ใบนี้เป็นใบปกติ อย่าใส่คีย์ legs
+     */
+    function buildTravelLegs() {
+        var days = extraDayDates();
+        if (!days.length) return null;
+
+        var dOut = parseFloat(document.getElementById('distOutbound')?.value) || 0;
+        var dRet = parseFloat(document.getElementById('distReturn')?.value)   || 0;
+        var from = (document.getElementById('travelFrom')?.value || '').trim();
+        var to   = (document.getElementById('travelTo')?.value   || '').trim();
+        var gFrom = getGeo('from'), gTo = getGeo('to');
+        var pathOut = Array.isArray(routePath) ? routePath : null;
+        var pathRet = pathOut ? pathOut.slice().reverse() : null;
+        var d0 = (document.getElementById('dateStart')?.value || '');
+        var dEnd = (document.getElementById('dateEnd')?.value || '') || d0;
+
+        /* ขาของวันแรกมาจากช่องที่กรอกไว้ตามปกติ
+           วันที่เพิ่มมาใช้เส้นทางและระยะชุดเดียวกัน ต่างแค่วันที่
+           ถ้าวันหลังต้องไปคนละที่ ต้องแยกใบ — ด่านเตือนบอกไว้แล้ว */
+        var mk = function (dir, date) {
+            var out = dir === 'ขาไป';
+            return {
+                dir: dir, date: date,
+                from: out ? from : to,
+                to:   out ? to   : from,
+                fromGeo: out ? gFrom : gTo,
+                toGeo:   out ? gTo   : gFrom,
+                km: out ? dOut : dRet,
+                path: out ? pathOut : pathRet,
+                route: out ? routeInfo : (retInfo || routeInfo)
+            };
+        };
+        var legs = [mk('ขาไป', d0), mk('ขากลับ', dEnd)];
+        days.forEach(function (d) {
+            legs.push(mk('ขาไป', d));
+            legs.push(mk('ขากลับ', d));
+        });
+        return legs;
+    }
+
     /* ══════════ ปุ่มดึงที่อยู่จากโปรไฟล์ / คัดลอกหมุด ══════════
        10 พ.ย. 2569 — เจ้าของงานตั้งที่อยู่ 141/36 ไว้ในโปรไฟล์พร้อมปักหมุดแล้ว
        แต่เอามาใส่ช่องค้นหาแผนที่ช่องอื่นไม่ได้เลย ต้องพิมพ์ชื่อให้ระบบค้นใหม่
@@ -4267,6 +4433,12 @@
         /* เลือกเหมาจ่ายแล้วใช้ยอดก้อนแทนสูตรระยะ × อัตรา
            ถ้าเงื่อนไขไม่ผ่าน (เช่นระยะเกินเพดาน) ให้ตกกลับไปคิดตามระยะจริง
            ไม่ปล่อยให้ยอดเป็นศูนย์เงียบ ๆ ซึ่งผู้ใช้จะไม่รู้ว่าเกิดอะไรขึ้น */
+        /* วันเดินทางที่เพิ่มเข้ามาใช้เส้นทางเดิม จึงวิ่งเพิ่มอีกวันละ (ขาไป + ขากลับ)
+           ถ้าไม่บวกตรงนี้ ยอดในฟอร์มจะเป็นของวันเดียว แต่เอกสารพิมพ์ครบทุกวัน
+           แล้วสองตัวเลขจะไม่ตรงกัน — เคยพลาดแบบเดียวกันมาแล้วฝั่งเอกสาร */
+        const extraDays = (typeof extraDayDates === 'function') ? extraDayDates().length : 0;
+        if (onReceipt && extraDays > 0) fuelDist += extraDays * (out + ret);
+
         let fuelTotal = fuelRate * fuelDist;
         let usedFlat = false;
         if (onReceipt && flatMethodOn()) {
@@ -4274,6 +4446,8 @@
             if (fr && fr.ok) { fuelTotal = fr.total; usedFlat = true; }
         }
         window.__flatRateUsed = usedFlat;
+        // เปิดให้ชุดทดสอบอ่านยอดที่คิดได้จริง โดยไม่ต้องไปขูดจากหน้าจอ
+        window.__lastFuelTotal = fuelTotal;
         if (typeof showFuelWorking === 'function') showFuelWorking();
         if (typeof showFlatRateNote === 'function') showFlatRateNote();
 
@@ -4343,6 +4517,9 @@
              ใบรายงานการเดินทาง (REPORT)      : วัน-เวลา · ออกจากไหน · จังหวัด · ที่พัก · เครื่องบิน
              ใบรับรองค่าพาหนะ (TRANSPORT_RECEIPT): ต้นทาง-ปลายทาง · ระยะทาง · ประเภทรถ · Taxi · ที่อยู่ · กิจกรรม
              ใช้ทั้งสองใบ                      : ค่าทางด่วน · ค่าอื่นๆ · ชื่อผู้ขอเบิก           */
+        /* เก็บไว้ให้ด่านกันอ่านได้ ว่าหมวดนี้ออกเอกสารอะไรบ้าง
+           ใบรายงานพิมพ์ "รวมเป็นเวลา" จากช่วงวันต่อเนื่อง จึงใช้กับใบหลายวันไม่ได้ */
+        window.__activeTemplates = templates.slice();
         const hasReport  = templates.includes('REPORT');
         const hasReceipt = templates.includes('TRANSPORT_RECEIPT');
         const show = (id, on) => {
@@ -5088,6 +5265,14 @@
                 distOut: needReceipt ? (document.getElementById('distOutbound')?.value || 0) : 0,
                 distRet: needReceipt ? (document.getElementById('distReturn')?.value   || 0) : 0
             };
+            /* เพิ่มวันเดินทางไว้ = เก็บขาทุกขาลงไปด้วย
+               ไม่ได้เพิ่ม = ไม่ใส่คีย์นี้เลย ใบจะมีหน้าตาข้อมูลเหมือนใบเก่าทุกประการ
+               ซึ่งสำคัญมาก เพราะถ้าใส่ให้ทุกใบจะแยกไม่ออกว่าใบไหนเปลี่ยนจริง
+               distOut/distRet ยังถูกเขียนไว้เหมือนเดิม ด่านตรวจฝั่งเซิร์ฟเวอร์จึงผ่านโดยไม่ต้องแก้ */
+            if (needReceipt && typeof buildTravelLegs === 'function') {
+                const _legs = buildTravelLegs();
+                if (_legs && _legs.length) metadata._travel.legs = _legs;
+            }
             // เก็บเฉพาะค่าของช่องที่แสดงอยู่จริง ให้ตรงกับที่ calculateTravelTotal คิดเงิน
             // ค่าในช่องที่ซ่อนคือของค้างจากหมวดอื่น ไม่ใช่สิ่งที่ผู้ใช้ตั้งใจเบิกในใบนี้
             metadata._costs = {
@@ -5134,6 +5319,17 @@
                 .map(i => i.value.trim()).filter(Boolean);
 
             // Validate taxi entries
+            /* ด่านกันชั้นสุดท้าย — ปุ่มถูกปิดไว้แล้ว แต่แถวอาจค้างมาจากตอนก่อนสลับวิธีคิดเงิน
+               ปล่อยผ่านตรงนี้ = เอกสารพิมพ์หลายวันแต่เงินคิดวันเดียว ซึ่งผู้เบิกเสียเปรียบ */
+            if (typeof checkExtraDayLimits === 'function' && !checkExtraDayLimits()) {
+                document.getElementById('extraDaysBox')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return alert('❌ ยังบันทึกไม่ได้\n\n'
+                    + 'ใบนี้มี "วันเดินทางเพิ่มเติม" อยู่ แต่วิธีเบิกที่เลือกไว้ยังใช้ร่วมกันไม่ได้\n\n'
+                    + '💡 เลือกอย่างใดอย่างหนึ่ง:\n'
+                    + '• ลบวันเดินทางเพิ่มเติมออกให้หมด แล้วแยกเป็นคนละใบ\n'
+                    + '• หรือเปลี่ยนไปใช้ "คิดค่าน้ำมันตามระยะทางจริง"');
+            }
+
             const taxiEntries = collectTaxiEntries();
             const travelStartDate = new Date(dateStart);
             const travelEndDate = new Date(dateEnd);
@@ -5659,6 +5855,25 @@
             document.getElementById('travelTo').value      = tr.to        || '';
             document.getElementById('distOutbound').value  = tr.distOut   || 0;
             document.getElementById('distReturn').value    = tr.distRet   || 0;
+
+            /* คืนวันเดินทางที่เพิ่มไว้ ไม่งั้นเปิดมาแก้แล้วบันทึกซ้ำ วันที่เพิ่มจะหายเงียบ
+               และยอดเงินจะลดลงโดยที่ผู้ใช้ไม่รู้ตัว
+               วันแรกมาจากช่องกำหนดการเดินทางอยู่แล้ว จึงเอาออกจากรายการนี้ */
+            const _list = document.getElementById('extraDaysList');
+            if (_list) {
+                _list.innerHTML = '';
+                if (Array.isArray(tr.legs) && tr.legs.length > 2) {
+                    const first = (tr.startDate || '').slice(0, 10);
+                    const seen = {};
+                    tr.legs.forEach(function (L) {
+                        const d = String(L && L.date || '').slice(0, 10);
+                        if (!d || d === first || seen[d]) return;
+                        seen[d] = 1;
+                        if (typeof addExtraDay === 'function') addExtraDay(d);
+                    });
+                }
+                if (typeof onExtraDaysChange === 'function') onExtraDaysChange();
+            }
 
             // ── คืนหมุดต้นทาง-ปลายทางและเส้นทาง ──
             // เดิมคืนแค่ขากลับ ขาไปไม่ได้คืน ผู้ใช้จึงต้องค้นหาและปักหมุดใหม่ทุกครั้งที่กดแก้ไข
