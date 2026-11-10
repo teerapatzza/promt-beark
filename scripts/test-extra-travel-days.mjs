@@ -64,10 +64,14 @@ try {
     "localStorage.setItem('token','x');",
     "const of = window.fetch;",
     "window.fetch = function (u,i) { const s=(typeof u==='string')?u:(u&&u.url)||'';",
+    /* ปลายทางของการ์ด (lat ~13.40) ต้องได้คนละเลขกับเส้นทางวันแรก
+       ไม่งั้นเทสต์แยกไม่ออกว่าใช้หมุดของการ์ดจริง หรือลอกระยะของวันแรกมา */
     "  if (s.indexOf('/map-route')>=0) {",
     "    const q = new URLSearchParams(s.split('?')[1]||'');",
+    "    const near = v => Math.abs(parseFloat(v) - 13.40) < 0.05;",
+    "    const m = (near(q.get('tlat')) || near(q.get('flat'))) ? " + (50 * 1000) + " : " + (KM * 1000) + ";",
     "    return Promise.resolve(new Response(JSON.stringify({ type:'FeatureCollection',",
-    "      features:[{ type:'Feature', properties:{ distance:" + (KM * 1000) + " },",
+    "      features:[{ type:'Feature', properties:{ distance:m },",
     "        geometry:{ type:'LineString', coordinates:[[q.get('flon')*1,q.get('flat')*1],[q.get('tlon')*1,q.get('tlat')*1]] } }] }),",
     "      {status:200,headers:{'Content-Type':'application/json'}}));",
     "  }",
@@ -258,6 +262,77 @@ try {
   await sleep(500);
   ok('ลดวันลงแล้วกลับมาบันทึกได้',
      (await ev('return checkExtraDayLimits();')) === true, '');
+
+  /* ══════════ 9. วันถัดไปไปคนละที่ ══════════
+     10 พ.ย. 2569 — เจ้าของงานสั่งเพิ่มว่า วันที่เพิ่มมาต้องเลือกไปคนละที่ได้ด้วย
+     ไม่ใช่บังคับใช้เส้นทางเดิมอย่างเดียว
+     หมุดของการ์ดต้องเก็บที่ช่องตัวเอง ห้ามไปแตะ geoFrom/geoTo ของเส้นทางหลัก
+     ถ้าทับกันเมื่อไหร่ ค่าน้ำมันของวันแรกจะเพี้ยนตามไปด้วย */
+  await ev('document.querySelectorAll("#extraDaysList .extra-day").forEach(function(r){r.remove();});'
+    + ' const rs=[...document.querySelectorAll("input[name=\\"fuelMethod\\"]")]'
+    + '   .find(function(e){return e.value!=="flat";});'
+    + ' if(rs){ rs.checked=true; rs.dispatchEvent(new Event("change",{bubbles:true})); }'
+    + ' addExtraDay("2026-11-10"); onExtraDaysChange(); return 1;');
+  await sleep(600);
+
+  const hasMode = await ev('return !!document.querySelector("#extraDaysList .extra-day-mode");');
+  ok('การ์ดมีตัวเลือก "ใช้เส้นทางเดิม / ไปคนละที่"', hasMode === true, String(hasMode));
+
+  // สลับไปโหมดคนละที่ แล้วช่องกรอกต้องโผล่
+  await ev('const r=document.querySelector("#extraDaysList .extra-day");'
+    + ' const m=r.querySelector(".extra-day-mode[value=\\"custom\\"]");'
+    + ' m.checked=true; m.dispatchEvent(new Event("change",{bubbles:true})); return 1;');
+  await sleep(500);
+  const fields = await ev('const r=document.querySelector("#extraDaysList .extra-day");'
+    + ' const b=r.querySelector(".extra-day-custom");'
+    + ' return { shown: !!(b && !b.classList.contains("hidden")),'
+    + '          from: !!r.querySelector(".extra-day-from"), to: !!r.querySelector(".extra-day-to") };');
+  ok('เลือก "ไปคนละที่" แล้วมีช่องกรอกจาก-ถึง',
+     fields.shown && fields.from && fields.to, JSON.stringify(fields));
+
+  /* ปักหมุดของการ์ดเอง แล้วให้คิดระยะ — ตัวคิดเส้นทางถูกตรึงไว้ที่ 20 กม.
+     ที่นี่ใช้จุดห่างกว่า เพื่อให้แน่ใจว่ามันคิดจากหมุดของการ์ด ไม่ใช่ลอกของวันแรก */
+  await ev('const r=document.querySelector("#extraDaysList .extra-day");'
+    + ' const f=r.querySelector(".extra-day-from"), t=r.querySelector(".extra-day-to");'
+    + ' f.value="บ้าน 141/36"; f.dataset.lat="13.90"; f.dataset.lng="100.50";'
+    + ' t.value="โรงพยาบาลอีกแห่ง"; t.dataset.lat="13.40"; t.dataset.lng="101.00";'
+    + ' await recalcExtraDay(r); return 1;');
+  await sleep(1500);
+
+  const custom = await ev('const L=buildTravelLegs()||[];'
+    + ' return { n:L.length, legs:L.map(function(x){return x.dir+"@"+x.date+":"+x.to+":"+x.km;}) };');
+  ok('ยังได้ 4 ขาเหมือนเดิม', custom.n === 4, JSON.stringify(custom.legs));
+  ok('ขาของวันที่ 10 ไปที่ใหม่ ไม่ใช่ที่เดิม',
+     /โรงพยาบาลอีกแห่ง/.test(custom.legs[2] || ''), JSON.stringify(custom.legs));
+  ok('ขาของวันแรกยังเป็นที่เดิม',
+     /โรงพยาบาลทดสอบ/.test(custom.legs[0] || ''), JSON.stringify(custom.legs));
+
+  const pins = await ev('const g=getGeo("to");'
+    + ' return { mainTo: g? g.lat+","+g.lng : "ไม่มี" };');
+  ok('หมุดเส้นทางหลักไม่ถูกการ์ดเขียนทับ',
+     pins.mainTo === HOSP.lat + ',' + HOSP.lng, JSON.stringify(pins));
+
+  /* เงิน: วันแรก 2 ขา x 20 กม. + วันที่สอง 2 ขา x ระยะของตัวเอง */
+  const km2 = await ev('const r=document.querySelector("#extraDaysList .extra-day");'
+    + ' return parseFloat(r.dataset.km)||0;');
+  ok('การ์ดเก็บระยะของตัวเองไว้ และต่างจากวันแรก (50 ไม่ใช่ ' + KM + ')',
+     km2 === 50, 'ได้ ' + km2);
+  await ev('calculateTravelTotal(); return 1;');
+  await sleep(400);
+  const money2 = await ev('return window.__lastFuelTotal;');
+  ok('ยอดเงิน = (2x' + KM + ' + 2x' + km2 + ') x ' + RATE,
+     Number(money2) === (2 * KM + 2 * km2) * RATE,
+     'ได้ ' + money2 + ' ควรได้ ' + ((2 * KM + 2 * km2) * RATE));
+
+  // กลับไปใช้เส้นทางเดิม ต้องกลับไปคิดแบบเดิมสนิท
+  await ev('const r=document.querySelector("#extraDaysList .extra-day");'
+    + ' const m=r.querySelector(".extra-day-mode[value=\\"same\\"]");'
+    + ' m.checked=true; m.dispatchEvent(new Event("change",{bubbles:true}));'
+    + ' await new Promise(function(s){setTimeout(s,300);}); calculateTravelTotal(); return 1;');
+  await sleep(900);
+  ok('สลับกลับมาใช้เส้นทางเดิม ยอดกลับเป็น ' + (KM * 4 * RATE),
+     Number(await ev('return window.__lastFuelTotal;')) === KM * 4 * RATE,
+     String(await ev('return window.__lastFuelTotal;')));
 
   ok('ไม่มี error ในหน้าเว็บ', pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '));
 } catch (e) {

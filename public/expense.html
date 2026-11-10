@@ -3010,23 +3010,160 @@
             .sort();
     }
 
-    /** เพิ่มแถววันเดินทาง — เว้นว่างได้ ผู้ใช้กรอกเอง */
+    var _extraDaySeq = 0;
+
+    /** เพิ่มการ์ดวันเดินทาง — เว้นว่างได้ ผู้ใช้กรอกเอง
+     *  ตั้งต้นเป็น "ใช้เส้นทางเดิม" เพราะเป็นเคสที่พบบ่อยสุด กดครั้งเดียวจบ
+     *  ถ้าวันนั้นไปคนละที่ ค่อยสลับโหมดแล้วกรอกเส้นทางของวันนั้นเอง */
     function addExtraDay(preset) {
         var list = document.getElementById('extraDaysList');
         if (!list) return;
+        var n = ++_extraDaySeq;
         var row = document.createElement('div');
-        row.className = 'extra-day flex items-center flex-wrap gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2';
+        row.className = 'extra-day bg-white border border-slate-200 rounded-lg px-3 py-2.5';
         row.innerHTML =
-            '<span class="text-xs font-bold text-slate-600">วันที่</span>'
-          + '<input type="date" class="extra-day-date fld" style="width:170px"'
-          + ' onchange="onExtraDaysChange()">'
-          + '<span class="extra-day-route text-xs text-slate-500"></span>'
-          + '<button type="button" class="ml-auto text-xs text-rose-600 hover:text-rose-800 font-bold"'
-          + ' onclick="this.closest(\'.extra-day\').remove(); onExtraDaysChange();">ลบ</button>';
+            '<div class="flex items-center flex-wrap gap-2">'
+          +   '<span class="text-xs font-bold text-slate-600">วันที่</span>'
+          +   '<input type="date" class="extra-day-date fld" style="width:170px" onchange="onExtraDaysChange()">'
+          +   '<label class="flex items-center gap-1 text-xs cursor-pointer ml-1">'
+          +     '<input type="radio" name="extraDayMode' + n + '" class="extra-day-mode" value="same" checked'
+          +     ' onchange="onExtraDayModeChange(this)"> ใช้เส้นทางเดิม</label>'
+          +   '<label class="flex items-center gap-1 text-xs cursor-pointer">'
+          +     '<input type="radio" name="extraDayMode' + n + '" class="extra-day-mode" value="custom"'
+          +     ' onchange="onExtraDayModeChange(this)"> ไปคนละที่</label>'
+          +   '<button type="button" class="ml-auto text-xs text-rose-600 hover:text-rose-800 font-bold"'
+          +   ' onclick="this.closest(\'.extra-day\').remove(); onExtraDaysChange();">ลบ</button>'
+          + '</div>'
+          + '<div class="extra-day-route text-xs text-slate-500 mt-1"></div>'
+          /* ช่องของวันนี้โดยเฉพาะ หมุดเก็บที่ช่องตัวเอง (dataset.lat/lng)
+             ไม่แตะ geoFrom/geoTo ซึ่งเป็นฐานคิดเงินของวันแรก — กติกาเดียวกับแถว Taxi */
+          + '<div class="extra-day-custom hidden mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">'
+          +   '<div><label class="block text-[11px] font-bold text-emerald-700 mb-0.5">จุดเริ่มต้นของวันนี้</label>'
+          +     '<div class="relative"><input type="text" autocomplete="off"'
+          +       ' class="extra-day-from w-full border border-slate-200 px-2 py-1.5 rounded text-sm outline-none focus:border-emerald-400"'
+          +       ' placeholder="พิมพ์ชื่อสถานที่ แล้วเลือกจากรายการ">'
+          +       '<div class="extra-day-from-sug hidden absolute z-[9100] w-full bg-white border border-slate-200 shadow-xl rounded-xl mt-1 max-h-56 overflow-y-auto"></div></div></div>'
+          +   '<div><label class="block text-[11px] font-bold text-rose-700 mb-0.5">จุดที่รถไปส่งของวันนี้</label>'
+          +     '<div class="relative"><input type="text" autocomplete="off"'
+          +       ' class="extra-day-to w-full border border-slate-200 px-2 py-1.5 rounded text-sm outline-none focus:border-rose-400"'
+          +       ' placeholder="พิมพ์ชื่อสถานที่ แล้วเลือกจากรายการ">'
+          +       '<div class="extra-day-to-sug hidden absolute z-[9100] w-full bg-white border border-slate-200 shadow-xl rounded-xl mt-1 max-h-56 overflow-y-auto"></div></div></div>'
+          +   '<div class="md:col-span-2 flex items-center gap-2">'
+          +     '<button type="button" class="place-chip" onclick="useProfileOnExtraDay(this)">📍 ที่อยู่ในโปรไฟล์</button>'
+          +     '<button type="button" class="place-chip" onclick="copyMainRouteToExtraDay(this)">⇄ เหมือนเส้นทางวันแรก</button>'
+          +     '<span class="extra-day-km text-xs font-bold text-slate-700 ml-auto"></span>'
+          +   '</div>'
+          + '</div>';
         list.appendChild(row);
         var inp = row.querySelector('.extra-day-date');
         if (preset) inp.value = preset;
+        wireExtraDaySearch(row);
         onExtraDaysChange();
+    }
+
+    /** ติดตัวค้นหาสถานที่ให้ช่องของการ์ด ใช้กลไกเดียวกับแถว Taxi ทุกประการ */
+    function wireExtraDaySearch(row) {
+        [['.extra-day-from', '.extra-day-from-sug'], ['.extra-day-to', '.extra-day-to-sug']]
+        .forEach(function (pair) {
+            var input = row.querySelector(pair[0]);
+            var box   = row.querySelector(pair[1]);
+            if (!input || !box || typeof attachSearchTo !== 'function') return;
+            attachSearchTo(input, box, taxiSinkKey(input), function () {
+                // พิมพ์ใหม่ = พิกัดเดิมเป็นของชื่อเก่า ใช้ไม่ได้แล้ว
+                delete this.dataset.lat; delete this.dataset.lng;
+                var r = this.closest('.extra-day');
+                if (r) { delete r.dataset.km; onExtraDaysChange(); }
+            });
+            // เลือกจากรายการแล้วต้องคิดระยะของวันนั้นใหม่ทันที
+            input.addEventListener('change', function () { recalcExtraDay(row); });
+            input.addEventListener('blur', function () { setTimeout(function () { recalcExtraDay(row); }, 400); });
+        });
+    }
+
+    /** สลับโหมดของการ์ด */
+    function onExtraDayModeChange(el) {
+        var row = el.closest('.extra-day');
+        if (!row) return;
+        var custom = el.value === 'custom' && el.checked;
+        var box = row.querySelector('.extra-day-custom');
+        if (box) box.classList.toggle('hidden', !custom);
+        if (!custom) delete row.dataset.km;    // กลับไปใช้ระยะของวันแรก
+        onExtraDaysChange();
+        if (custom) recalcExtraDay(row);
+    }
+
+    /** ดึงที่อยู่โปรไฟล์มาใส่ช่องจุดเริ่มต้นของการ์ด */
+    function useProfileOnExtraDay(btn) {
+        var row = btn.closest('.extra-day');
+        var p = window.__profilePin;
+        var f = row && row.querySelector('.extra-day-from');
+        if (!f) return;
+        if (!p) { alert('โปรไฟล์ยังไม่ได้ปักหมุดที่อยู่ — ไปปักที่หน้าโปรไฟล์ก่อน'); return; }
+        f.value = p.label || ''; f.dataset.lat = p.lat; f.dataset.lng = p.lng;
+        recalcExtraDay(row);
+    }
+
+    /** คัดลอกเส้นทางของวันแรกมาเป็นจุดตั้งต้นให้แก้ต่อ */
+    function copyMainRouteToExtraDay(btn) {
+        var row = btn.closest('.extra-day');
+        var gF = getGeo('from'), gT = getGeo('to');
+        var f = row && row.querySelector('.extra-day-from'), t = row && row.querySelector('.extra-day-to');
+        if (!f || !t) return;
+        if (gF) { f.value = gF.label || document.getElementById('travelFrom').value;
+                  f.dataset.lat = gF.lat; f.dataset.lng = gF.lng; }
+        if (gT) { t.value = gT.label || document.getElementById('travelTo').value;
+                  t.dataset.lat = gT.lat; t.dataset.lng = gT.lng; }
+        recalcExtraDay(row);
+    }
+
+    /** คิดระยะทางของการ์ดนี้จากหมุดของตัวเอง เก็บไว้ที่ row.dataset.km */
+    async function recalcExtraDay(row) {
+        if (!row) return;
+        var mode = row.querySelector('.extra-day-mode[value="custom"]');
+        var label = row.querySelector('.extra-day-km');
+        if (!mode || !mode.checked) { delete row.dataset.km; onExtraDaysChange(); return; }
+        var f = row.querySelector('.extra-day-from'), t = row.querySelector('.extra-day-to');
+        var a = f && f.dataset.lat ? { lat: +f.dataset.lat, lng: +f.dataset.lng } : null;
+        var b = t && t.dataset.lat ? { lat: +t.dataset.lat, lng: +t.dataset.lng } : null;
+        if (!a || !b) {
+            delete row.dataset.km;
+            if (label) label.textContent = 'ยังปักหมุดไม่ครบสองจุด';
+            onExtraDaysChange(); return;
+        }
+        if (label) label.textContent = 'กำลังคิดระยะทาง...';
+        try {
+            var leg = await routeLeg(a, b);
+            row.dataset.km = String(leg.km);
+            if (label) label.textContent = 'ระยะทาง ' + leg.km + ' กม./เที่ยว';
+        } catch (e) {
+            delete row.dataset.km;
+            if (label) label.textContent = 'คิดระยะทางไม่สำเร็จ — ลองใหม่อีกครั้ง';
+        }
+        onExtraDaysChange();
+    }
+
+    /** ข้อมูลของทุกการ์ด เรียงตามวัน — ที่เดียวที่อ่านการ์ดออกมาเป็นข้อมูล */
+    function extraDayRows() {
+        var seen = {};
+        return Array.from(document.querySelectorAll('#extraDaysList .extra-day'))
+            .map(function (r) {
+                var mode = r.querySelector('.extra-day-mode[value="custom"]');
+                var f = r.querySelector('.extra-day-from'), t = r.querySelector('.extra-day-to');
+                return {
+                    el: r,
+                    date: (r.querySelector('.extra-day-date') || {}).value || '',
+                    custom: !!(mode && mode.checked),
+                    from: f ? f.value.trim() : '', to: t ? t.value.trim() : '',
+                    fromGeo: (f && f.dataset.lat) ? { lat:+f.dataset.lat, lng:+f.dataset.lng, label:f.value.trim() } : null,
+                    toGeo:   (t && t.dataset.lat) ? { lat:+t.dataset.lat, lng:+t.dataset.lng, label:t.value.trim() } : null,
+                    km: parseFloat(r.dataset.km) || 0
+                };
+            })
+            .filter(function (d) {
+                if (!d.date || seen[d.date]) return false;
+                seen[d.date] = 1; return true;
+            })
+            .sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
     }
 
     /** เรียกทุกครั้งที่แถววันเปลี่ยน — อัปเดตคำอธิบายและคิดเงินใหม่ */
@@ -3039,10 +3176,22 @@
         if (hint) hint.textContent = days.length
             ? 'เพิ่มอีก ' + days.length + ' วัน — รวมเดินทาง ' + (days.length + 1) + ' วัน'
             : 'ไม่มี — ใบนี้เดินทางวันเดียว';
-        // บอกเส้นทางที่แถวนั้นจะใช้ ให้เห็นชัดว่าไม่ได้ต้องกรอกเส้นทางซ้ำ
+        /* บอกเส้นทางที่การ์ดนั้นจะใช้ ให้เห็นชัดว่าไม่ต้องกรอกซ้ำ
+           การ์ดที่เลือก "ไปคนละที่" ต้องไม่ขึ้นเส้นทางของวันแรก ไม่งั้นอ่านแล้วสับสน
+           ว่าตกลงวันนั้นไปที่ไหนกันแน่ (เจอตอนเปิดดูด้วยตา 10 พ.ย. 2569) */
         document.querySelectorAll('#extraDaysList .extra-day').forEach(function (r) {
             var el = r.querySelector('.extra-day-route');
-            if (el) el.textContent = (from && to)
+            if (!el) return;
+            var cm = r.querySelector('.extra-day-mode[value="custom"]');
+            if (cm && cm.checked) {
+                var t2 = (r.querySelector('.extra-day-to') || {}).value || '';
+                var k2 = parseFloat(r.dataset.km) || 0;
+                el.textContent = t2
+                    ? 'วันนี้ไป ' + t2.trim() + (k2 ? '  (' + k2 + ' กม./เที่ยว)' : '  — ยังไม่ได้คิดระยะทาง')
+                    : 'วันนี้ไปคนละที่ — กรอกเส้นทางด้านล่าง';
+                return;
+            }
+            el.textContent = (from && to)
                 ? 'ไป-กลับ ' + from + ' ↔ ' + to + (km ? '  (' + km + ' กม./เที่ยว)' : '')
                 : 'ใช้เส้นทางเดิมของใบนี้';
         });
@@ -3176,9 +3325,20 @@
             };
         };
         var legs = [mk('ขาไป', d0), mk('ขากลับ', dEnd)];
-        days.forEach(function (d) {
-            legs.push(mk('ขาไป', d));
-            legs.push(mk('ขากลับ', d));
+        /* การ์ดที่เลือก "ไปคนละที่" ใช้เส้นทางและระยะของตัวเอง
+           เส้นทางของวันนั้นยังไม่ถูกเก็บเป็นเส้น (path) เพราะหน้าแผนที่วาดได้จากหมุดสองจุด
+           ที่สำคัญคือระยะทางต้องเป็นของวันนั้นจริง ไม่ใช่ลอกของวันแรก ไม่งั้นเงินผิด */
+        extraDayRows().forEach(function (d) {
+            if (!d.custom) {
+                legs.push(mk('ขาไป', d.date));
+                legs.push(mk('ขากลับ', d.date));
+                return;
+            }
+            var km = d.km || 0;
+            legs.push({ dir:'ขาไป', date:d.date, from:d.from, to:d.to,
+                        fromGeo:d.fromGeo, toGeo:d.toGeo, km:km, path:null, route:null });
+            legs.push({ dir:'ขากลับ', date:d.date, from:d.to, to:d.from,
+                        fromGeo:d.toGeo, toGeo:d.fromGeo, km:km, path:null, route:null });
         });
         return legs;
     }
@@ -4485,8 +4645,12 @@
         /* วันเดินทางที่เพิ่มเข้ามาใช้เส้นทางเดิม จึงวิ่งเพิ่มอีกวันละ (ขาไป + ขากลับ)
            ถ้าไม่บวกตรงนี้ ยอดในฟอร์มจะเป็นของวันเดียว แต่เอกสารพิมพ์ครบทุกวัน
            แล้วสองตัวเลขจะไม่ตรงกัน — เคยพลาดแบบเดียวกันมาแล้วฝั่งเอกสาร */
-        const extraDays = (typeof extraDayDates === 'function') ? extraDayDates().length : 0;
-        if (onReceipt && extraDays > 0) fuelDist += extraDays * (out + ret);
+        if (onReceipt && typeof extraDayRows === 'function') {
+            extraDayRows().forEach(function (d) {
+                // ไปคนละที่ = ใช้ระยะของวันนั้น · ใช้เส้นทางเดิม = ใช้ระยะของวันแรก
+                fuelDist += d.custom ? (d.km * 2) : (out + ret);
+            });
+        }
 
         let fuelTotal = fuelRate * fuelDist;
         let usedFlat = false;
@@ -5914,11 +6078,34 @@
                 if (Array.isArray(tr.legs) && tr.legs.length > 2) {
                     const first = (tr.startDate || '').slice(0, 10);
                     const seen = {};
+                    /* วันไหนที่ปลายทางไม่ตรงกับปลายทางของวันแรก = วันนั้นไปคนละที่
+                       ต้องคืนทั้งโหมด ช่องกรอก หมุด และระยะ ไม่งั้นเปิดมาแก้แล้วบันทึกซ้ำ
+                       ระยะของวันนั้นจะกลายเป็นระยะของวันแรก แล้วเงินเปลี่ยนโดยไม่มีใครรู้ */
+                    const mainTo = tr.toGeo || null;
+                    const samePin = function (a, b) {
+                        return !!a && !!b && Math.abs(a.lat - b.lat) < 1e-6 && Math.abs(a.lng - b.lng) < 1e-6;
+                    };
                     tr.legs.forEach(function (L) {
                         const d = String(L && L.date || '').slice(0, 10);
-                        if (!d || d === first || seen[d]) return;
+                        if (!d || d === first || seen[d] || L.dir !== 'ขาไป') return;
                         seen[d] = 1;
-                        if (typeof addExtraDay === 'function') addExtraDay(d);
+                        if (typeof addExtraDay !== 'function') return;
+                        addExtraDay(d);
+                        const row = document.querySelector('#extraDaysList .extra-day:last-child');
+                        if (!row) return;
+                        if (samePin(L.toGeo, mainTo)) return;      // วันนั้นใช้เส้นทางเดิม
+                        const m = row.querySelector('.extra-day-mode[value="custom"]');
+                        if (m) { m.checked = true; onExtraDayModeChange(m); }
+                        const f = row.querySelector('.extra-day-from');
+                        const t = row.querySelector('.extra-day-to');
+                        if (f && L.fromGeo) { f.value = L.from || ''; f.dataset.lat = L.fromGeo.lat; f.dataset.lng = L.fromGeo.lng; }
+                        if (t && L.toGeo)   { t.value = L.to   || ''; t.dataset.lat = L.toGeo.lat;   t.dataset.lng = L.toGeo.lng; }
+                        // ใช้ระยะที่บันทึกไว้ ไม่ไปขอคิดใหม่ ตัวเลขจะได้ตรงกับใบที่เคยพิมพ์
+                        if (L.km) {
+                            row.dataset.km = String(L.km);
+                            const lab = row.querySelector('.extra-day-km');
+                            if (lab) lab.textContent = 'ระยะทาง ' + L.km + ' กม./เที่ยว';
+                        }
                     });
                 }
                 if (typeof onExtraDaysChange === 'function') onExtraDaysChange();
