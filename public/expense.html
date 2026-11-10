@@ -82,6 +82,15 @@
             font-family: inherit; color: #1e293b; transition: border-color .15s, box-shadow .15s;
         }
         .fld:focus { border-color: #60a5fa; box-shadow: 0 0 0 3px rgba(96,165,250,.15); }
+        /* ปุ่มเล็กเหนือช่องค้นหาแผนที่ — ดึงที่อยู่จากโปรไฟล์ / คัดลอกหมุดจากอีกช่อง
+           ทำให้ดูเป็นปุ่มช่วยเหลือ ไม่ใช่ปุ่มหลัก จะได้ไม่แย่งสายตาจากช่องกรอก */
+        .place-chip {
+            font-size: 11px; line-height: 1.5; padding: 1px 8px; border-radius: 999px;
+            border: 1px solid #cbd5e1; color: #475569; background: #fff;
+            white-space: nowrap; cursor: pointer; transition: background .12s, border-color .12s;
+        }
+        .place-chip:hover { background: #f1f5f9; border-color: #94a3b8; color: #1e293b; }
+        .place-chip:active { background: #e2e8f0; }
 
         /* ปุ่มสองตัวเลือกแบบสลับ แทน dropdown ที่ต้องกดสองครั้ง */
         .seg { display: inline-flex; background: #f1f5f9; padding: 3px; border-radius: 10px; gap: 3px; }
@@ -780,7 +789,10 @@
                         <div id="legOutRouteBox" class="hidden mt-2 pt-3 border-t border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div class="md:col-span-2 -mb-1"><span class="text-xs font-bold text-slate-600" id="legOutRouteTitle">เส้นทางของขาไป</span><span class="text-xs text-slate-400"> — กรอกเส้นทางที่รถวิ่งจริง ระบบใช้สองหมุดนี้คิดระยะทาง และดูว่าอยู่ในเขต กทม.ปริมณฑลหรือไม่</span></div>
                             <div>
-                                <label class="block text-xs font-bold text-emerald-700 mb-1">จุดเริ่มต้น <span class="text-rose-500">*</span></label>
+                                <div class="flex items-center flex-wrap gap-1.5 mb-1">
+                                    <label class="text-xs font-bold text-emerald-700">จุดเริ่มต้น <span class="text-rose-500">*</span></label>
+                                    <button type="button" onclick="usePlaceFromProfile('from')" class="place-chip">📍 ที่อยู่ในโปรไฟล์</button>
+                                </div>
                                 <div class="relative">
                                     <input type="text" id="travelFrom" autocomplete="off" placeholder="พิมพ์ชื่อสถานที่ แล้วเลือกจากรายการ"
                                         class="w-full border-2 border-white p-3 rounded-lg text-sm shadow-sm focus:border-emerald-400 outline-none">
@@ -835,7 +847,11 @@
                         <div id="legBackCarBox" class="hidden pl-6 pb-3">
                             <div id="returnDiffWrap" class="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 <div>
-                                    <label class="block text-xs font-bold text-violet-700 mb-1">จุดเริ่มต้นขากลับ</label>
+                                    <div class="flex items-center flex-wrap gap-1.5 mb-1">
+                                        <label class="text-xs font-bold text-violet-700">จุดเริ่มต้นขากลับ</label>
+                                        <button type="button" onclick="copyPlaceFrom('to','retfrom')" class="place-chip">⇄ เหมือนจุดที่รถไปส่ง</button>
+                                        <button type="button" onclick="usePlaceFromProfile('retfrom')" class="place-chip">📍 ที่อยู่ในโปรไฟล์</button>
+                                    </div>
                                     <div class="relative">
                                         <input type="text" id="travelReturnFrom" autocomplete="off" placeholder="ว่าง = ออกจากจุดที่รถไปส่งขาไป"
                                             class="w-full border-2 border-white p-3 rounded-lg text-sm shadow-sm focus:border-violet-400 outline-none"
@@ -845,7 +861,11 @@
                                     <p class="text-xs text-slate-400 mt-1" id="returnFromHint">เว้นว่างไว้ได้ ถ้าออกเดินทางกลับจากจุดที่รถไปส่งขาไป</p>
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-bold text-violet-700 mb-1">ปลายทางขากลับ</label>
+                                    <div class="flex items-center flex-wrap gap-1.5 mb-1">
+                                        <label class="text-xs font-bold text-violet-700">ปลายทางขากลับ</label>
+                                        <button type="button" onclick="copyPlaceFrom('from','ret')" class="place-chip">⇄ เหมือนจุดเริ่มต้น</button>
+                                        <button type="button" onclick="usePlaceFromProfile('ret')" class="place-chip">📍 ที่อยู่ในโปรไฟล์</button>
+                                    </div>
                                     <div class="relative">
                                         <input type="text" id="travelReturnTo" autocomplete="off" placeholder="ว่าง = กลับที่จุดเริ่มต้น"
                                             class="w-full border-2 border-white p-3 rounded-lg text-sm shadow-sm focus:border-violet-400 outline-none"
@@ -2923,29 +2943,90 @@
      * ถ้าโปรไฟล์มีพิกัดที่ยืนยันไว้แล้ว ใช้เลย (แม่นที่สุด)
      * ถ้ายังไม่มี ค้นหาจากที่อยู่แบบไล่ลำดับ ซอย -> ถนน -> ตำบล
      */
-    async function setOriginFromProfile(p) {
-        const input = document.getElementById('travelFrom');
-        const hint  = document.getElementById('fromHint');
-        if (!input) return;
+    /* ══════════ ปุ่มดึงที่อยู่จากโปรไฟล์ / คัดลอกหมุด ══════════
+       10 พ.ย. 2569 — เจ้าของงานตั้งที่อยู่ 141/36 ไว้ในโปรไฟล์พร้อมปักหมุดแล้ว
+       แต่เอามาใส่ช่องค้นหาแผนที่ช่องอื่นไม่ได้เลย ต้องพิมพ์ชื่อให้ระบบค้นใหม่
 
-        // ไม่ใส่คำว่า "ที่พัก" ซ้ำ เพราะมีตัวเลือก ที่พัก/ที่ทำงาน อยู่ด้านบนแล้ว
-        // ใส่คำนำหน้า ซอย/ถนน ให้ชัด ไม่งั้นจะอ่านเป็น "141/36 สุขสวัสดิ์ 55 สุขสวัสดิ์"
-        // ซึ่งดูไม่ออกว่าอันไหนซอยอันไหนถนน
-        const isBkk = /กรุงเทพ/.test(p.prov || '');
+       ทั้งสองปุ่มต้อง **คัดลอกพิกัดตรง ๆ ห้ามค้นหาใหม่**
+       ถ้าค้นใหม่ หมุดจะคลาดจากที่ตั้งใจไปเล็กน้อย แล้วระยะทางที่ใช้คิดเงินจะเพี้ยน */
+
+    /** ช่องกรอกของแต่ละหมุด ใช้ชื่อเดียวกับที่ attachPlaceSearch/pointHint ใช้ */
+    function placeInputOf(which) {
+        return document.getElementById(
+            which === 'from' ? 'travelFrom' : which === 'to' ? 'travelTo'
+            : which === 'retfrom' ? 'travelReturnFrom' : 'travelReturnTo');
+    }
+
+    /** เอาที่อยู่ + หมุดจากโปรไฟล์มาใส่ช่องที่ระบุ
+     *  คืน false เมื่อโปรไฟล์ยังไม่ได้ปักหมุด — ต้องไม่ปักหมุดมั่วและต้องไม่พัง */
+    function usePlaceFromProfile(which) {
+        const p = window.__profilePin;
+        const input = placeInputOf(which);
+        if (!input) return false;
+        if (!p || !isFinite(p.lat) || !isFinite(p.lng)) {
+            pointHint(which, '<span class="text-amber-600">โปรไฟล์ยังไม่ได้ปักหมุดที่อยู่ — '
+                + 'ไปปักที่หน้าโปรไฟล์ก่อน หรือพิมพ์ค้นหาเอง</span>');
+            return false;
+        }
+        input.value = p.label || '';
+        setPoint(which, p.lat, p.lng, p.label, p.precision, 'profile');
+        pointHint(which, p.precision === 'exact'
+            ? '<span class="text-emerald-600 font-bold">ใช้หมุดที่ยืนยันไว้ในโปรไฟล์</span>'
+            : '<span class="text-amber-600">ใช้พิกัดจากโปรไฟล์ (ยังไม่ยืนยัน) — ลากหมุดปรับได้</span>');
+        if (typeof syncReturnDiff === 'function') syncReturnDiff();
+        if (typeof updateReturnPlaceholders === 'function') updateReturnPlaceholders();
+        return true;
+    }
+
+    /** คัดลอกทั้งข้อความและหมุดจากช่องหนึ่งไปอีกช่อง
+     *  ใช้พิกัดชุดเดิมเป๊ะ ไม่ค้นใหม่ ระยะทางของสองขาจึงเท่ากันแน่นอน */
+    function copyPlaceFrom(src, dst) {
+        const g = getGeo(src);
+        const input = placeInputOf(dst);
+        if (!input) return false;
+        if (!g || !isFinite(g.lat) || !isFinite(g.lng)) {
+            pointHint(dst, '<span class="text-amber-600">ช่องต้นทางยังไม่มีหมุด '
+                + 'ให้ปักหมุดช่องนั้นก่อน</span>');
+            return false;
+        }
+        input.value = g.label || input.value || '';
+        setPoint(dst, g.lat, g.lng, g.label, g.precision, g.source);
+        pointHint(dst, '<span class="text-emerald-600 font-bold">ใช้หมุดชุดเดียวกับ'
+            + (src === 'from' ? 'จุดเริ่มต้น' : 'ช่องต้นทาง') + '</span>');
+        if (typeof syncReturnDiff === 'function') syncReturnDiff();
+        if (typeof updateReturnPlaceholders === 'function') updateReturnPlaceholders();
+        return true;
+    }
+
+    /** ข้อความที่อยู่สำหรับช่องค้นหาแผนที่ — ที่เดียวที่ประกอบข้อความนี้
+     *  ไม่ใส่คำว่า "ที่พัก" ซ้ำ เพราะมีตัวเลือก ที่พัก/ที่ทำงาน อยู่ด้านบนแล้ว
+     *  ใส่คำนำหน้า ซอย/ถนน ให้ชัด ไม่งั้นจะอ่านเป็น "141/36 สุขสวัสดิ์ 55 สุขสวัสดิ์"
+     *  ซึ่งดูไม่ออกว่าอันไหนซอยอันไหนถนน */
+    function profileAddrLabel(p) {
+        const q = p || {};
+        const isBkk = /กรุงเทพ/.test(q.prov || '');
         // ที่อยู่บางรายการเก็บคำว่า "ซอย"/"ถนน" มาในตัวข้อความแล้ว เติมซ้ำจะได้ "ซอยซอย..."
         const withPfx = (word, v) => {
             const t = String(v || '').trim();
             return !t ? '' : (t.startsWith(word) ? t : word + t);
         };
-        const label = [
-            p.no   ? p.no : '',
-            withPfx('ซอย', p.soi),
-            withPfx('ถนน', p.road)
+        return [
+            q.no   ? q.no : '',
+            withPfx('ซอย', q.soi),
+            withPfx('ถนน', q.road)
         ].filter(Boolean).join(' ') || [
-            p.sub  ? (isBkk ? 'แขวง' : 'ตำบล') + p.sub  : '',
-            p.dist ? (isBkk ? 'เขต'  : 'อำเภอ') + p.dist : '',
-            p.prov || ''
+            q.sub  ? (isBkk ? 'แขวง' : 'ตำบล') + q.sub  : '',
+            q.dist ? (isBkk ? 'เขต'  : 'อำเภอ') + q.dist : '',
+            q.prov || ''
         ].filter(Boolean).join(' ');
+    }
+
+    async function setOriginFromProfile(p) {
+        const input = document.getElementById('travelFrom');
+        const hint  = document.getElementById('fromHint');
+        if (!input) return;
+
+        const label = profileAddrLabel(p);
         input.value = label;
         // เก็บที่อยู่แยกส่วนไว้ด้วย เอกสารจะได้แสดงแยก เลขที่ / ซอย / ถนน ได้
         window.__fromAddrParts = { no: p.no || '', soi: p.soi || '', road: p.road || '',
@@ -3403,6 +3484,17 @@
             no: p.no || '', soi: p.soi || '', road: p.road || '',
             sub: p.sub || '', dist: p.dist || '', prov: p.prov || '', zip: p.zip || ''
         };
+        /* หมุดที่ผู้ใช้ปักไว้ในโปรไฟล์ — เก็บแยกจากที่อยู่เพราะปุ่ม "ที่อยู่ในโปรไฟล์"
+           ต้องเอาพิกัดตัวนี้ไปใส่ช่องค้นหาช่องไหนก็ได้ ไม่ใช่แค่ช่องจุดเริ่มต้น
+           10 พ.ย. 2569 เจ้าของงานแจ้งว่าตั้งที่อยู่พร้อมหมุดไว้แล้ว แต่เอามาใช้ช่องอื่นไม่ได้เลย */
+        window.__profilePin = (p.lat && p.lng) ? {
+            lat: parseFloat(p.lat), lng: parseFloat(p.lng),
+            label: profileAddrLabel(p),
+            // source 'user' = ผู้ใช้ลากหมุดเอง ถือว่ายืนยันแล้ว แม่นกว่าผลค้นหา
+            precision: (p.geo && p.geo.source === 'user') ? 'exact'
+                       : ((p.geo && p.geo.precision) || 'search'),
+            source: (p.geo && p.geo.source) || 'profile'
+        } : null;
         // ถ้ากำลังใช้ที่อยู่เฉพาะใบนี้อยู่ อย่าเขียนทับสิ่งที่ผู้ใช้ตั้งไว้
         if (!document.getElementById('addrOverride')?.checked) restoreProfileAddr();
 
