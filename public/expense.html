@@ -3365,7 +3365,35 @@
                 route: out ? routeInfo : (retInfo || routeInfo)
             };
         };
-        var legs = [mk('ขาไป', d0), mk('ขากลับ', dEnd)];
+
+        /* ขากลับของวันแรกอาจไม่ได้กลับที่เดิม (กรณีพิเศษ "ขากลับไปคนละที่")
+           เช่น บ้าน -> ดอนเมือง แล้วขากลับ ดอนเมือง -> ที่ทำงาน
+           ของเดิมสลับ to->from เสมอ ขาที่บันทึกจึงเขียนปลายทางเป็นบ้าน
+           ระยะถูกแต่ชื่อสถานที่ผิด -> ใบรับรองพิมพ์ผิด แผนที่วาดผิดจุด
+           เจอ 16 พ.ย. 2569 ตอนเจ้าของงานกดเล่นบนเซิร์ฟเวอร์ทดลอง
+
+           กติกาเดียวกับที่หน้าแผนที่ใช้: ต้องติ๊กไปคนละที่ และต้องมีหมุดจริง
+           วันที่เพิ่มมาไม่เกี่ยว เพราะเป็นไป-กลับจบในวันเดียว */
+        var mainRet = mk('ขากลับ', dEnd);
+        var rd = returnIsDifferent && returnIsDifferent();
+        var okGeo = function (g) { return !!g && isFinite(g.lat) && isFinite(g.lng); };
+        if (rd && okGeo(geoRetFrom)) {
+            mainRet.fromGeo = geoRetFrom;
+            mainRet.from = (document.getElementById('travelReturnFrom')?.value || '').trim()
+                           || geoRetFrom.label || mainRet.from;
+        }
+        if (rd && okGeo(geoRet)) {
+            mainRet.toGeo = geoRet;
+            mainRet.to = (document.getElementById('travelReturnTo')?.value || '').trim()
+                         || geoRet.label || mainRet.to;
+        }
+        if (rd) {
+            // ขากลับคนละทางมีเส้นทางของตัวเอง ไม่ใช่เส้นทางขาไปกลับหัว
+            mainRet.path  = Array.isArray(retPath) ? retPath : mainRet.path;
+            mainRet.route = retInfo || mainRet.route;
+        }
+
+        var legs = [mk('ขาไป', d0), mainRet];
         /* การ์ดที่เลือก "ไปคนละที่" ใช้เส้นทางและระยะของตัวเอง
            เส้นทางของวันนั้นยังไม่ถูกเก็บเป็นเส้น (path) เพราะหน้าแผนที่วาดได้จากหมุดสองจุด
            ที่สำคัญคือระยะทางต้องเป็นของวันนั้นจริง ไม่ใช่ลอกของวันแรก ไม่งั้นเงินผิด */

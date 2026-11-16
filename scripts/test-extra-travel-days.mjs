@@ -334,6 +334,47 @@ try {
      Number(await ev('return window.__lastFuelTotal;')) === KM * 4 * RATE,
      String(await ev('return window.__lastFuelTotal;')));
 
+  /* ══════════ 10. กรณีพิเศษ + เพิ่มวันเดินทาง ══════════
+     16 พ.ย. 2569 — เจ้าของงานกดเล่นบนเซิร์ฟเวอร์ทดลองแล้วเจอว่า
+     ใบที่ตั้งขากลับไป "ที่ทำงาน สรพ." (คนละที่กับบ้าน) แล้วเพิ่มวันเดินทางด้วย
+     ขาที่บันทึกลง _travel.legs เขียนปลายทางขากลับเป็น "บ้าน" ไม่ใช่ "ที่ทำงาน"
+     ระยะทางถูก แต่ชื่อสถานที่ผิด -> ใบรับรองพิมพ์ผิด และแผนที่วาดผิดจุด
+
+     ต้นเหตุคือ buildTravelLegs() สลับ to->from เสมอ โดยไม่ดู returnTo/returnGeo */
+  const WORK = { lat: 13.8613, lng: 100.5203, label: 'ที่ทำงาน สรพ.' };
+  await ev('document.querySelectorAll("#extraDaysList .extra-day").forEach(function(r){r.remove();});'
+    + ' const sp=document.getElementById("tripModeSpecial");'
+    + ' if (sp) { sp.checked=true; sp.dispatchEvent(new Event("change",{bubbles:true})); }'
+    + ' ["legOutCar","legBackCar"].forEach(function(i){ const e=document.getElementById(i);'
+    + '   if (e && !e.checked) { e.checked=true; e.dispatchEvent(new Event("change",{bubbles:true})); } });'
+    + ' return 1;');
+  await sleep(900);
+  await ev('document.getElementById("travelReturnTo").value=' + JSON.stringify(WORK.label) + ';'
+    + ' setPoint("ret",' + WORK.lat + ',' + WORK.lng + ',' + JSON.stringify(WORK.label) + ',"exact","user");'
+    + ' syncReturnDiff(); await recalcRoute(false); return 1;');
+  await sleep(1500);
+  await ev('addExtraDay("2026-11-10"); onExtraDaysChange(); return 1;');
+  await sleep(600);
+
+  const sp = await ev('const L=buildTravelLegs()||[];'
+    + ' return { n:L.length, ret:L[1]||null,'
+    + '   all:L.map(function(x){return x.dir+"@"+x.date+":"+x.to;}) };');
+  ok('กรณีพิเศษ: ขากลับของวันแรกต้องไปที่ที่ระบุไว้ ไม่ใช่กลับบ้าน',
+     sp.ret && sp.ret.to === WORK.label, JSON.stringify(sp.all));
+  ok('กรณีพิเศษ: หมุดปลายทางขากลับต้องเป็นของที่ที่ระบุไว้',
+     sp.ret && sp.ret.toGeo && Math.abs(sp.ret.toGeo.lat - WORK.lat) < 1e-6,
+     JSON.stringify(sp.ret && sp.ret.toGeo));
+  ok('วันที่เพิ่มมายังกลับบ้านตามเดิม (ไป-กลับในวันเดียว)',
+     sp.all[3] && /141\/36|บ้าน/.test(sp.all[3]), JSON.stringify(sp.all));
+
+  // ล้างกลับสู่เคสปกติ ไม่ให้ค้างไปรบกวนการรันซ้ำ
+  await ev('document.getElementById("travelReturnTo").value="";'
+    + ' document.querySelectorAll("#extraDaysList .extra-day").forEach(function(r){r.remove();});'
+    + ' const sp2=document.getElementById("tripModeSpecial");'
+    + ' if (sp2) { sp2.checked=false; sp2.dispatchEvent(new Event("change",{bubbles:true})); }'
+    + ' syncReturnDiff(); onExtraDaysChange(); return 1;');
+  await sleep(700);
+
   ok('ไม่มี error ในหน้าเว็บ', pageErrors.length === 0, pageErrors.slice(0, 2).join(' | '));
 } catch (e) {
   console.error('  ตก    ' + e.message);
