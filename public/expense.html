@@ -904,8 +904,8 @@
                          ทำแนวเดียวกับรายการเที่ยว Taxi ที่กดเพิ่มแถวได้
                          ผู้ใช้จะได้เห็นรูปแบบเดียวทั้งหน้า ไม่ต้องเรียนรู้สองแบบ -->
                     <div id="extraDaysBox" class="mb-3">
-                        <div class="flex items-center flex-wrap gap-2 mb-1.5">
-                            <span class="text-sm font-bold text-slate-800">ไปกลับเส้นทางเดิมอีกวัน</span>
+                        <div class="flex items-baseline flex-wrap gap-2 mb-2">
+                            <span class="text-sm font-bold text-slate-800">เดินทางอีกวันในใบเดียวกัน</span>
                             <span class="text-xs text-slate-400" id="extraDaysHint">ไม่มี — ใบนี้เดินทางวันเดียว</span>
                         </div>
                         <div id="extraDaysList" class="space-y-2"></div>
@@ -3019,40 +3019,75 @@
         var list = document.getElementById('extraDaysList');
         if (!list) return;
         var n = ++_extraDaySeq;
+        /* หน้าตาต้องเป็นชุดเดียวกับการ์ดขาไป/ขากลับที่มีอยู่แล้ว
+           ของเดิมผมทำเป็นแถวบาง ๆ คนละน้ำหนักกับการ์ดอื่น เจ้าของงานทักว่าอ่านแล้วสะดุด
+           จึงยึดชุดเดิมทุกชิ้น: กรอบ border-2 · หัวการ์ดมีเส้นคั่น · แถวติ๊ก py-1.5
+           · กล่องเส้นทางคั่นด้วย border-t · ช่องกรอก border-2 border-white p-3 shadow-sm
+           ใช้สีฟ้า (sky) เป็นสีที่สาม ต่อจากขาไป (emerald) และขากลับ (violet)
+           เพื่อให้รู้ว่าเป็นคนละวัน ไม่ใช่ขาของวันเดิม */
         var row = document.createElement('div');
-        row.className = 'extra-day bg-white border border-slate-200 rounded-lg px-3 py-2.5';
+        row.className = 'extra-day bg-white rounded-xl border-2 border-sky-200 p-4 mb-4';
+        var inputCls = 'w-full border-2 border-white p-3 rounded-lg text-sm shadow-sm outline-none';
+        var sugCls = 'hidden absolute z-[9100] w-full bg-white border border-slate-200 shadow-xl'
+                   + ' rounded-xl mt-1 max-h-64 overflow-y-auto overscroll-contain';
         row.innerHTML =
-            '<div class="flex items-center flex-wrap gap-2">'
-          +   '<span class="text-xs font-bold text-slate-600">วันที่</span>'
-          +   '<input type="date" class="extra-day-date fld" style="width:170px" onchange="onExtraDaysChange()">'
-          +   '<label class="flex items-center gap-1 text-xs cursor-pointer ml-1">'
-          +     '<input type="radio" name="extraDayMode' + n + '" class="extra-day-mode" value="same" checked'
-          +     ' onchange="onExtraDayModeChange(this)"> ใช้เส้นทางเดิม</label>'
-          +   '<label class="flex items-center gap-1 text-xs cursor-pointer">'
-          +     '<input type="radio" name="extraDayMode' + n + '" class="extra-day-mode" value="custom"'
-          +     ' onchange="onExtraDayModeChange(this)"> ไปคนละที่</label>'
-          +   '<button type="button" class="ml-auto text-xs text-rose-600 hover:text-rose-800 font-bold"'
-          +   ' onclick="this.closest(\'.extra-day\').remove(); onExtraDaysChange();">ลบ</button>'
+            '<div class="flex items-baseline gap-2 mb-3 pb-2 border-b border-sky-100">'
+          +   '<span class="text-sm font-bold text-sky-800">วันเดินทางเพิ่มเติม</span>'
+          +   '<span class="text-xs text-slate-400 extra-day-caption">ยังไม่ได้ระบุวันที่</span>'
+          +   '<button type="button" class="ml-auto text-xs font-bold text-rose-600 hover:text-rose-800"'
+          +   ' onclick="this.closest(\'.extra-day\').remove(); onExtraDaysChange();">ลบวันนี้</button>'
           + '</div>'
-          + '<div class="extra-day-route text-xs text-slate-500 mt-1"></div>'
+
+          + '<div class="flex items-center gap-2 text-sm py-1.5">'
+          +   '<span class="font-semibold text-slate-700">วันที่เดินทาง</span>'
+          +   '<input type="date" class="extra-day-date fld" style="width:170px" onchange="onExtraDaysChange()">'
+          + '</div>'
+
+          + '<label class="flex items-center gap-2 text-sm cursor-pointer py-1.5">'
+          +   '<input type="radio" name="extraDayMode' + n + '" class="extra-day-mode w-4 h-4" value="same"'
+          +   ' checked onchange="onExtraDayModeChange(this)">'
+          +   '<span class="font-semibold text-slate-700">ใช้เส้นทางเดิม</span>'
+          +   '<span class="text-xs text-slate-400 extra-day-route"></span>'
+          + '</label>'
+          + '<label class="flex items-center gap-2 text-sm cursor-pointer py-1.5">'
+          +   '<input type="radio" name="extraDayMode' + n + '" class="extra-day-mode w-4 h-4" value="custom"'
+          +   ' onchange="onExtraDayModeChange(this)">'
+          +   '<span class="font-semibold text-slate-700">ไปคนละที่</span>'
+          +   '<span class="text-xs text-slate-400">วันนี้ไปที่อื่น กรอกเส้นทางเอง</span>'
+          + '</label>'
+
           /* ช่องของวันนี้โดยเฉพาะ หมุดเก็บที่ช่องตัวเอง (dataset.lat/lng)
              ไม่แตะ geoFrom/geoTo ซึ่งเป็นฐานคิดเงินของวันแรก — กติกาเดียวกับแถว Taxi */
-          + '<div class="extra-day-custom hidden mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">'
-          +   '<div><label class="block text-[11px] font-bold text-emerald-700 mb-0.5">จุดเริ่มต้นของวันนี้</label>'
-          +     '<div class="relative"><input type="text" autocomplete="off"'
-          +       ' class="extra-day-from w-full border border-slate-200 px-2 py-1.5 rounded text-sm outline-none focus:border-emerald-400"'
-          +       ' placeholder="พิมพ์ชื่อสถานที่ แล้วเลือกจากรายการ">'
-          +       '<div class="extra-day-from-sug hidden absolute z-[9100] w-full bg-white border border-slate-200 shadow-xl rounded-xl mt-1 max-h-56 overflow-y-auto"></div></div></div>'
-          +   '<div><label class="block text-[11px] font-bold text-rose-700 mb-0.5">จุดที่รถไปส่งของวันนี้</label>'
-          +     '<div class="relative"><input type="text" autocomplete="off"'
-          +       ' class="extra-day-to w-full border border-slate-200 px-2 py-1.5 rounded text-sm outline-none focus:border-rose-400"'
-          +       ' placeholder="พิมพ์ชื่อสถานที่ แล้วเลือกจากรายการ">'
-          +       '<div class="extra-day-to-sug hidden absolute z-[9100] w-full bg-white border border-slate-200 shadow-xl rounded-xl mt-1 max-h-56 overflow-y-auto"></div></div></div>'
-          +   '<div class="md:col-span-2 flex items-center gap-2">'
-          +     '<button type="button" class="place-chip" onclick="useProfileOnExtraDay(this)">📍 ที่อยู่ในโปรไฟล์</button>'
-          +     '<button type="button" class="place-chip" onclick="copyMainRouteToExtraDay(this)">⇄ เหมือนเส้นทางวันแรก</button>'
-          +     '<span class="extra-day-km text-xs font-bold text-slate-700 ml-auto"></span>'
+          + '<div class="extra-day-custom hidden mt-2 pt-3 border-t border-slate-100'
+          +      ' grid grid-cols-1 md:grid-cols-2 gap-3">'
+          +   '<div class="md:col-span-2 -mb-1">'
+          +     '<span class="text-xs font-bold text-slate-600">เส้นทางของวันนี้</span>'
+          +     '<span class="text-xs text-slate-400"> — กรอกเส้นทางที่รถวิ่งจริงในวันนี้ '
+          +       'ระบบใช้สองหมุดนี้คิดระยะทางของวันนี้แยกจากวันแรก</span>'
           +   '</div>'
+          +   '<div>'
+          +     '<div class="flex items-center flex-wrap gap-1.5 mb-1">'
+          +       '<label class="text-xs font-bold text-emerald-700">จุดเริ่มต้น</label>'
+          +       '<button type="button" class="place-chip" onclick="useProfileOnExtraDay(this)">📍 ที่อยู่ในโปรไฟล์</button>'
+          +     '</div>'
+          +     '<div class="relative">'
+          +       '<input type="text" autocomplete="off" placeholder="พิมพ์ชื่อสถานที่ แล้วเลือกจากรายการ"'
+          +       ' class="extra-day-from ' + inputCls + ' focus:border-emerald-400">'
+          +       '<div class="extra-day-from-sug ' + sugCls + '"></div>'
+          +     '</div>'
+          +   '</div>'
+          +   '<div>'
+          +     '<div class="flex items-center flex-wrap gap-1.5 mb-1">'
+          +       '<label class="text-xs font-bold text-rose-700">จุดที่รถไปส่ง</label>'
+          +       '<button type="button" class="place-chip" onclick="copyMainRouteToExtraDay(this)">⇄ เหมือนวันแรก</button>'
+          +     '</div>'
+          +     '<div class="relative">'
+          +       '<input type="text" autocomplete="off" placeholder="พิมพ์ชื่อสถานที่ แล้วเลือกจากรายการ"'
+          +       ' class="extra-day-to ' + inputCls + ' focus:border-rose-400">'
+          +       '<div class="extra-day-to-sug ' + sugCls + '"></div>'
+          +     '</div>'
+          +   '</div>'
+          +   '<p class="md:col-span-2 text-xs font-bold text-slate-600 extra-day-km"></p>'
           + '</div>';
         list.appendChild(row);
         var inp = row.querySelector('.extra-day-date');
@@ -3180,20 +3215,26 @@
            การ์ดที่เลือก "ไปคนละที่" ต้องไม่ขึ้นเส้นทางของวันแรก ไม่งั้นอ่านแล้วสับสน
            ว่าตกลงวันนั้นไปที่ไหนกันแน่ (เจอตอนเปิดดูด้วยตา 10 พ.ย. 2569) */
         document.querySelectorAll('#extraDaysList .extra-day').forEach(function (r) {
+            /* หัวการ์ดบอกวันที่ของการ์ดนั้น แบบเดียวกับการ์ดขาไป/ขากลับ
+               คนกรอกจะได้รู้ว่ากำลังดูการ์ดของวันไหน โดยไม่ต้องอ่านช่องวันที่ */
+            var cap = r.querySelector('.extra-day-caption');
+            if (cap) {
+                var dv = (r.querySelector('.extra-day-date') || {}).value || '';
+                var dd = dv ? new Date(dv + 'T00:00:00') : null;
+                cap.textContent = (dd && !isNaN(dd.getTime()))
+                    ? dd.toLocaleDateString('th-TH', { day:'numeric', month:'short', year:'numeric' })
+                    : 'ยังไม่ได้ระบุวันที่';
+            }
+            /* ข้อความนี้อยู่ในแถวของตัวเลือก "ใช้เส้นทางเดิม" จึงต้องอธิบาย
+               เส้นทางของวันแรกเสมอ ไม่ใช่เส้นทางที่กรอกในโหมดคนละที่
+               ก่อนหน้านี้เขียนข้อมูลของอีกตัวเลือกลงตรงนี้ อ่านแล้วสลับกัน
+               (เจอตอนเปิดดูด้วยตา 16 พ.ย. 2569) ส่วนระยะของโหมดคนละที่
+               แสดงอยู่ที่บรรทัด .extra-day-km ใต้ช่องกรอกอยู่แล้ว */
             var el = r.querySelector('.extra-day-route');
             if (!el) return;
-            var cm = r.querySelector('.extra-day-mode[value="custom"]');
-            if (cm && cm.checked) {
-                var t2 = (r.querySelector('.extra-day-to') || {}).value || '';
-                var k2 = parseFloat(r.dataset.km) || 0;
-                el.textContent = t2
-                    ? 'วันนี้ไป ' + t2.trim() + (k2 ? '  (' + k2 + ' กม./เที่ยว)' : '  — ยังไม่ได้คิดระยะทาง')
-                    : 'วันนี้ไปคนละที่ — กรอกเส้นทางด้านล่าง';
-                return;
-            }
             el.textContent = (from && to)
-                ? 'ไป-กลับ ' + from + ' ↔ ' + to + (km ? '  (' + km + ' กม./เที่ยว)' : '')
-                : 'ใช้เส้นทางเดิมของใบนี้';
+                ? from + ' ↔ ' + to + (km ? '  (' + km + ' กม./เที่ยว)' : '')
+                : 'เส้นทางเดียวกับวันแรกของใบนี้';
         });
         if (typeof checkExtraDayLimits === 'function') checkExtraDayLimits();
         if (typeof calculateTravelTotal === 'function') calculateTravelTotal();
