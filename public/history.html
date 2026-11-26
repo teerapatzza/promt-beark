@@ -1801,13 +1801,41 @@
                 // เริ่มจากขั้นที่ไม่ใหญ่กว่าของเดิม จะได้ไม่ไปขยายใบที่ถูกตั้งค่าไว้แล้ว
                 let i = RC_FIT_STEPS.findIndex(s => s <= start + 0.01);
                 if (i < 0) i = 0;
-                while (page.getBoundingClientRect().height > limit && i < RC_FIT_STEPS.length - 1) {
+
+                /* ── ต้องดูความกว้างด้วย ไม่ใช่แค่ความสูง ──
+                   26 พ.ย. 2569 — พี่ดิว (สรพ.) แจ้งว่า PDF ของ พญ.เอกจิตรา สุขกุล
+                   "หน้ามันตัดไป" เปิดไฟล์จริงแล้วคอลัมน์ "จำนวนเงิน" หายทั้งคอลัมน์
+
+                   วัดได้ว่าพื้นที่ในหน้ากว้าง 678 px แต่ตารางกว้าง 833 px
+                   ล้นออกไป 155 px html2canvas ถ่ายได้แค่เท่าหน้า ส่วนเกินเลยหายไปเงียบ ๆ
+
+                   ต้นเหตุคือที่อยู่ยาวผิดปกติ (ผู้ใช้พิมพ์ที่อยู่ทั้งก้อนรวมคำบอกทาง
+                   ลงช่อง "เลขที่" ช่องเดียว) และบรรทัดที่อยู่ตั้ง white-space:nowrap ไว้
+                   เพื่อกันบั๊กตัวหนังสือซ้อนของ 2.30.3 จึงตัดบรรทัดไม่ได้ ดันตารางทะลุขอบ
+
+                   เลือกแก้ที่นี่แทนการปลด nowrap เพราะปลดแล้วเสี่ยงได้บั๊กตัวหนังสือซ้อน
+                   กลับมา ส่วนการย่อฟอนต์เป็นกลไกเดิมที่ใช้งานมานานแล้ว และใบที่ไม่ล้น
+                   จะไม่ถูกแตะเลยสักขั้น
+
+                   วัดจาก .rc-table เทียบกับพื้นที่ในหน้า (หักช่องไฟซ้ายขวาออกแล้ว)
+                   ไม่ใช้ scrollWidth ของหน้า เพราะ overflow เป็น visible จึงเชื่อไม่ได้ */
+                const pcs = getComputedStyle(page);
+                const innerW = page.clientWidth
+                    - (parseFloat(pcs.paddingLeft) || 0)
+                    - (parseFloat(pcs.paddingRight) || 0);
+                const wideBy = () => (innerW > 0)
+                    ? tbl.getBoundingClientRect().width - innerW : 0;
+
+                while ((page.getBoundingClientRect().height > limit || wideBy() > 1)
+                       && i < RC_FIT_STEPS.length - 1) {
                     i++;
                     tbl.style.fontSize = RC_FIT_STEPS[i] + 'px';
                     shrunk++;
                 }
                 const h = page.getBoundingClientRect().height;
                 if (h > limit) overflow.push({ page: idx + 1, over: Math.round(h - limit) });
+                // ย่อจนเล็กสุดแล้วยังกว้างเกิน ต้องบอกผู้ใช้ ไม่ใช่ปล่อยให้ได้ใบที่ขอบขวาหาย
+                if (wideBy() > 1) overflow.push({ page: idx + 1, wide: Math.round(wideBy()) });
             });
             return { shrunk: shrunk, overflow: overflow };
         }
@@ -2100,9 +2128,26 @@
                 if (fit.shrunk) console.log('[pdf] ย่อใบรับรองให้พอดีหน้า ' + fit.shrunk + ' ขั้น');
                 if (fit.overflow.length) {
                     console.warn('[pdf] ใบรับรองยังเกินหน้า', fit.overflow);
-                    alert('เอกสารยาวเกินหนึ่งหน้า แม้ย่อจนเล็กที่สุดที่ยังอ่านออกแล้ว\n\n'
-                        + 'ใบรับรองค่าพาหนะจะถูกตัดไปหน้าถัดไป\n'
-                        + 'แนะนำให้ลดรายละเอียดกิจกรรมลง หรือแยกเป็นใบเบิกคนละใบ');
+                    /* แยกข้อความสองกรณี เพราะวิธีแก้ของผู้ใช้คนละเรื่องกัน
+                       ยาวเกิน = ลดรายละเอียดกิจกรรม · กว้างเกิน = ที่อยู่ยาวเกินไป
+                       ถ้าใช้ข้อความเดียวกัน คนที่เจอขอบขวาหายจะไปไล่ลบกิจกรรมเปล่า ๆ */
+                    const tooWide = fit.overflow.some(function (o) { return o.wide; });
+                    const tooTall = fit.overflow.some(function (o) { return o.over; });
+                    const NL = String.fromCharCode(10);
+                    let msg = '';
+                    if (tooTall) {
+                        msg += 'เอกสารยาวเกินหนึ่งหน้า แม้ย่อจนเล็กที่สุดที่ยังอ่านออกแล้ว' + NL + NL
+                            +  'ใบรับรองค่าพาหนะจะถูกตัดไปหน้าถัดไป' + NL
+                            +  'แนะนำให้ลดรายละเอียดกิจกรรมลง หรือแยกเป็นใบเบิกคนละใบ';
+                    }
+                    if (tooWide) {
+                        if (msg) msg += NL + NL;
+                        msg += 'เนื้อหากว้างเกินหน้ากระดาษ แม้ย่อจนเล็กที่สุดแล้ว' + NL + NL
+                            +  'ขอบขวาของใบรับรองค่าพาหนะจะถูกตัดหายไป' + NL
+                            +  'มักเกิดจากที่อยู่ยาวเกินไป ลองแยกใส่ช่องซอย ถนน ตำบล อำเภอ'
+                            +  ' แทนการพิมพ์รวมในช่องเลขที่ช่องเดียว';
+                    }
+                    if (msg) alert(msg);
                 }
             } catch (e) {
                 console.warn('[pdf] ย่อให้พอดีหน้าไม่สำเร็จ ใช้ขนาดเดิมต่อ', e);
