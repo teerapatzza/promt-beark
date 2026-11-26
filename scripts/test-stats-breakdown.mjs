@@ -107,6 +107,36 @@ ok('ค่าน้ำมันของใบนี้ 20 กม. x 5', near(b.
    จึงยังเป็นผลรวมสองขาเหมือนเดิม ไม่ผูกกับ carType */
 ok('km ยังเป็นระยะทางรวมสองขาเหมือนเดิม', near(b.km, 20), b.km + ' กม.');
 
+/* ═══ 3ก. ค่าเบี้ยเลี้ยงต้องไม่หายไปจาก Dashboard ═══
+   26 พ.ย. 2569 — ฟอร์มแยกช่อง "ค่าเบี้ยเลี้ยง" ออกจาก "อื่นๆ" แล้ว
+   ยอดใหม่ไปอยู่คีย์ perDiemAmount ถ้าตรงนี้ไม่นับด้วย ยอดรวมบน Dashboard
+   จะน้อยกว่ายอดที่ผู้ใช้เบิกจริง โดยไม่มีใครเห็นว่าหายไปไหน
+
+   server.js:1194 ประกาศชุดคีย์ไว้ตายตัว { fuel hotel taxi air toll parking other }
+   แล้ว Object.keys(cost).forEach บวกทีละคีย์ ถ้าเพิ่มคีย์ perDiem ใหม่ตรงนี้
+   มันจะถูกข้ามเงียบ ๆ เงินก็หายอยู่ดี จึงต้องบวกรวมลงคีย์ other
+   (เป็นวิธีเดียวกับใบ FM-SAM-095-00 ซึ่งมีแถว "ค่าใช้จ่ายอื่นๆ" แถวเดียว) */
+console.log('');
+console.log('═══ 3ก. ค่าเบี้ยเลี้ยงต้องถูกนับด้วย ═══');
+
+const withPerDiem = md('ไป-กลับ', 10, 10, 5, {
+  _costs: { fuelRate: 5, taxiEntries: [], hotelEntries: [],
+            airAmount: 0, tollAmount: 0, parkingAmount: 0,
+            perDiemAmount: 200, otherAmount: 150, otherDesc: 'ค่ารถในสนามบิน' }
+});
+const bp = costBreakdown(withPerDiem);
+ok('เบี้ยเลี้ยง 200 + อื่นๆ 150 ต้องนับครบ 350', near(bp.other, 350), bp.other + ' บาท');
+ok('ไม่มีคีย์ perDiem โผล่มาใหม่ (server.js จะข้ามทิ้ง)',
+   bp.perDiem === undefined, String(bp.perDiem));
+
+const oldLump = md('ไป-กลับ', 10, 10, 5, {
+  _costs: { fuelRate: 5, taxiEntries: [], hotelEntries: [],
+            airAmount: 0, tollAmount: 0, parkingAmount: 0, otherAmount: 350 }
+});
+ok('ใบเก่าที่ยอดก้อนเดียว 350 ได้เท่ากันเป๊ะ',
+   near(costBreakdown(oldLump).other, bp.other),
+   'เก่า ' + costBreakdown(oldLump).other + ' · ใหม่ ' + bp.other);
+
 console.log('');
 console.log('═══ 4. ข้อมูลพิกล ต้องไม่พัง ═══');
 

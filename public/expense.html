@@ -1008,8 +1008,17 @@
                             <label class="block text-xs font-bold text-slate-700 mb-2">3.2 ค่าที่จอดรถ</label>
                             <input type="number" id="parkingCost" placeholder="จำนวนเงิน" class="w-full border p-2 rounded text-sm outline-none focus:border-blue-500" oninput="calculateTravelTotal()">
                         </div>
+                        <!-- 26 พ.ย. 2569 — เดิมเป็นช่องเดียว "ค่าเบี้ยเลี้ยง/อื่นๆ"
+                             เอกสารจึงพิมพ์รวมกันบรรทัดเดียว คนตรวจแยกไม่ออกว่ายอดคืออะไร
+                             แยกเป็นสองช่อง และช่อง "อื่นๆ" ให้ระบุได้ว่าเป็นค่าอะไร
+                             ข้อความที่ระบุจะไปขึ้นในวงเล็บบนใบรายงาน เช่น อื่นๆ (ค่ารถในสนามบิน) -->
+                        <div id="costPerDiemBox" class="bg-white p-3 rounded-lg border border-slate-200">
+                            <label class="block text-xs font-bold text-slate-700 mb-2">3.3 ค่าเบี้ยเลี้ยง</label>
+                            <input type="number" id="perDiemCost" placeholder="จำนวนเงิน" class="w-full border p-2 rounded text-sm outline-none focus:border-blue-500" oninput="calculateTravelTotal()">
+                        </div>
                         <div id="costOtherBox" class="bg-white p-3 rounded-lg border border-slate-200">
-                            <label class="block text-xs font-bold text-slate-700 mb-2">3.3 ค่าเบี้ยเลี้ยง/อื่นๆ</label>
+                            <label class="block text-xs font-bold text-slate-700 mb-2">3.4 อื่นๆ</label>
+                            <input type="text" id="otherDesc" placeholder="ระบุว่าเป็นค่าอะไร เช่น ค่ารถในสนามบิน" class="w-full border p-2 rounded text-sm mb-2 outline-none focus:border-blue-500">
                             <input type="number" id="otherCost" placeholder="จำนวนเงิน" class="w-full border p-2 rounded text-sm outline-none focus:border-blue-500" oninput="calculateTravelTotal()">
                         </div>
                     </div>
@@ -1153,6 +1162,10 @@
                         <div id="breakdownParking" class="hidden flex justify-between items-center py-1">
                             <span class="text-slate-600">🅿️ ค่าที่จอดรถ</span>
                             <span class="font-bold text-slate-800" id="breakdownParkingAmount">0</span>
+                        </div>
+                        <div id="breakdownPerDiem" class="hidden flex justify-between items-center py-1">
+                            <span class="text-slate-600">🍽️ ค่าเบี้ยเลี้ยง</span>
+                            <span class="font-bold text-slate-800" id="breakdownPerDiemAmount">0</span>
                         </div>
                         <div id="breakdownOther" class="hidden flex justify-between items-center py-1">
                             <span class="text-slate-600">📦 ค่าใช้จ่ายอื่นๆ</span>
@@ -4745,8 +4758,10 @@
             ? (parseFloat(document.getElementById('tollCost').value)||0) : 0;
         const parking = onTravel ? (parseFloat(document.getElementById('parkingCost')?.value)||0) : 0;
         const other = onTravel ? (parseFloat(document.getElementById('otherCost').value)||0) : 0;
+        // แยกออกจากช่อง "อื่นๆ" เมื่อ 26 พ.ย. 2569 คิดเงินเหมือนเดิมทุกประการ
+        const perDiem = onTravel ? (parseFloat(document.getElementById('perDiemCost')?.value)||0) : 0;
 
-        const total = hotel + fuelTotal + taxiTotal + air + toll + parking + other;
+        const total = hotel + fuelTotal + taxiTotal + air + toll + parking + perDiem + other;
         document.getElementById('totalAmount').innerHTML = new Intl.NumberFormat('th-TH', { style: 'decimal', minimumFractionDigits: 2 }).format(total) + ' <span class="text-2xl">฿</span>';
         document.getElementById('totalAmount').dataset.value = total;
         if (typeof updateCaseNote === 'function') updateCaseNote(onTravel, onReceipt);
@@ -4777,6 +4792,7 @@
         updateBreakdownItem('breakdownAir', 'breakdownAirAmount', air);
         updateBreakdownItem('breakdownToll', 'breakdownTollAmount', toll);
         updateBreakdownItem('breakdownParking', 'breakdownParkingAmount', parking);
+        updateBreakdownItem('breakdownPerDiem', 'breakdownPerDiemAmount', perDiem);
         updateBreakdownItem('breakdownOther', 'breakdownOtherAmount', other);
 
         // Show/hide breakdown container
@@ -5566,7 +5582,12 @@
                 tollAmount:    window.__flatRateUsed ? 0
                                : (document.getElementById('tollCost')?.value || 0),
                 parkingAmount: document.getElementById('parkingCost')?.value || 0,
-                otherAmount:   document.getElementById('otherCost')?.value   || 0
+                /* perDiemAmount ถูกเก็บทุกครั้ง (เว้นว่างได้ 0) เอกสารใช้ "มีคีย์นี้ไหม"
+                   เป็นตัวแยกใบใหม่ออกจากใบเก่าที่ยังรวมเบี้ยเลี้ยงกับอื่นๆ ไว้ก้อนเดียว
+                   ถ้าวันหลังเอาบรรทัดนี้ออก ใบใหม่จะกลายเป็นใบเก่าทันที */
+                perDiemAmount: document.getElementById('perDiemCost')?.value || 0,
+                otherAmount:   document.getElementById('otherCost')?.value   || 0,
+                otherDesc:     document.getElementById('otherDesc')?.value   || ''
             };
             // ประเภทรถอยู่ในใบรับรองค่าพาหนะเท่านั้น ถ้าหมวดนี้ไม่ได้ติ๊กใบนั้น
             // ช่องจะถูกซ่อน แต่ยังค้างค่าเดิมไว้จากตอนเลือกหมวดอื่น
@@ -6271,6 +6292,11 @@
             document.getElementById('tollCost').value    = c.tollAmount || '';
             document.getElementById('parkingCost').value = c.parkingAmount || '';
             document.getElementById('otherCost').value   = c.otherAmount || '';
+            // ใบเก่าไม่มีสองคีย์นี้ ช่องจึงว่าง ยอดเดิมยังอยู่ครบในช่อง "อื่นๆ" เหมือนที่บันทึกไว้
+            const _pd = document.getElementById('perDiemCost');
+            if (_pd) _pd.value = c.perDiemAmount || '';
+            const _od = document.getElementById('otherDesc');
+            if (_od) _od.value = c.otherDesc || '';
 
             // Taxi entries
             const taxiList = document.getElementById('taxiEntriesList');
@@ -6754,7 +6780,8 @@
        ผูกด้วย listener ที่ document ไม่ได้ไปแก้ฟังก์ชันเดิมสักตัว
        ══════════════════════════════════════════════════════════════════ */
     const PB_BREAKDOWN_ROWS = ['breakdownFuel', 'breakdownHotel', 'breakdownTaxi',
-                               'breakdownAir', 'breakdownToll', 'breakdownParking', 'breakdownOther'];
+                               'breakdownAir', 'breakdownToll', 'breakdownParking',
+                               'breakdownPerDiem', 'breakdownOther'];
 
     /* กดเช็กลิสต์แล้วต้องไปถึงที่หมายจริง
        12 ต.ค. 2569 ผู้ใช้แจ้งว่า "กดตามจุดแต่มันไม่ไป มันมั่ว" วัดแล้วเจอสองสาเหตุ

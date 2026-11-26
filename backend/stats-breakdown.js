@@ -58,7 +58,12 @@ function costBreakdown(md) {
     air:     num(c.airAmount),
     toll:    num(c.tollAmount),
     parking: num(c.parkingAmount),
-    other:   num(c.otherAmount),
+    /* 26 พ.ย. 2569 — ฟอร์มแยกช่อง "ค่าเบี้ยเลี้ยง" (perDiemAmount) ออกจาก "อื่นๆ"
+       ต้องบวกทั้งสองก้อนลงคีย์ other ห้ามเพิ่มคีย์ใหม่
+       เพราะ server.js:1194 ประกาศชุดคีย์ไว้ตายตัวแล้ววนบวกทีละคีย์
+       คีย์ที่ไม่อยู่ในชุดนั้นจะถูกข้ามเงียบ ๆ เงินบน Dashboard จะหายไปโดยไม่มีใครเห็น
+       ใบเก่าไม่มี perDiemAmount ได้ 0 ยอดจึงเท่าเดิมทุกบาท */
+    other:   num(c.otherAmount) + num(c.perDiemAmount),
     km
   };
 }

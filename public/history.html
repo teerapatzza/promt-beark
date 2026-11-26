@@ -963,15 +963,39 @@
                 const parkingTotal = parseFloat(c.parkingAmount || 0);
                 const otherTotal = parseFloat(c.otherAmount || 0);
 
+                /* ── 26 พ.ย. 2569 — แยก "ค่าเบี้ยเลี้ยง" ออกจาก "อื่นๆ" ──
+                   เจ้าของงานเปิดใบจริงแล้วทักว่าข้อ 3 พิมพ์ "ค่าเบี้ยเลี้ยง / อื่นๆ"
+                   รวมอยู่บรรทัดเดียว คนตรวจจึงแยกไม่ออกว่ายอดนั้นคือเบี้ยเลี้ยง
+                   หรือค่าอะไรอย่างอื่น สั่งให้แยกเป็นสองบรรทัด และบรรทัด "อื่นๆ"
+                   ต้องบอกได้ว่าอื่นๆ คืออะไร เช่น "อื่นๆ (ค่ารถในสนามบิน)"
+
+                   ใบที่บันทึกก่อนวันนี้มีแต่ otherAmount ก้อนเดียว ไม่มีข้อมูลให้แยก
+                   จึงใช้ "มีคีย์ perDiemAmount ไหม" เป็นตัวบอกว่าเป็นใบใหม่หรือใบเก่า
+                   ฟอร์มบันทึกคีย์นี้เสมอ (เว้นว่างได้ 0) ใบเก่าจึงไม่มีคีย์นี้แน่นอน
+                   ใบเก่าต้องพิมพ์เหมือนเดิมทุกตัวอักษร ห้ามเปลี่ยนความหมายย้อนหลัง
+                   ของเอกสารที่การเงินอนุมัติไปแล้ว */
+                const hasPerDiemField = (c.perDiemAmount !== undefined && c.perDiemAmount !== null);
+                const perDiemTotal = hasPerDiemField ? parseFloat(c.perDiemAmount || 0) : 0;
+                const otherDescText = String(c.otherDesc == null ? '' : c.otherDesc).trim();
+                const otherLabelText = (function () {
+                    if (!hasPerDiemField) return 'ค่าเบี้ยเลี้ยง / อื่นๆ';
+                    if (!otherDescText) return 'อื่นๆ';
+                    // ป้ายถูกต่อเข้า HTML ตรง ๆ ข้อความมาจากผู้ใช้ จึงต้อง escape ในที่
+                    const esc = String(otherDescText).replace(/[&<>"']/g,
+                        ch => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[ch]));
+                    return 'อื่นๆ (' + esc + ')';
+                })();
+
                 /* ── ข้อ 3 ของใบรายงาน แยกเป็นรายการละบรรทัด ──
-                   ฟอร์มแยกช่อง ค่าทางด่วน / ค่าที่จอดรถ / ค่าเบี้ยเลี้ยง-อื่นๆ ไว้อยู่แล้ว
+                   ฟอร์มแยกช่อง ค่าทางด่วน / ค่าที่จอดรถ / ค่าเบี้ยเลี้ยง / อื่นๆ ไว้อยู่แล้ว
                    แต่เอกสารเคยยุบรวมเป็นก้อนเดียว คนตรวจจึงแยกไม่ออกว่ายอดมาจากอะไรบ้าง
                    ใบรับรองค่าพาหนะแยกให้อยู่แล้ว ใบรายงานก็ควรตรงกัน
                    แบบฟอร์มมีสองบรรทัด ถ้ามีรายการน้อยกว่านั้นก็เว้นว่างไว้ให้เหมือนกระดาษจริง */
                 const reportOtherItems = [
-                    ['ค่าทางด่วน',            tollTotal],
-                    ['ค่าที่จอดรถ',           parkingTotal],
-                    ['ค่าเบี้ยเลี้ยง / อื่นๆ', otherTotal]
+                    ['ค่าทางด่วน',    tollTotal],
+                    ['ค่าที่จอดรถ',   parkingTotal],
+                    ['ค่าเบี้ยเลี้ยง', perDiemTotal],
+                    [otherLabelText,  otherTotal]
                 ].filter(function (it) { return it[1] > 0; });
                 while (reportOtherItems.length < 2) reportOtherItems.push(['', 0]);
 
@@ -1034,7 +1058,11 @@
                     }, 0);
                 }
                 
-                const receiptTotal = taxiTotal + fuelTotal + tollTotal + parkingTotal + otherTotal;
+                /* แบบฟอร์ม FM-SAM-095-00 ของจริงมีแถว "ค่าใช้จ่ายอื่นๆ" แถวเดียว
+                   ไม่มีแถวเบี้ยเลี้ยง จึงบวกสองยอดลงแถวเดิม ไม่เพิ่มแถวในแบบฟอร์มราชการ
+                   ใบเก่า perDiemTotal = 0 ยอดจึงเท่าเดิมทุกบาท */
+                const rcOtherTotal = perDiemTotal + otherTotal;
+                const receiptTotal = taxiTotal + fuelTotal + tollTotal + parkingTotal + rcOtherTotal;
                 const receiptAmtText = getThaiBahtText(receiptTotal);
                 
                 const date1 = new Date(`${tr.startDate}T${tr.startTime||'00:00'}`);
@@ -1463,8 +1491,8 @@
 
                                 ${rcRow('', rcSquare(tollTotal > 0)    + ' ค่าทางด่วน',  tollTotal > 0 ? formatNumber(tollTotal) : '')}
                                 ${rcRow('', rcSquare(parkingTotal > 0) + ' ค่าที่จอดรถ', parkingTotal > 0 ? formatNumber(parkingTotal) : '')}
-                                ${rcRow('', rcSquare(otherTotal > 0)   + ' ค่าใช้จ่ายอื่นๆ (โปรดระบุ) <span style="font-size:11px;">เช่น ค่าที่พัก ค่าอาหาร ค่าเบ็ดเตล็ด กรณีเป็นบิลเงินสด</span>',
-                                        otherTotal > 0 ? formatNumber(otherTotal) : '')}
+                                ${rcRow('', rcSquare(rcOtherTotal > 0)   + ' ค่าใช้จ่ายอื่นๆ (โปรดระบุ) <span style="font-size:11px;">เช่น ค่าที่พัก ค่าอาหาร ค่าเบ็ดเตล็ด กรณีเป็นบิลเงินสด</span>',
+                                        rcOtherTotal > 0 ? formatNumber(rcOtherTotal) : '')}
 
                                 ${rcRow('', addrLinesHtml, '')}
                                 ${rcRow('', '<b>กิจกรรม</b>' + (extraActivities[0] ? ' &nbsp; ' + actSpan(extraActivities[0]) : ''), '')}
@@ -1535,7 +1563,11 @@
                     <tr>
                         <td style="text-align: center; vertical-align: top; padding: 5px 8px; border: 1px solid #000;">${row.date ? formatDateDisplay(row.date) : ''}</td>
                         <td style="padding: 5px 8px; border: 1px solid #000;">${row.description || ''}</td>
-                        <td style="text-align: right; padding: 5px 8px; border: 1px solid #000; font-family: monospace;">${row.amount ? formatNumber(row.amount) : ''}</td>
+                        <!-- เอา font-family: monospace ออกเมื่อ 26 พ.ย. 2569
+                             ใบนี้เคยเป็นใบเดียวในซองที่ตัวเลขเป็นฟอนต์พิมพ์ดีด
+                             ใบ 001-04 และ 095-00 ไม่เคยตั้งฟอนต์ให้ตัวเลขเลย
+                             ปล่อยให้รับฟอนต์ Sarabun ของหน้ากระดาษเหมือนกันทั้งสามใบ -->
+                        <td style="text-align: right; padding: 5px 8px; border: 1px solid #000;">${row.amount ? formatNumber(row.amount) : ''}</td>
                     </tr>
                 `).join('');
 
@@ -1582,11 +1614,15 @@
                             ${grRowsHtml}
                             <tr style="font-weight: bold;">
                                 <td colspan="2" style="text-align: right; border: 1px solid #000; padding: 5px 8px;">รวมทั้งสิ้น</td>
-                                <td style="text-align: right; border: 1px solid #000; padding: 5px 8px; font-family: monospace;">${formatNumber(grTotal)}</td>
+                                <td style="text-align: right; border: 1px solid #000; padding: 5px 8px;">${formatNumber(grTotal)}</td>
                             </tr>
+                            <!-- 26 พ.ย. 2569 — ตัวอักษรจำนวนเงินเคยถูกยัดลงคอลัมน์ "จำนวนเงิน"
+                                 ซึ่งกว้างแค่ 22% ของหน้า ใบนี้จึงดูผิดรูปไปจากอีกสองใบในซองเดียวกัน
+                                 ใบรายงาน (001-04) และใบรับรองค่าพาหนะ (095-00) ใช้แถวเต็มความกว้าง
+                                 จัดกึ่งกลางและครอบวงเล็บทั้งคู่ เจ้าของงานสั่งให้ใบนี้ทำแบบเดียวกัน
+                                 และให้ใช้คำว่า "จำนวนเงินตัวอักษร" ตามใบ 095-00 -->
                             <tr style="font-weight: bold;">
-                                <td colspan="2" style="text-align: right; border: 1px solid #000; padding: 5px 8px;">จำนวนเงินรวมตัวอักษร</td>
-                                <td style="text-align: left; border: 1px solid #000; padding: 5px 8px;">${grAmtText}</td>
+                                <td colspan="3" style="text-align: center; border: 1px solid #000; padding: 5px 8px;">จำนวนเงินตัวอักษร ( ${grAmtText} )</td>
                             </tr>
                         </tbody>
                     </table>
