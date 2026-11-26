@@ -249,16 +249,29 @@ try {
 
   console.log('');
   console.log('=== 6. บันทึกได้ตามปกติ ไม่มีด่านใหม่มาขวาง ===');
+  /* 26 พ.ย. 2569 — รอบแรกเขียนผิดเป็น validateBeforeSave() ซึ่งไม่มีอยู่จริง
+     เงื่อนไข typeof จึงเป็นเท็จ ไม่มีอะไรถูกเรียก แล้วเทสต์รายงานว่า "ผ่าน"
+     ทั้งที่ไม่ได้ทดสอบอะไรเลย ฟังก์ชันจริงชื่อ submitExpense()
+     บทเรียน: เทสต์ที่ห่อด้วย typeof ... === 'function' ต้องยืนยันก่อนว่าชื่อนั้นมีจริง
+     ไม่งั้นได้เทสต์ที่ผ่านตลอดกาลโดยไม่มีใครรู้ */
+  const hasFn = await ev("return typeof submitExpense === 'function';");
+  ok('หาเส้นทางบันทึกเจอจริง (submitExpense)', hasFn === true, String(hasFn));
+
   const blocked = await ev([
-    "let msg = '';",
+    "let msgs = [];",
     "const realAlert = window.alert;",
-    "window.alert = function (m) { msg = String(m); };",
-    "try { if (typeof validateBeforeSave === 'function') validateBeforeSave(); } catch (e) {}",
+    "window.alert = function (m) { msgs.push(String(m)); };",
+    "try { await submitExpense(); } catch (e) { msgs.push('EXCEPTION: ' + e.message); }",
     "window.alert = realAlert;",
-    "return msg;"
+    "return msgs.join(' | ');"
   ].join(NEWLINE));
-  ok('คำเตือนไม่ได้กลายเป็นด่านบล็อกการบันทึก',
-     !/ไม่ตรง|ไม่เท่า/.test(blocked || ''), blocked || '(ไม่มีข้อความ)');
+  /* ใบจำลองนี้กรอกไม่ครบ จึงอาจติดด่านอื่น เช่น วันที่จัดกิจกรรม ซึ่งเป็นเรื่องปกติ
+     สิ่งที่ต้องไม่เกิดคือด่านที่พูดถึง "ยอดไม่ตรงกับค่าที่พัก" ซึ่งเป็นของใหม่วันนี้ */
+  ok('เรียกเส้นทางบันทึกได้จริง มีการตอบกลับ', typeof blocked === 'string',
+     blocked || '(ไม่มีข้อความ)');
+  ok('ไม่มีด่านใหม่เรื่องยอดไม่ตรงมาขวางการบันทึก',
+     !/ไม่เท่ากับค่าที่พัก|ยอดรวมในตาราง/.test(blocked || ''),
+     blocked || '(ไม่มีข้อความ)');
 
   console.log('');
   console.log('=== 7. หัวกล่องต้องบอกตรง ๆ ว่าไม่ได้บวกเข้ายอดเบิก ===');
