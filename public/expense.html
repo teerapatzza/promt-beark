@@ -1061,10 +1061,22 @@
 
                 <div id="generalReceiptSection" class="hidden mt-6 animate-fade-in">
                     <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
-                        <div class="bg-slate-50 px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-                            <h3 class="text-sm font-bold text-blue-900">รายการค่าใช้จ่าย (FM-SAM-003-06)</h3>
+                        <!-- 26 พ.ย. 2569 — เจ้าของงานเปิดหน้านี้แล้วบอกว่า "งง"
+                             เพราะต้องพิมพ์ค่าที่พักสองที่ คือหมวด 1 กับตารางนี้
+                             ตารางนี้คือหน้าตาของเอกสาร ไม่ใช่ช่องคิดเงิน
+                             ถ้าบวกทั้งสองที่ ยอดเบิกจะเด้งเป็นสองเท่า จึงต้องแยกกันต่อไป
+                             แต่ต้องบอกผู้ใช้ให้ชัด ไม่ใช่ปล่อยให้เดาเอง -->
+                        <div class="bg-slate-50 px-5 py-3 border-b border-slate-100 flex items-start justify-between gap-3">
+                            <div>
+                                <h3 class="text-sm font-bold text-blue-900">รายการค่าใช้จ่าย (FM-SAM-003-06)</h3>
+                                <p class="text-xs text-slate-500 mt-0.5 leading-relaxed">
+                                    ตารางนี้คือหน้าตาของเอกสารใบรับรองแทนใบเสร็จรับเงิน
+                                    <b class="text-slate-600">ไม่ได้บวกเข้ายอดเบิก</b>
+                                    — ยอดเบิกคิดจากหมวด 1-3 ด้านบน
+                                </p>
+                            </div>
                             <button type="button" onclick="addGeneralReceiptRow()"
-                                class="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition-colors">
+                                class="flex-none text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 transition-colors">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
                                 </svg>
@@ -1088,6 +1100,12 @@
                             <span class="text-xs text-slate-500 font-semibold">รวมทั้งสิ้น</span>
                             <span class="font-bold text-slate-800 font-mono" id="generalReceiptTotal">0.00 บาท</span>
                         </div>
+                        <!-- เตือนอย่างเดียว ไม่บล็อกการบันทึก
+                             ใบ 470 บนระบบจริงมีค่าที่พัก 3,530 แต่ตารางนี้บอก 1,980
+                             เอกสารสองใบในซองเดียวกันจึงบอกตัวเลขคนละอย่างโดยไม่มีใครรู้
+                             แต่บางใบตั้งใจให้ต่างกันจริง (ส่วนหนึ่งมีใบเสร็จแล้ว) จึงห้ามบังคับ -->
+                        <p id="grHotelMismatch"
+                           class="hidden px-5 py-3 text-xs bg-amber-50 border-t border-amber-200 text-amber-800 leading-relaxed"></p>
                     </div>
                 </div>
 
@@ -4782,6 +4800,11 @@
             }
         };
 
+        /* ค่าที่พักเพิ่งเปลี่ยน จึงเป็นจังหวะเดียวที่ต้องไปอัปเดตแถวในตาราง 003-06
+           วางไว้หลังคิดยอดเสร็จแล้ว และห่อ try ไว้ ถ้าพังก็แค่ไม่เติมให้
+           ฟอร์มกับยอดเงินต้องทำงานต่อได้เสมอ ไม่ว่าของใหม่นี้จะเป็นยังไง */
+        try { syncGeneralReceiptHotelRow(); } catch (e) {}
+
         // เรียกป้ายให้ตรงกับวิธีคิดที่เลือกอยู่ ไม่ให้ขัดกับป้ายเกณฑ์ด้านบน
         const fuelLbl = document.getElementById('breakdownFuelLabel');
         if (fuelLbl) fuelLbl.textContent = usedFlat
@@ -4867,6 +4890,12 @@
             setTimeout(() => { if (routeMap) { routeMap.invalidateSize(); fitRoute(); } }, 150);
         }
         document.getElementById('generalReceiptSection').classList.toggle('hidden', !hasGeneral);
+
+        /* เปลี่ยนหมวดแล้วต้องซิงก์ตาราง 003-06 ทุกครั้ง ไม่ใช่เฉพาะตอนคิดยอด
+           หมวดที่ไม่ออกใบรายงานและใบพาหนะจะไม่มีใครเรียก calculateTravelTotal เลย
+           ถ้าไม่เรียกตรงนี้ แถวค่าที่พักที่ระบบเติมไว้ตอนอยู่หมวดก่อนหน้า
+           จะค้างอยู่ในเอกสารทั้งที่เงินก้อนนั้นไม่ได้อยู่ในใบเบิกนี้แล้ว */
+        try { syncGeneralReceiptHotelRow(); } catch (e) {}
         document.getElementById('descBox').classList.toggle('hidden', !hasNormal || hasTravel);
         document.getElementById('dynamicInputs').classList.toggle('hidden', !hasNormal || hasTravel);
 
@@ -5036,13 +5065,13 @@
         tr.className = 'gr-row';
         tr.innerHTML = `
             <td class="px-3 py-2">
-                <input type="date" class="gr-date w-full border border-slate-200 px-2 py-1.5 rounded text-sm outline-none focus:border-blue-400">
+                <input type="date" class="gr-date w-full border border-slate-200 px-2 py-1.5 rounded text-sm outline-none focus:border-blue-400" oninput="grMarkRowTouched(this)" onchange="grMarkRowTouched(this)">
             </td>
             <td class="px-3 py-2">
-                <input type="text" class="gr-desc w-full border border-slate-200 px-2 py-1.5 rounded text-sm outline-none focus:border-blue-400" placeholder="เช่น ค่าอาหารกลางวัน">
+                <input type="text" class="gr-desc w-full border border-slate-200 px-2 py-1.5 rounded text-sm outline-none focus:border-blue-400" placeholder="เช่น ค่าอาหารกลางวัน" oninput="grMarkRowTouched(this)">
             </td>
             <td class="px-3 py-2">
-                <input type="number" min="0" step="any" class="gr-amt w-full border border-slate-200 px-2 py-1.5 rounded text-sm text-right font-mono outline-none focus:border-blue-400" placeholder="0.00" oninput="calcGeneralReceiptTotal()">
+                <input type="number" min="0" step="any" class="gr-amt w-full border border-slate-200 px-2 py-1.5 rounded text-sm text-right font-mono outline-none focus:border-blue-400" placeholder="0.00" oninput="grMarkRowTouched(this); calcGeneralReceiptTotal()">
             </td>
             <td class="px-2 py-2 text-center">
                 <button type="button" onclick="removeGeneralReceiptRow(this)" class="text-slate-300 hover:text-rose-500 transition-colors p-1">
@@ -5058,6 +5087,131 @@
     function removeGeneralReceiptRow(btn) {
         btn.closest('.gr-row').remove();
         calcGeneralReceiptTotal();
+        updateGrHotelWarning();
+    }
+
+    /* ══════════════════════════════════════════════════════════════════
+       เติมแถวค่าที่พักให้ตาราง FM-SAM-003-06 เอง  (26 พ.ย. 2569)
+       ──────────────────────────────────────────────────────────────────
+       เจ้าของงานเปิดหน้ากรอกแล้วบอกว่า "งง" เพราะต้องพิมพ์ค่าที่พักสองที่
+       นับจากฐานข้อมูลจริง 439 ใบ มี 19 ใบที่ใช้ตารางนี้
+         13 ใบ พิมพ์ค่าที่พักซ้ำสองที่ ตรงกันเป๊ะทั้งข้อความและตัวเลข
+         1 ใบ (id 470) ซ้ำแล้วไม่ตรง ช่องค่าที่พัก 3,530 ตารางบอก 1,980
+       แปลว่าเกือบทุกคนทำงานเดียวกันสองรอบ และพลาดได้โดยไม่มีใครเห็น
+
+       กฎที่ยึด
+         1. สร้างแถวให้เฉพาะตอนตารางยังว่างเปล่าเท่านั้น
+            ตอนเปิดใบเก่ามาแก้ ตารางจะมีแถวที่ผู้ใช้พิมพ์ไว้แล้ว
+            ถ้าไม่กันข้อนี้ จะได้แถวค่าที่พักซ้ำสองแถวในเอกสารทันที
+         2. ผู้ใช้แตะช่องไหนในแถวนั้น = ทั้งแถวเป็นของผู้ใช้ ระบบเลิกยุ่งตลอดไป
+         3. ไม่แตะแถวที่ผู้ใช้เพิ่มเอง และไม่แตะยอดเบิก
+            แถวนี้เป็นแค่ข้อความบนกระดาษ เงินมาจากหมวด 1-3 ด้านบนเท่านั้น
+       ══════════════════════════════════════════════════════════════════ */
+
+    function grMarkRowTouched(el) {
+        const tr = el.closest('.gr-row');
+        if (tr) tr.dataset.auto = '';
+        updateGrHotelWarning();
+    }
+
+    function grHasGeneral() {
+        return (window.currentPdfTemplates || []).includes('GENERAL_RECEIPT');
+    }
+
+    /** ค่าที่พักที่ "มีสิทธิ์" ไปอยู่ในตาราง 003-06 ของหมวดนี้ — ไม่เข้าเงื่อนไขคืน 0
+     *
+     *  26 พ.ย. 2569 — เจ้าของงานถามว่าถ้าสร้างหมวดใหม่เองแล้วติ๊กใบ 003-06
+     *  คู่กับใบอื่น จะทำงานเหมือนกันไหม ตรวจแล้วพบว่ารุ่นแรกดูแค่ว่ามีใบ 003-06
+     *  ซึ่งไม่พอ เพราะในระบบเดิมค่าที่พักผูกกับใบรายงาน (REPORT) อีกชั้น
+     *      show('secHotel', hasReport)              ไม่ติ๊ก REPORT = ซ่อนกล่อง
+     *      const hotel = onReport ? getHotelTotal() : 0;   และไม่นับเป็นเงิน
+     *  ช่องที่ถูกซ่อนไม่ได้ถูกล้างค่า ของค้างจากหมวดก่อนหน้าจึงยังอยู่
+     *  หมวดอย่าง "ใบพาหนะ + 003-06" จึงได้แถวค่าที่พักผีขึ้นมาในเอกสาร
+     *  ทั้งที่เงินก้อนนั้นไม่ได้อยู่ในใบเบิกนี้เลย (เทสต์ test-gr-custom-categories)
+     *
+     *  ผูกกับชนิดใบ ไม่ใช่ชื่อหมวด หมวดใหม่ที่แอดมินสร้างเองจึงทำงานถูกต้อง
+     *  ตามที่ติ๊ก โดยไม่ต้องกลับมาแก้โค้ดอีก */
+    function grHotelTotalForTable() {
+        const t = window.currentPdfTemplates || [];
+        if (!t.includes('GENERAL_RECEIPT')) return 0;   // ไม่มีตารางให้ใส่
+        if (!t.includes('REPORT')) return 0;            // ค่าที่พักไม่ใช่เงินของใบนี้
+        return (typeof getHotelTotal === 'function') ? getHotelTotal() : 0;
+    }
+
+    /** ข้อความแถวค่าที่พัก เขียนตามที่ผู้ใช้จริงพิมพ์กันมา
+     *  เช่น "ค่าที่พัก : อีโคบลิส รีสอร์ท 990 บาท x 2 คืน" */
+    function grHotelRowText() {
+        const name = (document.getElementById('hotelName')?.value || '').trim();
+        const parts = [];
+        document.querySelectorAll('#accommodationEntriesContainer .accommodation-entry').forEach(e => {
+            const rate = parseFloat(e.querySelector('.accommodation-rate')?.value) || 0;
+            const nights = parseFloat(e.querySelector('.accommodation-nights')?.value) || 0;
+            if (rate > 0 && nights > 0) {
+                parts.push(rate.toLocaleString() + ' บาท x ' + nights + ' คืน');
+            }
+        });
+        if (!parts.length) return '';
+        return 'ค่าที่พัก' + (name ? ' : ' + name : '') + ' ' + parts.join(', ');
+    }
+
+    function syncGeneralReceiptHotelRow() {
+        const tbody = document.getElementById('generalReceiptBody');
+        if (!tbody) return;
+
+        /* ไม่ตัดจบตั้งแต่ต้นแม้หมวดนี้จะไม่ออกใบ 003-06
+           เพราะต้องมีจังหวะเก็บกวาดแถวที่ระบบเคยเติมไว้ตอนอยู่หมวดก่อนหน้า
+           grHotelTotalForTable() คืน 0 ให้เอง จึงไม่มีทางสร้างแถวใหม่ได้ */
+        const hotelTotal = grHotelTotalForTable();
+        let auto = tbody.querySelector('.gr-row[data-auto="1"]');
+
+        if (!(hotelTotal > 0)) {
+            if (auto) { auto.remove(); calcGeneralReceiptTotal(); }
+            updateGrHotelWarning();
+            return;
+        }
+
+        if (!auto) {
+            // กฎข้อ 1 — สร้างให้เฉพาะตอนตารางยังว่าง
+            if (tbody.querySelectorAll('.gr-row').length > 0) { updateGrHotelWarning(); return; }
+            addGeneralReceiptRow();
+            auto = tbody.querySelector('.gr-row:last-child');
+            if (!auto) return;
+            auto.dataset.auto = '1';
+        }
+
+        // ตั้งค่าด้วยการกำหนด .value ตรง ๆ ไม่ยิง event จึงไม่ไปปลุก grMarkRowTouched
+        const d = auto.querySelector('.gr-date');
+        const s = auto.querySelector('.gr-desc');
+        const a = auto.querySelector('.gr-amt');
+        if (d) d.value = document.getElementById('dateStart')?.value || '';
+        if (s) s.value = grHotelRowText();
+        if (a) a.value = String(hotelTotal);
+        calcGeneralReceiptTotal();
+        updateGrHotelWarning();
+    }
+
+    /** เตือนอย่างเดียว ไม่บล็อก — บางใบตั้งใจให้ต่างกันจริง */
+    function updateGrHotelWarning() {
+        const box = document.getElementById('grHotelMismatch');
+        if (!box) return;
+        const hide = () => box.classList.add('hidden');
+        if (!grHasGeneral()) return hide();
+
+        // ใช้ตัวเดียวกับที่ตัดสินว่าค่าที่พักเข้าตารางได้ไหม
+        // ไม่งั้นหมวดที่ซ่อนกล่องค่าที่พักไว้จะขึ้นคำเตือนจากตัวเลขที่ผู้ใช้มองไม่เห็น
+        const hotelTotal = grHotelTotalForTable();
+        if (!(hotelTotal > 0)) return hide();
+
+        let grTotal = 0;
+        document.querySelectorAll('#generalReceiptBody .gr-amt')
+            .forEach(i => { grTotal += parseFloat(i.value) || 0; });
+        if (Math.abs(grTotal - hotelTotal) <= 0.01) return hide();
+
+        const f = n => n.toLocaleString(undefined, { minimumFractionDigits: 2 });
+        box.textContent = 'ยอดรวมในตารางนี้ ' + f(grTotal) +
+            ' บาท ไม่เท่ากับค่าที่พักในหมวด 1 ซึ่งเป็น ' + f(hotelTotal) +
+            ' บาท — ถ้าตั้งใจให้ต่างกัน (เช่น ค่าที่พักบางส่วนมีใบเสร็จอยู่แล้ว) ข้ามข้อความนี้ได้ บันทึกได้ตามปกติ';
+        box.classList.remove('hidden');
     }
 
     function calcGeneralReceiptTotal() {
